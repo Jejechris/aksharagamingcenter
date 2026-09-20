@@ -125,14 +125,23 @@ export default function AutonomousFulfillmentPage() {
     setTimeout(() => setToastMsg(""), 3500);
   };
 
-  // Fetch orders
+  // Fetch orders with localStorage hydration
   const fetchOrders = useCallback(async () => {
     try {
+      try {
+        const stored = localStorage.getItem("akshara_autonomous_orders_v1");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) setOrders(parsed);
+        }
+      } catch(e) {}
+
       const res = await fetch("/api/orders/autonomous");
       const json = await res.json();
       if (json.status === "success" && Array.isArray(json.orders)) {
         setOrders(json.orders);
         setStats(json.stats);
+        try { localStorage.setItem("akshara_autonomous_orders_v1", JSON.stringify(json.orders)); } catch(e) {}
       }
     } catch (e) {
       console.error("Failed to fetch autonomous orders:", e);
@@ -141,15 +150,24 @@ export default function AutonomousFulfillmentPage() {
     }
   }, []);
 
-  // Fetch vault items
+  // Fetch vault items with localStorage hydration
   const fetchVault = useCallback(async () => {
     setIsVaultLoading(true);
     try {
+      try {
+        const stored = localStorage.getItem("akshara_inventory_vault_v1");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) setVaultItems(parsed);
+        }
+      } catch(e) {}
+
       const res = await fetch("/api/inventory/vault");
       const json = await res.json();
       if (json.status === "success" && Array.isArray(json.items)) {
         setVaultItems(json.items);
         setVaultStats(json.stats);
+        try { localStorage.setItem("akshara_inventory_vault_v1", JSON.stringify(json.items)); } catch(e) {}
       }
     } catch (e) {
       console.error("Failed to fetch vault items:", e);

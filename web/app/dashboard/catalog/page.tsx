@@ -8,7 +8,7 @@ import {
   Check, Filter, Search, Sliders, ChevronDown, ChevronUp,
   Cpu, Trash2, ArrowUpRight, ShieldAlert, Sparkles, Star,
   Award, QrCode, Zap, Layers, BarChart3, CheckCircle2, Clock, Save,
-  Pencil, FileText
+  Pencil, FileText, Download, Upload, Database
 } from 'lucide-react';
 import { getG2GSellerUrl, getG2GGameCategoryUrl } from '@/lib/g2g';
 
@@ -107,6 +107,20 @@ export default function CatalogDashboardPage() {
   const [drawerSetSelected, setDrawerSetSelected] = useState(true);
   const [isSubmittingDrawerSeller, setIsSubmittingDrawerSeller] = useState(false);
 
+  // Permanent persistence synchronization across localStorage & serverless API
+  const syncAndSaveGames = (nextGames: CatalogGame[]) => {
+    setGames(nextGames);
+    try {
+      localStorage.setItem('akshara_custom_catalog_v2', JSON.stringify(nextGames));
+      // Proactively keep serverless warm with latest state
+      fetch('/api/catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextGames)
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
   const handleAddSellerToGame = async (gameId: string, gameTitle: string) => {
     if (!drawerSellerName.trim()) return;
     setIsSubmittingDrawerSeller(true);
@@ -134,10 +148,12 @@ export default function CatalogDashboardPage() {
 
       if (res.ok) {
         const json = await res.json();
-        setGames(prev => prev.map(g => g.id === gameId ? json.data : g));
+        const updated = json.data;
+        const next = games.map(g => g.id === gameId ? updated : g);
+        syncAndSaveGames(next);
         setDrawerAddSellerGameId(null);
         setDrawerSellerName('');
-        showToast(`✅ Seller "${drawerSellerName}" berhasil ditambahkan ke ${gameTitle} & tersimpan ke database!`);
+        showToast(`✅ Seller "${drawerSellerName}" berhasil ditambahkan ke ${gameTitle} & tersimpan permanen!`);
       } else {
         showToast('Gagal menambahkan seller.', 'error');
       }
@@ -161,7 +177,9 @@ export default function CatalogDashboardPage() {
       });
       if (res.ok) {
         const json = await res.json();
-        setGames(prev => prev.map(g => g.id === gameId ? json.data : g));
+        const updated = json.data;
+        const next = games.map(g => g.id === gameId ? updated : g);
+        syncAndSaveGames(next);
         showToast(`Seller "${sellerName}" telah dihapus.`);
       }
     } catch (e) {
@@ -209,7 +227,9 @@ export default function CatalogDashboardPage() {
 
       if (res.ok) {
         const json = await res.json();
-        setGames(prev => prev.map(g => g.id === editingSellerData.gameId ? json.data : g));
+        const updated = json.data;
+        const next = games.map(g => g.id === editingSellerData.gameId ? updated : g);
+        syncAndSaveGames(next);
         showToast(`✅ Seller "${editingSellerData.sellerName}" berhasil diperbarui & disimpan permanen!`);
         setEditingSellerData(null);
       } else {
@@ -225,10 +245,43 @@ export default function CatalogDashboardPage() {
   const fetchCatalog = async () => {
     setLoading(true);
     try {
+      // 1. Instant hydration from localStorage
+      let localGames: CatalogGame[] = [];
+      try {
+        const stored = localStorage.getItem('akshara_custom_catalog_v2');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localGames = parsed;
+            setGames(parsed);
+          }
+        }
+      } catch (e) {}
+
+      // 2. Fetch server catalog
       const res = await fetch('/api/catalog');
       const json = await res.json();
       if (json.status === 'success' && Array.isArray(json.data)) {
-        setGames(json.data);
+        const serverGames: CatalogGame[] = json.data;
+
+        if (localGames.length > 0) {
+          // Merge: Preserve user-added games that server might have lost on cold-start
+          const merged = [...serverGames];
+          for (const localG of localGames) {
+            const idx = merged.findIndex(s => s.id === localG.id || s.title.toLowerCase().trim() === localG.title.toLowerCase().trim());
+            if (idx === -1) {
+              merged.unshift(localG);
+            } else {
+              // If local has custom sellers or different price, prefer local
+              if (localG.selling_price_shopee_idr !== merged[idx].selling_price_shopee_idr || (localG.sellers && localG.sellers.length > merged[idx].sellers.length)) {
+                merged[idx] = localG;
+              }
+            }
+          }
+          syncAndSaveGames(merged);
+        } else {
+          syncAndSaveGames(serverGames);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch catalog:', err);
@@ -281,7 +334,9 @@ export default function CatalogDashboardPage() {
 
       if (res.ok) {
         const json = await res.json();
-        setGames(prev => prev.map(g => g.id === gameId ? json.data : g));
+        const updated = json.data;
+        const next = games.map(g => g.id === gameId ? updated : g);
+        syncAndSaveGames(next);
         showToast('Supplier G2G berhasil dialihkan! Margin laba telah diperbarui.');
       } else {
         showToast('Gagal mengubah supplier.', 'error');
@@ -304,9 +359,13 @@ export default function CatalogDashboardPage() {
 
       if (res.ok) {
         const json = await res.json();
-        setGames(prev => prev.map(g => g.id === gameId ? json.data : g));
+        const updated = json.data;
+        const next = games.map(g => g.id === gameId ? updated : g);
+        syncAndSaveGames(next);
         setEditingPriceId(null);
         showToast('Harga jual Shopee berhasil diperbarui.');
+      } else {
+        showToast('Gagal memperbarui harga.', 'error');
       }
     } catch (e) {
       showToast('Gagal memperbarui harga.', 'error');
@@ -316,11 +375,10 @@ export default function CatalogDashboardPage() {
   const handleDeleteGame = async (gameId: string, title: string) => {
     if (!confirm(`Hapus "${title}" dari Radar Portofolio?`)) return;
     try {
-      const res = await fetch(`/api/catalog?id=${gameId}`, { method: 'DELETE' });
-      if (res.ok) {
-        setGames(prev => prev.filter(g => g.id !== gameId));
-        showToast(`Game "${title}" telah dihapus.`);
-      }
+      const next = games.filter(g => g.id !== gameId);
+      syncAndSaveGames(next);
+      await fetch(`/api/catalog?id=${gameId}`, { method: 'DELETE' });
+      showToast(`Game "${title}" telah dihapus.`);
     } catch (e) {
       showToast('Gagal menghapus game.', 'error');
     }
@@ -361,6 +419,37 @@ export default function CatalogDashboardPage() {
     }
   };
 
+  const handleExportBackup = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(games, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `akshara_catalog_backup_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast("💾 File backup katalog berhasil diunduh!");
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          syncAndSaveGames(parsed);
+          showToast(`📥 Berhasil memulihkan ${parsed.length} game dari backup!`);
+        } else {
+          showToast("Format file JSON tidak valid.", "error");
+        }
+      } catch (err) {
+        showToast("Gagal membaca file JSON.", "error");
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle) return;
@@ -397,12 +486,19 @@ export default function CatalogDashboardPage() {
       });
 
       if (res.ok) {
+        const json = await res.json();
+        const createdGame = json.data;
+        if (createdGame) {
+          const next = [createdGame, ...games.filter(g => g.id !== createdGame.id && g.title.toLowerCase().trim() !== createdGame.title.toLowerCase().trim())];
+          syncAndSaveGames(next);
+        }
         setShowAddModal(false);
         setNewTitle('');
         setResearchedSellers([]);
         setResearchSummary('');
-        fetchCatalog();
-        showToast(`Game "${newTitle}" berhasil ditambahkan ke portofolio!`);
+        showToast(`Game "${newTitle}" berhasil ditambahkan & tersimpan permanen!`);
+      } else {
+        showToast('Gagal menambahkan game baru ke server.', 'error');
       }
     } catch (e) {
       showToast('Gagal menambahkan game baru.', 'error');
@@ -501,12 +597,32 @@ export default function CatalogDashboardPage() {
           </div>
         </div>
         
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="v0-btn-primary whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4 mr-2" /> Tambah Game Baru
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="cursor-pointer px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/80 text-xs font-mono flex items-center gap-1.5 transition-all">
+            <Upload className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Restore JSON</span>
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImportBackup}
+              className="hidden"
+            />
+          </label>
+          <button
+            onClick={handleExportBackup}
+            className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/80 text-xs font-mono flex items-center gap-1.5 transition-all"
+            title="Unduh cadangan data katalog JSON"
+          >
+            <Download className="w-3.5 h-3.5 text-amber-400" />
+            <span>Backup JSON</span>
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="v0-btn-primary whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Tambah Game Baru
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

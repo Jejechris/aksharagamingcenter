@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 const DATA_FILE = path.resolve(process.cwd(), "data", "inventory_vault.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "inventory_vault.json");
 const REPLICA_FILE = path.resolve("C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\inventory_vault.json");
+const TMP_FILE = path.resolve(os.tmpdir(), "akshara_inventory_vault.json");
 
 export interface VaultItem {
   id: string;
@@ -26,16 +28,35 @@ export interface VaultItem {
 let inMemoryVaultCache: VaultItem[] | null = null;
 
 function getVault(): VaultItem[] {
+  // 1. Prioritize warm in-memory cache
+  if (inMemoryVaultCache !== null && inMemoryVaultCache.length > 0) {
+    return inMemoryVaultCache;
+  }
+
+  // 2. Read from writable /tmp directory
+  if (fs.existsSync(TMP_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(TMP_FILE, "utf-8"));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        inMemoryVaultCache = parsed;
+        return parsed;
+      }
+    } catch (e) {
+      console.error("Error reading TMP_FILE vault:", e);
+    }
+  }
+
+  // 3. Fallback to bundled seed or local output
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+    if (fs.existsSync(OUTPUT_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"));
       if (Array.isArray(parsed) && parsed.length > 0) {
         inMemoryVaultCache = parsed;
         return parsed;
       }
     }
-    if (fs.existsSync(OUTPUT_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"));
+    if (fs.existsSync(DATA_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
       if (Array.isArray(parsed) && parsed.length > 0) {
         inMemoryVaultCache = parsed;
         return parsed;
@@ -56,6 +77,11 @@ function getVault(): VaultItem[] {
 function saveVault(items: VaultItem[]) {
   inMemoryVaultCache = items;
   const content = JSON.stringify(items, null, 2);
+  try {
+    fs.writeFileSync(TMP_FILE, content, "utf-8");
+  } catch (e) {
+    console.warn("Could not write to TMP_FILE vault:", e);
+  }
   try {
     fs.writeFileSync(DATA_FILE, content, "utf-8");
   } catch (e) {

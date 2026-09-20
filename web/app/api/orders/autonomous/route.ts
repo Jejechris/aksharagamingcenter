@@ -1,25 +1,46 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 const DATA_FILE = path.resolve(process.cwd(), "data", "autonomous_orders.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "autonomous_orders.json");
 const REPLICA_FILE = path.resolve("C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\autonomous_orders.json");
+const TMP_FILE = path.resolve(os.tmpdir(), "akshara_autonomous_orders.json");
 
 // In-memory cache fallback for serverless environments (Vercel)
 let inMemoryOrdersCache: any[] | null = null;
 
 function getOrders(): any[] {
+  // 1. Prioritize warm in-memory cache
+  if (inMemoryOrdersCache !== null && inMemoryOrdersCache.length > 0) {
+    return inMemoryOrdersCache;
+  }
+
+  // 2. Read from writable /tmp directory
+  if (fs.existsSync(TMP_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(TMP_FILE, "utf-8"));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        inMemoryOrdersCache = parsed;
+        return parsed;
+      }
+    } catch (e) {
+      console.error("Error reading TMP_FILE orders:", e);
+    }
+  }
+
+  // 3. Fallback to bundled seed or local output
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+    if (fs.existsSync(OUTPUT_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"));
       if (Array.isArray(parsed) && parsed.length > 0) {
         inMemoryOrdersCache = parsed;
         return parsed;
       }
     }
-    if (fs.existsSync(OUTPUT_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"));
+    if (fs.existsSync(DATA_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
       if (Array.isArray(parsed) && parsed.length > 0) {
         inMemoryOrdersCache = parsed;
         return parsed;
@@ -40,6 +61,11 @@ function getOrders(): any[] {
 function saveOrders(orders: any[]) {
   inMemoryOrdersCache = orders;
   const content = JSON.stringify(orders, null, 2);
+  try {
+    fs.writeFileSync(TMP_FILE, content, "utf-8");
+  } catch (e) {
+    console.warn("Could not write to TMP_FILE orders:", e);
+  }
   try {
     fs.writeFileSync(DATA_FILE, content, "utf-8");
   } catch (e) {

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 const catalogPath = path.resolve(process.cwd(), "..", "output", "active_catalog.json");
 const bundledCatalogPath = path.resolve(process.cwd(), "data", "active_catalog.json");
+const tmpCatalogPath = path.resolve(os.tmpdir(), "akshara_active_catalog.json");
 
 // Secondary replica paths if present on this machine
 const replicaOutputPath = "C:\\Users\\jesen\\Desktop\\scrt\\output\\active_catalog.json";
@@ -13,7 +15,26 @@ const replicaWebPath = "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\active_catal
 let inMemoryCatalogCache: any[] | null = null;
 
 function getCatalogData(): any[] {
-  // Always read from file if available to prevent stale cache across processes/tabs
+  // 1. If in-memory cache is populated (by previous writes in this lambda), prioritize it
+  if (inMemoryCatalogCache !== null && inMemoryCatalogCache.length > 0) {
+    return inMemoryCatalogCache;
+  }
+
+  // 2. Try reading from writable serverless /tmp directory
+  if (fs.existsSync(tmpCatalogPath)) {
+    try {
+      const raw = fs.readFileSync(tmpCatalogPath, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        inMemoryCatalogCache = parsed;
+        return parsed;
+      }
+    } catch (e) {
+      console.error("Error reading tmpCatalogPath:", e);
+    }
+  }
+
+  // 3. Try reading from local output path (local dev orchestrator)
   if (fs.existsSync(catalogPath)) {
     try {
       const raw = fs.readFileSync(catalogPath, "utf-8");
@@ -27,6 +48,7 @@ function getCatalogData(): any[] {
     }
   }
 
+  // 4. Fallback to bundled seed catalog
   if (fs.existsSync(bundledCatalogPath)) {
     try {
       const raw = fs.readFileSync(bundledCatalogPath, "utf-8");
@@ -51,6 +73,13 @@ function getCatalogData(): any[] {
 function saveCatalogData(data: any[]) {
   inMemoryCatalogCache = data;
   const jsonStr = JSON.stringify(data, null, 2);
+
+  // 0. Save to writable /tmp directory (Vercel Serverless environment)
+  try {
+    fs.writeFileSync(tmpCatalogPath, jsonStr, "utf-8");
+  } catch (err) {
+    console.warn("Could not write to tmpCatalogPath:", err);
+  }
 
   // 1. Save to primary output directory (orchestrator / daemon)
   try {
