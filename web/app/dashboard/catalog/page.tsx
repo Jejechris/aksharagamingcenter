@@ -106,18 +106,13 @@ export default function CatalogDashboardPage() {
   const [drawerSellerTier, setDrawerSellerTier] = useState<'ultra_safe' | 'lowest_price' | 'mid_level'>('mid_level');
   const [drawerSetSelected, setDrawerSetSelected] = useState(true);
   const [isSubmittingDrawerSeller, setIsSubmittingDrawerSeller] = useState(false);
+  const [isSubmittingGame, setIsSubmittingGame] = useState(false);
 
-  // Permanent persistence synchronization across localStorage & serverless API
-  const syncAndSaveGames = (nextGames: CatalogGame[]) => {
+  // Synchronize state & localStorage cleanly without redundant server writes
+  const updateCatalogState = (nextGames: CatalogGame[]) => {
     setGames(nextGames);
     try {
       localStorage.setItem('akshara_custom_catalog_v2', JSON.stringify(nextGames));
-      // Proactively keep serverless warm with latest state
-      fetch('/api/catalog', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nextGames)
-      }).catch(() => {});
     } catch (e) {}
   };
 
@@ -150,7 +145,7 @@ export default function CatalogDashboardPage() {
         const json = await res.json();
         const updated = json.data;
         const next = games.map(g => g.id === gameId ? updated : g);
-        syncAndSaveGames(next);
+        updateCatalogState(next);
         setDrawerAddSellerGameId(null);
         setDrawerSellerName('');
         showToast(`✅ Seller "${drawerSellerName}" berhasil ditambahkan ke ${gameTitle} & tersimpan permanen!`);
@@ -179,7 +174,7 @@ export default function CatalogDashboardPage() {
         const json = await res.json();
         const updated = json.data;
         const next = games.map(g => g.id === gameId ? updated : g);
-        syncAndSaveGames(next);
+        updateCatalogState(next);
         showToast(`Seller "${sellerName}" telah dihapus.`);
       }
     } catch (e) {
@@ -229,7 +224,7 @@ export default function CatalogDashboardPage() {
         const json = await res.json();
         const updated = json.data;
         const next = games.map(g => g.id === editingSellerData.gameId ? updated : g);
-        syncAndSaveGames(next);
+        updateCatalogState(next);
         showToast(`✅ Seller "${editingSellerData.sellerName}" berhasil diperbarui & disimpan permanen!`);
         setEditingSellerData(null);
       } else {
@@ -245,43 +240,22 @@ export default function CatalogDashboardPage() {
   const fetchCatalog = async () => {
     setLoading(true);
     try {
-      // 1. Instant hydration from localStorage
-      let localGames: CatalogGame[] = [];
+      // 1. Instant hydration from localStorage for fast initial paint
       try {
         const stored = localStorage.getItem('akshara_custom_catalog_v2');
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            localGames = parsed;
+          if (Array.isArray(parsed)) {
             setGames(parsed);
           }
         }
       } catch (e) {}
 
-      // 2. Fetch server catalog
+      // 2. Fetch authoritative catalog from database via server API
       const res = await fetch('/api/catalog');
       const json = await res.json();
       if (json.status === 'success' && Array.isArray(json.data)) {
-        const serverGames: CatalogGame[] = json.data;
-
-        if (localGames.length > 0) {
-          // Merge: Preserve user-added games that server might have lost on cold-start
-          const merged = [...serverGames];
-          for (const localG of localGames) {
-            const idx = merged.findIndex(s => s.id === localG.id || s.title.toLowerCase().trim() === localG.title.toLowerCase().trim());
-            if (idx === -1) {
-              merged.unshift(localG);
-            } else {
-              // If local has custom sellers or different price, prefer local
-              if (localG.selling_price_shopee_idr !== merged[idx].selling_price_shopee_idr || (localG.sellers && localG.sellers.length > merged[idx].sellers.length)) {
-                merged[idx] = localG;
-              }
-            }
-          }
-          syncAndSaveGames(merged);
-        } else {
-          syncAndSaveGames(serverGames);
-        }
+        updateCatalogState(json.data);
       }
     } catch (err) {
       console.error('Failed to fetch catalog:', err);
@@ -336,7 +310,7 @@ export default function CatalogDashboardPage() {
         const json = await res.json();
         const updated = json.data;
         const next = games.map(g => g.id === gameId ? updated : g);
-        syncAndSaveGames(next);
+        updateCatalogState(next);
         showToast('Supplier G2G berhasil dialihkan! Margin laba telah diperbarui.');
       } else {
         showToast('Gagal mengubah supplier.', 'error');
@@ -361,7 +335,7 @@ export default function CatalogDashboardPage() {
         const json = await res.json();
         const updated = json.data;
         const next = games.map(g => g.id === gameId ? updated : g);
-        syncAndSaveGames(next);
+        updateCatalogState(next);
         setEditingPriceId(null);
         showToast('Harga jual Shopee berhasil diperbarui.');
       } else {
@@ -376,7 +350,7 @@ export default function CatalogDashboardPage() {
     if (!confirm(`Hapus "${title}" dari Radar Portofolio?`)) return;
     try {
       const next = games.filter(g => g.id !== gameId);
-      syncAndSaveGames(next);
+      updateCatalogState(next);
       await fetch(`/api/catalog?id=${gameId}`, { method: 'DELETE' });
       showToast(`Game "${title}" telah dihapus.`);
     } catch (e) {
@@ -438,7 +412,12 @@ export default function CatalogDashboardPage() {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          syncAndSaveGames(parsed);
+          updateCatalogState(parsed);
+          fetch('/api/catalog', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(parsed)
+          }).catch(() => {});
           showToast(`📥 Berhasil memulihkan ${parsed.length} game dari backup!`);
         } else {
           showToast("Format file JSON tidak valid.", "error");
@@ -452,23 +431,28 @@ export default function CatalogDashboardPage() {
 
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle) return;
+    const cleanTitle = newTitle.trim();
+    if (!cleanTitle) {
+      showToast('Harap masukkan nama game lengkap terlebih dahulu!', 'error');
+      return;
+    }
 
+    setIsSubmittingGame(true);
     const payload = {
       action: 'add',
-      title: newTitle,
+      title: cleanTitle,
       platform: newPlatform,
       category: newCategory,
-      selling_price_shopee_idr: Number(newSellingPrice),
-      target_margin_pct: Number(newTargetMargin),
+      selling_price_shopee_idr: Number(newSellingPrice) || 100000,
+      target_margin_pct: Number(newTargetMargin) || 25,
       selected_seller_id: researchedSellers.length > 0 ? researchedSellers[0].seller_id : 'G2G-INIT-01',
       sellers: researchedSellers.length > 0 ? researchedSellers : [
         {
           seller_id: 'G2G-INIT-01',
-          seller_name: newSellerName,
-          rating_pct: Number(newSellerRating),
-          reviews_count: Number(newSellerReviews),
-          price_g2g_idr: Number(newSellerPrice),
+          seller_name: newSellerName.trim() || 'G2G Seller',
+          rating_pct: Number(newSellerRating) || 99.5,
+          reviews_count: Number(newSellerReviews) || 1000,
+          price_g2g_idr: Number(newSellerPrice) || 100000,
           delivery_speed: 'Instant Delivery',
           stock: 25,
           risk_score: 0,
@@ -485,23 +469,25 @@ export default function CatalogDashboardPage() {
         body: JSON.stringify(payload)
       });
 
-      if (res.ok) {
-        const json = await res.json();
+      const json = await res.json();
+      if (res.ok && json.status === 'success') {
         const createdGame = json.data;
         if (createdGame) {
-          const next = [createdGame, ...games.filter(g => g.id !== createdGame.id && g.title.toLowerCase().trim() !== createdGame.title.toLowerCase().trim())];
-          syncAndSaveGames(next);
+          const next = [createdGame, ...games.filter(g => g.id !== createdGame.id && g.title.toLowerCase().trim() !== cleanTitle.toLowerCase())];
+          updateCatalogState(next);
         }
         setShowAddModal(false);
         setNewTitle('');
         setResearchedSellers([]);
         setResearchSummary('');
-        showToast(`Game "${newTitle}" berhasil ditambahkan & tersimpan permanen!`);
+        showToast(`Game "${cleanTitle}" berhasil ditambahkan & tersimpan permanen!`);
       } else {
-        showToast('Gagal menambahkan game baru ke server.', 'error');
+        showToast(json.message || 'Gagal menambahkan game baru ke server.', 'error');
       }
     } catch (e) {
-      showToast('Gagal menambahkan game baru.', 'error');
+      showToast('Gagal menambahkan game baru (kesalahan jaringan).', 'error');
+    } finally {
+      setIsSubmittingGame(false);
     }
   };
 
@@ -617,10 +603,17 @@ export default function CatalogDashboardPage() {
             <span>Backup JSON</span>
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
-            className="v0-btn-primary whitespace-nowrap"
+            type="button"
+            onClick={() => {
+              setNewTitle('');
+              setResearchedSellers([]);
+              setResearchSummary('');
+              setShowAddModal(true);
+            }}
+            className="v0-btn-primary inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-lg hover:shadow-white/10 transition-all cursor-pointer select-none"
           >
-            <Plus className="w-4 h-4 mr-2" /> Tambah Game Baru
+            <Plus className="w-4 h-4" />
+            <span>Tambah Game Baru</span>
           </button>
         </div>
       </div>
@@ -734,10 +727,17 @@ export default function CatalogDashboardPage() {
           </p>
           {games.length === 0 && (
             <button
-              onClick={() => setShowAddModal(true)}
-              className="v0-btn-primary mt-2 text-xs font-semibold px-5 py-2.5"
+              type="button"
+              onClick={() => {
+                setNewTitle('');
+                setResearchedSellers([]);
+                setResearchSummary('');
+                setShowAddModal(true);
+              }}
+              className="v0-btn-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold shadow-lg hover:shadow-white/10 transition-all cursor-pointer select-none mt-2"
             >
-              <Plus className="w-4 h-4 mr-1.5" /> Tambah Game Pertama
+              <Plus className="w-4 h-4" />
+              <span>Tambah Game Pertama</span>
             </button>
           )}
         </div>
@@ -1338,12 +1338,6 @@ export default function CatalogDashboardPage() {
                     placeholder="Contoh: Monster Hunter Wilds"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAutoResearch();
-                      }
-                    }}
                     className="flex-1 bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-amber-500 text-xs"
                   />
                   <button
@@ -1471,15 +1465,27 @@ export default function CatalogDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-slate-300 text-xs font-sans transition-colors"
+                  disabled={isSubmittingGame}
+                  className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-slate-300 text-xs font-sans transition-colors disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="v0-btn-primary text-xs"
+                  disabled={isSubmittingGame || !newTitle.trim()}
+                  className="v0-btn-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold shadow-lg hover:shadow-white/10 transition-all disabled:opacity-50 cursor-pointer"
                 >
-                  Simpan Portofolio
+                  {isSubmittingGame ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Menyimpan Game...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Simpan Game</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

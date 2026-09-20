@@ -128,18 +128,18 @@ function NavLink({
     <Link
       href={item.href}
       className={[
-        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 w-full",
+        "group relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors duration-150 w-full outline-none focus:outline-none select-none border",
         active
-          ? "bg-white/[0.08] text-white border border-white/[0.09]"
-          : "text-slate-500 hover:text-slate-200 hover:bg-white/[0.04]",
+          ? "bg-white/[0.08] text-white border-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+          : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]",
       ].join(" ")}
     >
-      <span className={active ? "opacity-100" : "opacity-60"}>
+      <span className={active ? "opacity-100" : "opacity-60 group-hover:opacity-100 transition-opacity"}>
         {item.icon}
       </span>
       <span className="leading-none">{item.label}</span>
       {active && (
-        <span className="ml-auto w-1 h-4 rounded-full bg-white/25 shrink-0" />
+        <span className="ml-auto flex h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] shrink-0" />
       )}
     </Link>
   );
@@ -158,7 +158,8 @@ export default function SidebarLayout({
   }, [pathname]);
 
   useEffect(() => {
-    if (sidebarOpen) {
+    if (typeof window === "undefined") return;
+    if (sidebarOpen && window.innerWidth < 768) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -188,7 +189,7 @@ export default function SidebarLayout({
       <aside
         className={[
           "fixed inset-y-0 left-0 z-50 flex w-[240px] flex-col",
-          "bg-[#07080d]/98 border-r border-white/[0.06] backdrop-blur-2xl",
+          "bg-[#07080d] border-r border-white/[0.06]",
           "transition-transform duration-300 ease-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         ].join(" ")}
@@ -245,10 +246,10 @@ export default function SidebarLayout({
           <Link
             href="/dashboard/health"
             className={[
-              "flex items-center justify-between px-3 py-2 rounded-lg border transition-all duration-150 w-full group",
+              "flex items-center justify-between px-3 py-2 rounded-lg border transition-colors duration-150 w-full group outline-none focus:outline-none select-none",
               isActive("/dashboard/health")
-                ? "bg-white/[0.08] text-white border-white/[0.12]"
-                : "bg-white/[0.02] text-slate-400 hover:text-white hover:bg-white/[0.05] border-white/[0.05]"
+                ? "bg-white/[0.08] text-white border-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                : "border-transparent text-slate-400 hover:text-white hover:bg-white/[0.04]"
             ].join(" ")}
           >
             <div className="flex items-center gap-2">

@@ -274,16 +274,22 @@ function calculateItemMetrics(item: any) {
   };
 }
 
-export async function GET() {
+async function loadCatalog(): Promise<any[]> {
   try {
     const dbCatalog = await getDbCatalog();
-    let rawCatalog: any[];
     if (dbCatalog !== null) {
-      rawCatalog = dbCatalog;
       inMemoryCatalogCache = dbCatalog;
-    } else {
-      rawCatalog = getCatalogData();
+      return dbCatalog;
     }
+  } catch (err) {
+    console.warn("loadCatalog DB fallback notice:", err);
+  }
+  return getCatalogData();
+}
+
+export async function GET() {
+  try {
+    const rawCatalog = await loadCatalog();
     const enriched = rawCatalog.map(calculateItemMetrics);
     return NextResponse.json({
       status: "success",
@@ -298,7 +304,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const catalog = getCatalogData();
+    const catalog = await loadCatalog();
 
     // Direct whole catalog replacement
     if (Array.isArray(body)) {
@@ -548,7 +554,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ status: "error", message: "game_id or title required" }, { status: 400 });
     }
 
-    const catalog = getCatalogData();
+    const catalog = await loadCatalog();
     let itemIndex = findGameIndex(catalog, game_id, title);
 
     if (itemIndex === -1) {
@@ -686,16 +692,14 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ status: "error", message: "Game id required" }, { status: 400 });
     }
 
-    let catalog = getCatalogData();
-    const targetIdx = findGameIndex(catalog, gameId);
-    if (targetIdx >= 0) {
-      catalog.splice(targetIdx, 1);
-      saveCatalogData(catalog);
-      await deleteDbGame(gameId);
-      return NextResponse.json({ status: "success", message: "Game deleted and saved to disk" });
-    }
+    // Always delete from Supabase database
+    await deleteDbGame(gameId);
 
-    return NextResponse.json({ status: "error", message: "Game not found" }, { status: 404 });
+    const catalog = await loadCatalog();
+    const nextCatalog = catalog.filter((g) => g.id !== gameId);
+    saveCatalogData(nextCatalog);
+
+    return NextResponse.json({ status: "success", message: `Game "${gameId}" deleted successfully` });
   } catch (error: any) {
     return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
   }
