@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import OperationsHealthWidget from "./OperationsHealthWidget";
 import {
   Shield,
   Home,
@@ -228,8 +229,11 @@ export default function SidebarLayout({
           ))}
         </nav>
 
+        {/* Operations Health Telemetry */}
+        <OperationsHealthWidget />
+
         {/* Footer */}
-        <div className="px-4 py-4 border-t border-white/[0.05] shrink-0">
+        <div className="px-4 py-3 border-t border-white/[0.05] shrink-0">
           <div className="flex items-center gap-2 text-slate-700">
             <Terminal className="w-3 h-3 shrink-0" />
             <span className="text-[10px] font-mono truncate">
