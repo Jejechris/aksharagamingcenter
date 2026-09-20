@@ -1,0 +1,50 @@
+import os
+from PIL import Image, ImageDraw
+
+dest_dir = r"C:\Users\jesen\OneDrive\Desktop\Scrt\web\public\assets\platforms"
+os.makedirs(dest_dir, exist_ok=True)
+
+# 1. PlayStation (playstation.svg)
+ps_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <circle cx="50" cy="50" r="48" fill="#003791" stroke="#002466" stroke-width="2" />
+  <g transform="translate(18, 22) scale(0.32)">
+    <path fill="#ffffff" fill-rule="evenodd" d="m 197.2 118 c -3.9 4.9 -13.3 8.4 -13.3 8.4 l -70.5 25.3 v -18.7 l 51.9 -18.5 c 5.9 -2.1 6.8 -5.1 2 -6.7 -4.8 -1.6 -13.4 -1.1 -19.3 1 l -34.6 12.2 v -19.4 s 2 -0.7 2 -0.7 c 10 -3.5 24 -5.1 44.7 5.3 15.2 4.8 16.9 11.9 13.1 16.8 z M 120.1 86.2 v -47.8 c 0 -5.6 -1 -10.8 -6.3 -12.2 -4 -1.3 -6.5 2.5 -6.5 8.1 v 119.6 l -32.3 -10.2 v -142.6 c 13.7 2.5 33.7 8.6 44.4 12.2 27.3 9.4 36.6 21 36.6 47.3 0 25.6 -15.8 35.3 -35.9 25.6 z M 15.9 131 c -15.7 -4.4 -18.3 -13.6 -11.1 -18.8 6.6 -4.9 17.8 -8.5 17.8 -8.5 l 46.2 -16.4 v 18.7 l -33.3 11.9 c -5.9 2.1 -6.8 5.1 -2 6.7 4.8 1.6 13.4 1.1 19.3 -1 l 16 -5.8 v 16.8 c -16 2.6 -33 1.5 -49.7 -4 z" />
+  </g>
+</svg>"""
+
+with open(os.path.join(dest_dir, "playstation.svg"), "w", encoding="utf-8") as f:
+    f.write(ps_svg)
+
+# 2. EA App (ea.svg)
+ea_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <circle cx="50" cy="50" r="48" fill="#111622" stroke="#ff4747" stroke-width="3" />
+  <g transform="translate(14, 14) scale(0.072)">
+    <path fill="#ffffff" d="m500 934c-239 0-434-194-434-434 0-239 194-434 434-434 239 0 434 194 434 434 0 239-194 434-434 434zm73-602h-245l-37 60h245zm50 1-150 238h-166l38-60h100l38-60h-230l-38 60h54l-76 120h316l117-184 42 64h-38l-36 60h113l40 60h72z" />
+  </g>
+</svg>"""
+
+with open(os.path.join(dest_dir, "ea.svg"), "w", encoding="utf-8") as f:
+    f.write(ea_svg)
+
+# 3. Xbox (xbox.svg)
+xbox_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <circle cx="50" cy="50" r="48" fill="#0d1117" stroke="#107c10" stroke-width="2.5" />
+  <g transform="translate(15, 15) scale(0.795)">
+    <path fill="#107c10" d="M39.73 86.91c-6.628-.635-13.338-3.015-19.102-6.776-4.83-3.15-5.92-4.447-5.92-7.032 0-5.193 5.71-14.29 15.48-24.658 5.547-5.89 13.275-12.79 14.11-12.604 1.626.363 14.616 13.034 19.48 19 7.69 9.43 11.224 17.154 9.428 20.597-1.365 2.617-9.837 7.733-16.06 9.698-5.13 1.62-11.867 2.306-17.416 1.775zM8.184 67.703c-4.014-6.158-6.042-12.22-7.02-20.988-.324-2.895-.21-4.55.733-10.494 1.173-7.4 5.39-15.97 10.46-21.24 2.158-2.24 2.35-2.3 4.982-1.41 3.19 1.08 6.6 3.436 11.89 8.22l3.09 2.794-1.69 2.07c-7.828 9.61-16.09 23.24-19.2 31.67-1.69 4.58-2.37 9.18-1.64 11.095.49 1.294.04.812-1.61-1.714zm70.453 1.047c.397-1.936-.105-5.49-1.28-9.076-2.545-7.765-11.054-22.21-18.867-32.032l-2.46-3.092 2.662-2.443c3.474-3.19 5.886-5.1 8.49-6.723 2.053-1.28 4.988-2.413 6.25-2.413.777 0 3.516 2.85 5.726 5.95 3.424 4.8 5.942 10.63 7.218 16.69.825 3.92.894 12.3.133 16.21-.63 3.208-1.95 7.366-3.23 10.187-.97 2.113-3.36 6.218-4.41 7.554-.54.687-.54.686-.24-.796zM40.44 11.505C36.834 9.675 31.272 7.71 28.2 7.18c-1.076-.185-2.913-.29-4.08-.23-2.536.128-2.423-.004 1.643-1.925 3.38-1.597 6.2-2.536 10.03-3.34C40.098.78 48.193.77 52.43 1.663c4.575.965 9.964 2.97 13 4.84l.904.554-2.07-.104C60.148 6.745 54.15 8.408 47.71 11.54c-1.942.946-3.63 1.7-3.754 1.68-.123-.024-1.706-.795-3.52-1.715z"/>
+  </g>
+</svg>"""
+
+with open(os.path.join(dest_dir, "xbox.svg"), "w", encoding="utf-8") as f:
+    f.write(xbox_svg)
+
+# 4. Epic Games (epic.svg)
+epic_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <path d="M12 12 H88 V66 L50 92 L12 66 Z" fill="#1c1c20" stroke="#4a4a55" stroke-width="3" />
+  <text x="50" y="46" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="900" text-anchor="middle" letter-spacing="1">EPIC</text>
+  <text x="50" y="65" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" letter-spacing="2">GAMES</text>
+</svg>"""
+
+with open(os.path.join(dest_dir, "epic.svg"), "w", encoding="utf-8") as f:
+    f.write(epic_svg)
+
+print("SVGs successfully written to:", dest_dir)

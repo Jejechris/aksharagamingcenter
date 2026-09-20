@@ -1,0 +1,11 @@
+{
+  "status": "RUNNING",
+  "last_heartbeat": "2026-09-16 19:47:28 WIB",
+  "interval_seconds": 300,
+  "interval_minutes": 5,
+  "games_monitored": 6,
+  "total_sellers_tracked": 18,
+  "auto_switches_total": 15,
+  "health": "OPTIMAL",
+  "summary": "Selesai memindai 6 game (18 seller G2G). Status optimal. 0 failover dieksekusi."
+}

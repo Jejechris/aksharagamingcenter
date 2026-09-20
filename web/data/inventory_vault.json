@@ -1,0 +1,80 @@
+[
+  {
+    "id": "VLT-20260920-001",
+    "game_title": "Minecraft: Java & Bedrock Edition",
+    "platform": "PC / Microsoft",
+    "category": "Account (Full Access)",
+    "username": "mine_vault_01@outlook.com",
+    "password": "MineVault#2026!Alpha",
+    "cost_idr": 125000,
+    "supplier_name": "HellenWong",
+    "status": "AVAILABLE",
+    "added_at": "2026-09-20 11:30:00",
+    "notes": "Full access, region global, mail access include."
+  },
+  {
+    "id": "VLT-20260920-002",
+    "game_title": "Minecraft: Java & Bedrock Edition",
+    "platform": "PC / Microsoft",
+    "category": "Account (Full Access)",
+    "username": "mine_vault_02@outlook.com",
+    "password": "MineVault#2026!Bravo",
+    "cost_idr": 125000,
+    "supplier_name": "HellenWong",
+    "status": "AVAILABLE",
+    "added_at": "2026-09-20 11:35:00",
+    "notes": "Full access, belum pernah login game."
+  },
+  {
+    "id": "VLT-20260920-003",
+    "game_title": "Minecraft: Java & Bedrock Edition",
+    "platform": "PC / Microsoft",
+    "category": "Account (Full Access)",
+    "username": "mine_vault_03@outlook.com",
+    "password": "MineVault#2026!Charlie",
+    "cost_idr": 125000,
+    "supplier_name": "TAceOfSpades",
+    "status": "AVAILABLE",
+    "added_at": "2026-09-20 12:00:00",
+    "notes": "Full access, siap ganti email & password."
+  },
+  {
+    "id": "VLT-20260920-004",
+    "game_title": "Terraria",
+    "platform": "Steam",
+    "category": "Account (Full Access)",
+    "username": "terra_store_01@outlook.com",
+    "password": "Terra#Pass2026!X",
+    "cost_idr": 16900,
+    "supplier_name": "madangna",
+    "status": "AVAILABLE",
+    "added_at": "2026-09-20 12:15:00",
+    "notes": "Fresh steam account with Terraria game license."
+  },
+  {
+    "id": "VLT-20260920-005",
+    "game_title": "Terraria",
+    "platform": "Steam",
+    "category": "Account (Full Access)",
+    "username": "terra_store_02@outlook.com",
+    "password": "Terra#Pass2026!Y",
+    "cost_idr": 16900,
+    "supplier_name": "madangna",
+    "status": "AVAILABLE",
+    "added_at": "2026-09-20 12:20:00",
+    "notes": "Fresh steam account with Terraria game license."
+  },
+  {
+    "id": "VLT-20260920-006",
+    "game_title": "Grand Theft Auto V: Enhanced Edition",
+    "platform": "Rockstar / Steam",
+    "category": "Account (Full Access)",
+    "username": "gtav_prem_99@outlook.com",
+    "password": "GtaV#Security99!",
+    "cost_idr": 186000,
+    "supplier_name": "Sharktech",
+    "status": "AVAILABLE",
+    "added_at": "2026-09-20 12:45:00",
+    "notes": "Includes Criminal Enterprise Starter Pack."
+  }
+]

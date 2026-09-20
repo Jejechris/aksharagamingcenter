@@ -1,0 +1,18 @@
+[
+  {
+    "order_id": "240916MC99211A",
+    "timestamp": "2026-09-16 12:45:48",
+    "channel": "Shopee",
+    "product_name": "Minecraft: Java & Bedrock Edition - Full Access",
+    "buyer_username": "alvin_surabaya_gamers",
+    "gross_revenue_idr": 219900.0,
+    "cogs_g2g_idr": 134000.0,
+    "qris_fee_idr": 938.0,
+    "cogs_usd": 8.2,
+    "cogs_net_idr": 134938.0,
+    "platform_fee_idr": 18592.0,
+    "packaging_cost_idr": 2000.0,
+    "net_profit_idr": 64370.0,
+    "net_margin_pct": 29.27
+  }
+]
