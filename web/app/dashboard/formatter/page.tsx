@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Sparkles,
@@ -19,9 +19,20 @@ import {
   CheckCircle2,
   HelpCircle,
   Info,
+  Tag,
+  Store,
 } from "lucide-react";
 
+interface CatalogItem {
+  id: string;
+  title: string;
+  platform: string;
+  category: string;
+  selling_price_shopee_idr: number;
+}
+
 export default function FormatterPage() {
+  const [catalogGames, setCatalogGames] = useState<CatalogItem[]>([]);
   const [rawCredentials, setRawCredentials] = useState("");
   const [gameTitle, setGameTitle] = useState("Terraria");
   const [platform, setPlatform] = useState("Steam");
@@ -44,6 +55,26 @@ export default function FormatterPage() {
   const [copiedPass, setCopiedPass] = useState(false);
   const [showPassword, setShowPassword] = useState(true);
 
+  // Fetch active catalog games from DB
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const res = await fetch("/api/catalog");
+        const json = await res.json();
+        if (json.status === "success" && Array.isArray(json.data) && json.data.length > 0) {
+          setCatalogGames(json.data);
+          const first = json.data[0];
+          setGameTitle(first.title);
+          setPlatform(first.platform);
+          setRawCredentials(`${first.title.toLowerCase().replace(/[^a-z0-9]/g, '')}_user@domain.com:AksharaPass123! | access: full`);
+        }
+      } catch (e) {
+        console.error("Failed to fetch catalog:", e);
+      }
+    }
+    loadCatalog();
+  }, []);
+
   const handleLoadSample = (sampleType: "terraria" | "minecraft" | "gtav") => {
     if (sampleType === "terraria") {
       setGameTitle("Terraria");
@@ -61,6 +92,12 @@ export default function FormatterPage() {
       setBuyerName("Kak Alvin");
       setRawCredentials("alvin_heist:LosSantos2025! | recovery_mail: active");
     }
+  };
+
+  const handleLoadCatalogGame = (g: CatalogItem) => {
+    setGameTitle(g.title);
+    setPlatform(g.platform);
+    setRawCredentials(`${g.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}_ready:AksharaPass2025! | platform: ${g.platform}`);
   };
 
   const handleGenerate = async (e?: React.FormEvent) => {
@@ -152,25 +189,52 @@ export default function FormatterPage() {
         </div>
       </div>
 
-      {/* Quick Presets */}
+      {/* Quick Presets & Portfolio Games */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5">
-          <HelpCircle className="w-3.5 h-3.5" /> Contoh cepat:
+          {catalogGames.length > 0 ? (
+            <>
+              <Tag className="w-3.5 h-3.5 text-purple-400" />
+              <span>Portofolio Aktif:</span>
+            </>
+          ) : (
+            <>
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Contoh cepat:</span>
+            </>
+          )}
         </span>
-        {[
-          { key: "terraria" as const, label: "🎮 Terraria (Steam)" },
-          { key: "minecraft" as const, label: "⛏️ Minecraft (Microsoft)" },
-          { key: "gtav" as const, label: "🚗 GTA V (Rockstar)" },
-        ].map((s) => (
-          <button
-            key={s.key}
-            type="button"
-            onClick={() => handleLoadSample(s.key)}
-            className="px-3 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800 hover:border-purple-500/40 text-[11px] font-mono text-slate-400 hover:text-purple-300 transition-all"
-          >
-            {s.label}
-          </button>
-        ))}
+        {catalogGames.length > 0 ? (
+          catalogGames.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => handleLoadCatalogGame(g)}
+              className={`px-3 py-1 rounded-xl text-[11px] font-mono transition-all border ${
+                gameTitle.toLowerCase() === g.title.toLowerCase()
+                  ? "bg-purple-500/20 border-purple-500/50 text-purple-300 font-bold"
+                  : "bg-zinc-950/80 border-zinc-800 hover:border-purple-500/40 text-slate-400 hover:text-purple-300"
+              }`}
+            >
+              🎮 {g.title.split(":")[0]} ({g.platform})
+            </button>
+          ))
+        ) : (
+          [
+            { key: "terraria" as const, label: "🎮 Terraria (Steam)" },
+            { key: "minecraft" as const, label: "⛏️ Minecraft (Microsoft)" },
+            { key: "gtav" as const, label: "🚗 GTA V (Rockstar)" },
+          ].map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => handleLoadSample(s.key)}
+              className="px-3 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800 hover:border-purple-500/40 text-[11px] font-mono text-slate-400 hover:text-purple-300 transition-all"
+            >
+              {s.label}
+            </button>
+          ))
+        )}
       </div>
 
       {/* Main 2-column grid */}
@@ -269,6 +333,29 @@ export default function FormatterPage() {
               <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Metadata Pesanan</h2>
               <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
             </div>
+
+            {catalogGames.length > 0 && (
+              <div className="mb-3">
+                <label className="text-[10px] font-mono uppercase tracking-widest text-purple-400 block mb-1">
+                  Pilih Cepat dari Portofolio ({catalogGames.length} Game)
+                </label>
+                <select
+                  onChange={(e) => {
+                    const sel = catalogGames.find(g => g.id === e.target.value);
+                    if (sel) handleLoadCatalogGame(sel);
+                  }}
+                  className="w-full bg-zinc-950 border border-purple-500/30 rounded-xl px-3 py-2 text-xs font-mono text-purple-200 focus:outline-none focus:border-purple-500"
+                >
+                  <option value="">-- Pilih Game Portofolio --</option>
+                  {catalogGames.map(g => (
+                    <option key={g.id} value={g.id}>
+                      {g.title} ({g.platform})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-mono uppercase tracking-widest text-slate-600">Nama Game</label>

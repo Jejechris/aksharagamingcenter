@@ -41,7 +41,7 @@ export async function getDbCatalog(): Promise<any[] | null> {
     const rows = await queryDb(
       "SELECT id, title, platform, category, selling_price_shopee_idr, target_margin_pct, status, selected_seller_id, sellers FROM catalog_games ORDER BY updated_at DESC"
     );
-    if (rows && rows.length > 0) {
+    if (rows) {
       return rows.map((r: any) => ({
         ...r,
         selling_price_shopee_idr: Number(r.selling_price_shopee_idr),
@@ -107,7 +107,7 @@ export async function getDbVault(): Promise<any[] | null> {
     const rows = await queryDb(
       "SELECT id, game_title, platform, category, username, password, cost_idr, supplier_name, status, assigned_order_id, added_at, dispatched_at, notes FROM inventory_vault ORDER BY added_at DESC"
     );
-    if (rows && rows.length > 0) {
+    if (rows) {
       return rows.map((r: any) => ({
         ...r,
         cost_idr: Number(r.cost_idr),
@@ -174,7 +174,7 @@ export async function getDbOrders(): Promise<any[] | null> {
     const rows = await queryDb(
       "SELECT id, order_id, channel, buyer_name, buyer_phone, buyer_email, game_title, platform, category, price_idr, credentials, status, dispatched_channels, messages, created_at FROM autonomous_orders ORDER BY created_at DESC"
     );
-    if (rows && rows.length > 0) {
+    if (rows) {
       return rows.map((r: any) => ({
         ...r,
         price_idr: Number(r.price_idr),

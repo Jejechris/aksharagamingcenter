@@ -17,12 +17,39 @@ import {
   Users,
   Sparkles,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Store,
+  Tag
 } from "lucide-react";
 import { getG2GSellerUrl } from "@/lib/g2g";
 
+interface CatalogItem {
+  id: string;
+  title: string;
+  platform: string;
+  category: string;
+  selling_price_shopee_idr: number;
+  sellers?: Array<{
+    seller_id?: string;
+    id?: string;
+    seller_name?: string;
+    name?: string;
+    price_g2g_idr?: number;
+    price_idr?: number;
+    rating_pct?: number;
+    reviews_count?: number;
+    reviews?: number;
+    delivery_speed?: string;
+    is_selected?: boolean;
+    tier?: string;
+    tier_label?: string;
+    tier_desc?: string;
+  }>;
+}
+
 export default function TheRiskOfficerPage() {
   const [mounted, setMounted] = useState(false);
+  const [catalogGames, setCatalogGames] = useState<CatalogItem[]>([]);
 
   // Live Gemini AI Threat Scanner State
   const [scanSellerName, setScanSellerName] = useState("AlphaVault_Store");
@@ -31,6 +58,70 @@ export default function TheRiskOfficerPage() {
   );
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
+
+  // Load catalog games from DB
+  useEffect(() => {
+    setMounted(true);
+    async function loadCatalog() {
+      try {
+        const res = await fetch("/api/catalog");
+        const json = await res.json();
+        if (json.status === "success" && Array.isArray(json.data)) {
+          setCatalogGames(json.data);
+          const firstGame = json.data[0];
+          const firstSeller = firstGame?.sellers?.[0];
+          if (firstSeller) {
+            const sName = firstSeller.seller_name || firstSeller.name;
+            if (sName) setScanSellerName(sName);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load catalog into risk page:", e);
+      }
+    }
+    loadCatalog();
+  }, []);
+
+  // Compute all sellers from catalog
+  const catalogSellers = React.useMemo(() => {
+    const list: Array<{
+      id: string;
+      name: string;
+      gameTitle: string;
+      platform: string;
+      price_idr: number;
+      rating_pct: number;
+      reviews: number;
+      delivery: string;
+      is_selected: boolean;
+      tier: string;
+      tier_label: string;
+      tier_desc: string;
+    }> = [];
+
+    catalogGames.forEach(g => {
+      (g.sellers || []).forEach((s: any) => {
+        const name = s.seller_name || s.name;
+        if (name) {
+          list.push({
+            id: s.seller_id || s.id || name,
+            name: name,
+            gameTitle: g.title,
+            platform: g.platform,
+            price_idr: Number(s.price_g2g_idr || s.price_idr) || 0,
+            rating_pct: Number(s.rating_pct) || 99.0,
+            reviews: Number(s.reviews_count || s.reviews) || 1000,
+            delivery: s.delivery_speed || "Instant Delivery",
+            is_selected: !!s.is_selected,
+            tier: s.tier || "ultra_safe",
+            tier_label: s.tier_label || "🛡️ Top Verified",
+            tier_desc: s.tier_desc || "Verified G2G Seller"
+          });
+        }
+      });
+    });
+    return list;
+  }, [catalogGames]);
 
   const handleRunAiAudit = async () => {
     if (!scanSellerName.trim()) return;
@@ -54,10 +145,6 @@ export default function TheRiskOfficerPage() {
       setIsScanning(false);
     }
   };
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   return (
     <div className="px-5 sm:px-8 py-8 max-w-[960px] mx-auto space-y-7">
@@ -106,7 +193,7 @@ export default function TheRiskOfficerPage() {
               <Users className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-3xl font-bold font-mono text-white tracking-tight">3</div>
+          <div className="text-3xl font-bold font-mono text-white tracking-tight">{catalogSellers.length}</div>
           <div className="text-[10px] font-mono text-slate-600 mt-3 pt-2.5 border-t border-white/[0.05]">
             Listing G2G aktif diverifikasi
           </div>
@@ -121,7 +208,9 @@ export default function TheRiskOfficerPage() {
               <ShieldCheck className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-3xl font-bold font-mono text-emerald-400 tracking-tight">1</div>
+          <div className="text-3xl font-bold font-mono text-emerald-400 tracking-tight">
+            {catalogSellers.filter(s => s.rating_pct >= 98).length}
+          </div>
           <div className="text-[10px] font-mono text-emerald-700 mt-3 pt-2.5 border-t border-emerald-500/10">
             Lolos standar rating &gt;98%
           </div>
@@ -137,13 +226,13 @@ export default function TheRiskOfficerPage() {
             </div>
           </div>
           <div className="text-2xl font-bold font-mono text-emerald-400 tracking-tight flex items-center gap-2">
-            <span>LOW</span>
+            <span>{catalogSellers.length === 0 ? "NONE" : catalogSellers.some(s => s.rating_pct < 95) ? "HIGH" : "LOW"}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-sans font-medium">
-              Aman
+              {catalogSellers.length === 0 ? "Bersih" : "Aman"}
             </span>
           </div>
           <div className="text-[10px] font-mono text-rose-700 mt-3 pt-2.5 border-t border-rose-500/10">
-            0 Insiden Hackback tercatat
+            {catalogSellers.length === 0 ? "0 Supplier di Portofolio" : "0 Insiden Hackback tercatat"}
           </div>
         </div>
       </div>
@@ -168,6 +257,37 @@ export default function TheRiskOfficerPage() {
             </div>
           </div>
         </div>
+
+        {/* Quick Active Portfolio Supplier Chips */}
+        {catalogSellers.length > 0 && (
+          <div className="space-y-1.5 p-3 rounded-xl bg-zinc-950/60 border border-white/[0.06]">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+              <Tag className="w-3 h-3 text-rose-400" />
+              <span>Pilih Cepat Supplier dari Portofolio ({catalogSellers.length}):</span>
+            </span>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+              {catalogSellers.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    setScanSellerName(s.name);
+                    setScanReviews(
+                      `Rating: ${s.rating_pct}% | Reviews: ${s.reviews.toLocaleString("id-ID")}\nInstant delivery verified.\nAkun normal tanpa masalah ganti kredensial.`
+                    );
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition-all border whitespace-nowrap ${
+                    scanSellerName === s.name
+                      ? "bg-rose-500/20 border-rose-500/50 text-rose-300 font-bold"
+                      : "bg-zinc-900 border-zinc-800 text-slate-400 hover:text-white hover:border-zinc-700"
+                  }`}
+                >
+                  {s.name} ({s.gameTitle.split(":")[0]})
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {/* Input Form */}
@@ -350,180 +470,147 @@ export default function TheRiskOfficerPage() {
         </div>
 
         <div className="space-y-3">
-          {/* Supplier 1: APPROVED */}
-          <div className="v0-card card-division-risk p-5 rounded-2xl border-emerald-500/25 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <a
-                    href={getG2GSellerUrl("HellenWong", "Minecraft")}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-white text-[15px] hover:text-emerald-300 inline-flex items-center gap-1.5 underline decoration-emerald-500/30 underline-offset-4 transition-colors"
-                  >
-                    HellenWong
-                    <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
-                  </a>
-                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    APPROVED
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    🛡️ Tier 1: Top Verified
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 font-mono mt-2">
-                  <span className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-slate-200">99.8%</span> Rating
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
-                    <span className="text-slate-200">32,450</span> Reviews
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Zap className="w-3.5 h-3.5 text-amber-400" /> Instant API
-                  </span>
-                  <span className="text-emerald-400 font-bold">Rp 186.000 (QRIS)</span>
-                </div>
-              </div>
-
-              <div className="sm:text-right">
-                <span className="text-[10px] font-mono text-slate-500 block mb-0.5">Risk Score</span>
-                <span className="text-2xl font-bold font-mono text-emerald-400">0/100</span>
-              </div>
+          {catalogSellers.length === 0 ? (
+            <div className="p-8 rounded-2xl border border-white/[0.08] bg-zinc-950/40 text-center space-y-3">
+              <ShieldCheck className="w-8 h-8 text-slate-500 mx-auto" />
+              <div className="text-sm font-semibold text-white">Belum Ada Supplier di Portofolio</div>
+              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                Tambahkan game dan supplier baru di <Link href="/dashboard/catalog" className="text-emerald-400 underline font-medium">Katalog Radar</Link> atau <Link href="/dashboard/quant" className="text-emerald-400 underline font-medium">The Quant</Link> agar otomatis masuk audit sentry di sini.
+              </p>
+              <Link
+                href="/dashboard/catalog"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono hover:bg-emerald-500/20 transition-all font-semibold mt-2"
+              >
+                <Store className="w-3.5 h-3.5" /> + Tambah Game & Supplier ke Katalog
+              </Link>
             </div>
+          ) : (
+            catalogSellers.map((seller) => {
+              const isApproved = seller.rating_pct >= 98 && seller.reviews >= 5000;
+              const isWarning = seller.rating_pct < 98 && seller.rating_pct >= 95;
+              const status = isApproved ? "APPROVED" : isWarning ? "WARNING" : "REJECTED";
+              const riskScore = isApproved ? 0 : isWarning ? 25 : 85;
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-300 pt-3 border-t border-white/[0.05]">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Rating &gt; 98%</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Reviews &gt; 5,000</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Instant Delivery</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Full Access (Email)</span>
-              </div>
-            </div>
-          </div>
+              return (
+                <div
+                  key={seller.id}
+                  className={`v0-card card-division-risk p-5 rounded-2xl space-y-4 border ${
+                    isApproved
+                      ? "border-emerald-500/25"
+                      : isWarning
+                      ? "border-amber-500/25"
+                      : "border-rose-500/25 opacity-80"
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <a
+                          href={getG2GSellerUrl(seller.name, seller.gameTitle)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-white text-[15px] hover:text-emerald-300 inline-flex items-center gap-1.5 underline decoration-emerald-500/30 underline-offset-4 transition-colors"
+                        >
+                          {seller.name}
+                          <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                        </a>
+                        <span
+                          className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full border ${
+                            isApproved
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                              : isWarning
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                              : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                          }`}
+                        >
+                          {status}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-900 text-slate-300 border border-white/[0.08]">
+                          🎮 {seller.gameTitle.split(":")[0]} ({seller.platform})
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          {seller.tier_label || "🛡️ Verified"}
+                        </span>
+                      </div>
 
-          {/* Supplier 2: REJECTED */}
-          <div className="v0-card card-division-risk p-5 rounded-2xl border-amber-500/20 opacity-80 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <a
-                    href={getG2GSellerUrl("QuickGameDeals_ID", "Minecraft")}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-slate-300 text-[15px] hover:text-amber-300 inline-flex items-center gap-1.5 underline decoration-amber-500/30 underline-offset-4 transition-colors"
-                  >
-                    QuickGameDeals_ID
-                    <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-                  </a>
-                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    REJECTED
-                  </span>
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 font-mono mt-2">
+                        <span className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-slate-200">{seller.rating_pct}%</span> Rating
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="text-slate-200">{seller.reviews.toLocaleString("id-ID")}</span> Reviews
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5 text-amber-400" /> {seller.delivery}
+                        </span>
+                        {seller.price_idr > 0 && (
+                          <span className="text-emerald-400 font-bold">
+                            Rp {seller.price_idr.toLocaleString("id-ID")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2">
+                      <div className="sm:text-right">
+                        <span className="text-[10px] font-mono text-slate-500 block mb-0.5">Risk Score</span>
+                        <span
+                          className={`text-2xl font-bold font-mono ${
+                            isApproved ? "text-emerald-400" : isWarning ? "text-amber-400" : "text-rose-400"
+                          }`}
+                        >
+                          {riskScore}/100
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScanSellerName(seller.name);
+                          setScanReviews(
+                            `Rating: ${seller.rating_pct}% | Reviews: ${seller.reviews.toLocaleString("id-ID")}\nInstant delivery verified.\nAkun normal tanpa kendala ganti email.`
+                          );
+                          window.scrollTo({ top: 200, behavior: "smooth" });
+                        }}
+                        className="px-3 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-[11px] font-mono transition-all flex items-center gap-1"
+                      >
+                        <Sparkles className="w-3 h-3 text-rose-400" />
+                        <span>Scan AI</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-300 pt-3 border-t border-white/[0.05]">
+                    <div className="flex items-center gap-1.5">
+                      {seller.rating_pct >= 98 ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      )}
+                      <span>Rating &gt; 98%</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {seller.reviews >= 5000 ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      )}
+                      <span>Reviews &gt; 5,000</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Instant Delivery</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Full Access (Email)</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 font-mono mt-2">
-                  <span className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5" /> 96.8% Rating
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MessageSquare className="w-3.5 h-3.5" /> 2,100 Reviews
-                  </span>
-                  <span>Manual Delivery</span>
-                  <span className="font-mono text-slate-400">Rp 122.000 (QRIS)</span>
-                </div>
-              </div>
-
-              <div className="sm:text-right">
-                <span className="text-[10px] font-mono text-slate-500 block mb-0.5">Risk Score</span>
-                <span className="text-2xl font-bold font-mono text-amber-400">94/100</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-500 pt-3 border-t border-white/[0.05]">
-              <div className="flex items-center gap-1.5">
-                <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                <span className="line-through">Rating &gt; 98%</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                <span className="line-through">Reviews &gt; 5,000</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                <span className="line-through">Instant Delivery</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-slate-300">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Full Access (Email)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Supplier 3: BLACKLISTED */}
-          <div className="v0-card card-division-risk p-5 rounded-2xl border-rose-500/20 opacity-60 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <a
-                    href={getG2GSellerUrl("sketchy_gaming_shop", "Minecraft")}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-slate-400 text-[15px] hover:text-rose-400 inline-flex items-center gap-1.5 underline decoration-rose-500/30 underline-offset-4 transition-colors"
-                  >
-                    sketchy_gaming_shop
-                    <ExternalLink className="w-3.5 h-3.5 text-rose-400" />
-                  </a>
-                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                    BLACKLISTED
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 font-mono mt-2">
-                  <span className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5" /> 92.1% Rating
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MessageSquare className="w-3.5 h-3.5" /> 340 Reviews
-                  </span>
-                  <span>Manual Delivery</span>
-                  <span className="font-mono text-slate-500">Rp 55.000 (QRIS)</span>
-                </div>
-              </div>
-
-              <div className="sm:text-right">
-                <span className="text-[10px] font-mono text-slate-600 block mb-0.5">Risk Score</span>
-                <span className="text-2xl font-bold font-mono text-rose-500">100/100</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-600 pt-3 border-t border-white/[0.05]">
-              <div className="flex items-center gap-1.5">
-                <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                <span className="line-through">Rating &gt; 98%</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                <span className="line-through">Reviews &gt; 5,000</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                <span className="line-through">Instant Delivery</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                <span className="line-through">Full Access (Email)</span>
-              </div>
-            </div>
-          </div>
+              );
+            })
+          )}
         </div>
       </div>
 

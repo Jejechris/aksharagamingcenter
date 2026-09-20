@@ -112,7 +112,7 @@ export async function GET(req: Request) {
 
     const dbVault = await getDbVault();
     let allItems: VaultItem[];
-    if (dbVault && dbVault.length > 0) {
+    if (dbVault !== null) {
       allItems = dbVault;
       inMemoryVaultCache = dbVault;
     } else {

@@ -263,23 +263,32 @@ function DescriptionMakerContent() {
             <span>Pilih Cepat Game dari Portofolio Aktif:</span>
           </div>
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {catalogGames.map((g) => {
-              const isSelected = selectedGameId === g.id || gameTitle.toLowerCase() === g.title.toLowerCase();
-              return (
-                <button
-                  key={g.id}
-                  onClick={() => handleSelectPresetGame(g)}
-                  className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-mono transition-all border text-left ${
-                    isSelected
-                      ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-300 font-bold shadow-sm"
-                      : "bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700"
-                  }`}
-                >
-                  <div className="truncate max-w-[200px]">{g.title.split(":")[0]}</div>
-                  <div className="text-[10px] text-zinc-500 mt-0.5">{formatRp(g.selling_price_shopee_idr)} • {g.platform}</div>
-                </button>
-              );
-            })}
+            {catalogGames.length === 0 ? (
+              <div className="p-3 rounded-xl border border-white/[0.06] bg-zinc-950/40 text-xs text-slate-400 font-mono flex items-center justify-between w-full">
+                <span>Portofolio masih kosong. Tambahkan game baru di <Link href="/dashboard/catalog" className="text-fuchsia-400 underline font-medium">Katalog Radar</Link> atau ketik manual di bawah.</span>
+                <Link href="/dashboard/catalog" className="px-3 py-1 rounded-lg bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 text-xs font-mono hover:bg-fuchsia-500/20 whitespace-nowrap ml-4">
+                  + Tambah Game
+                </Link>
+              </div>
+            ) : (
+              catalogGames.map((g) => {
+                const isSelected = selectedGameId === g.id || gameTitle.toLowerCase() === g.title.toLowerCase();
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => handleSelectPresetGame(g)}
+                    className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-mono transition-all border text-left ${
+                      isSelected
+                        ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-300 font-bold shadow-sm"
+                        : "bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="truncate max-w-[200px]">{g.title.split(":")[0]}</div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">{formatRp(g.selling_price_shopee_idr)} • {g.platform}</div>
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
 

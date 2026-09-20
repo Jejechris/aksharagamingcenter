@@ -178,7 +178,7 @@ export async function GET() {
   try {
     const dbOrders = await getDbOrders();
     let orders: any[];
-    if (dbOrders && dbOrders.length > 0) {
+    if (dbOrders !== null) {
       orders = dbOrders;
       inMemoryOrdersCache = dbOrders;
     } else {

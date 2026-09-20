@@ -723,9 +723,23 @@ export default function CatalogDashboardPage() {
         </div>
       ) : filteredGames.length === 0 ? (
         <div className="v0-card rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3">
-          <Store className="w-8 h-8 text-slate-600" />
-          <div className="text-slate-300 font-medium">Tidak ada game yang sesuai pencarian</div>
-          <p className="text-xs text-slate-500">Coba kata kunci lain atau tambahkan game baru.</p>
+          <Store className="w-10 h-10 text-amber-500/40" />
+          <div className="text-slate-200 font-medium text-base">
+            {games.length === 0 ? "Portofolio Katalog Masih Kosong" : "Tidak ada game yang sesuai pencarian"}
+          </div>
+          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+            {games.length === 0 
+              ? "Mulai tambahkan game jualan Anda ke sistem untuk otomatis menghubungkan simulasi laba di The Quant, template di AI Formatter, audit supplier di Risk Officer, dan pengiriman di Auto-Fulfillment." 
+              : "Coba kata kunci lain atau ubah filter platform di atas."}
+          </p>
+          {games.length === 0 && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="v0-btn-primary mt-2 text-xs font-semibold px-5 py-2.5"
+            >
+              <Plus className="w-4 h-4 mr-1.5" /> Tambah Game Pertama
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -832,12 +846,30 @@ export default function CatalogDashboardPage() {
 
                     <div className="flex items-center gap-1.5 ml-2">
                       <Link
+                        href="/dashboard/quant"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all"
+                        title="Simulasi laba & margin game ini di The Quant"
+                      >
+                        <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="hidden sm:inline">Quant</span>
+                      </Link>
+
+                      <Link
                         href={`/dashboard/description?game=${encodeURIComponent(game.title)}`}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30 transition-all"
                         title="Buat Deskripsi Shopee untuk game ini"
                       >
                         <FileText className="w-3.5 h-3.5 text-fuchsia-400" />
                         <span className="hidden sm:inline">Deskripsi</span>
+                      </Link>
+
+                      <Link
+                        href="/dashboard/autonomous"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all"
+                        title="Kelola pengiriman otonom & stok buffer di Auto-Fulfillment"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="hidden sm:inline">Otonom</span>
                       </Link>
 
                       <button

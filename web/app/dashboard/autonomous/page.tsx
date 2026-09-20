@@ -57,9 +57,27 @@ interface VaultItem {
   notes?: string;
 }
 
+interface CatalogItem {
+  id: string;
+  title: string;
+  platform: string;
+  category: string;
+  selling_price_shopee_idr: number;
+  target_margin_pct: number;
+  sellers?: Array<{
+    seller_id: string;
+    seller_name: string;
+    price_g2g_idr: number;
+    is_selected?: boolean;
+  }>;
+}
+
 export default function AutonomousFulfillmentPage() {
   // Navigation & Tab Switcher
   const [mainTab, setMainTab] = useState<"dispatch" | "vault">("dispatch");
+
+  // Dynamic Catalog Portfolio Integration
+  const [catalogGames, setCatalogGames] = useState<CatalogItem[]>([]);
 
   // Orders State
   const [orders, setOrders] = useState<AutonomousOrder[]>([]);
@@ -125,6 +143,38 @@ export default function AutonomousFulfillmentPage() {
     setTimeout(() => setToastMsg(""), 3500);
   };
 
+  // Fetch catalog games to connect portfolio dynamically
+  const fetchCatalog = useCallback(async () => {
+    try {
+      const res = await fetch("/api/catalog");
+      const json = await res.json();
+      if (json.status === "success" && Array.isArray(json.data)) {
+        setCatalogGames(json.data);
+        if (json.data.length > 0) {
+          const first = json.data[0];
+          setVFormGame(first.title);
+          setVFormPlatform(first.platform);
+          setVFormCategory(first.category);
+          const firstSeller = first.sellers?.find((s: any) => s.is_selected) || first.sellers?.[0];
+          if (firstSeller) {
+            setVFormCost(firstSeller.price_g2g_idr);
+            setVFormSupplier(firstSeller.seller_name);
+            setBulkCost(firstSeller.price_g2g_idr);
+            setBulkSupplier(firstSeller.seller_name);
+          }
+          setBulkGame(first.title);
+          setBulkPlatform(first.platform);
+          setBulkCategory(first.category);
+          setFormGame(first.title);
+          setFormPlatform(first.platform);
+          setFormPrice(first.selling_price_shopee_idr);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load catalog into autonomous page:", e);
+    }
+  }, []);
+
   // Fetch orders with localStorage hydration
   const fetchOrders = useCallback(async () => {
     try {
@@ -179,12 +229,13 @@ export default function AutonomousFulfillmentPage() {
   useEffect(() => {
     fetchOrders();
     fetchVault();
+    fetchCatalog();
     const timer = setInterval(() => {
       fetchOrders();
       fetchVault();
     }, 15000);
     return () => clearInterval(timer);
-  }, [fetchOrders, fetchVault]);
+  }, [fetchOrders, fetchVault, fetchCatalog]);
 
   // Format Indonesian Phone Number for WhatsApp Link
   const formatPhoneForWa = (phone: string) => {
@@ -466,6 +517,12 @@ export default function AutonomousFulfillmentPage() {
               <span>Auto-Pilot: {autoPilotOn ? "ON (OTONOM)" : "PAUSED"}</span>
             </button>
 
+            <Link
+              href="/dashboard/catalog"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-all"
+            >
+              <Store className="w-3.5 h-3.5 text-amber-400" /> Radar Portofolio ({catalogGames.length})
+            </Link>
             <Link
               href="/dashboard/description"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-all"
@@ -1351,13 +1408,41 @@ export default function AutonomousFulfillmentPage() {
 
               <form onSubmit={handleAddSingleVault} className="space-y-3 text-xs font-mono">
                 <div>
-                  <label className="block text-zinc-400 mb-1">Judul Game</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-zinc-400">Judul Game</label>
+                    {catalogGames.length > 0 && (
+                      <span className="text-[10px] text-emerald-400 font-medium">✨ Terhubung Portofolio</span>
+                    )}
+                  </div>
+                  {catalogGames.length > 0 && (
+                    <select
+                      onChange={(e) => {
+                        const sel = catalogGames.find(g => g.id === e.target.value);
+                        if (sel) {
+                          setVFormGame(sel.title);
+                          setVFormPlatform(sel.platform);
+                          setVFormCategory(sel.category);
+                          const activeSeller = sel.sellers?.find((s: any) => s.is_selected) || sel.sellers?.[0];
+                          if (activeSeller) {
+                            setVFormCost(activeSeller.price_g2g_idr);
+                            setVFormSupplier(activeSeller.seller_name);
+                          }
+                        }
+                      }}
+                      className="w-full bg-zinc-900 border border-emerald-500/40 rounded-xl px-3.5 py-2 text-emerald-300 mb-2 focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="">-- Pilih dari Portofolio ({catalogGames.length} Game) --</option>
+                      {catalogGames.map(g => (
+                        <option key={g.id} value={g.id}>{g.title} ({g.platform})</option>
+                      ))}
+                    </select>
+                  )}
                   <input
                     type="text"
                     value={vFormGame}
                     onChange={(e) => setVFormGame(e.target.value)}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                    placeholder="Minecraft: Java & Bedrock Edition"
+                    placeholder="Contoh: Monster Hunter Wilds"
                   />
                 </div>
 
@@ -1483,9 +1568,41 @@ export default function AutonomousFulfillmentPage() {
               </div>
 
               <form onSubmit={handleBulkImportVault} className="space-y-3 text-xs font-mono">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-zinc-400">Game Target</label>
+                    {catalogGames.length > 0 && (
+                      <span className="text-[10px] text-purple-400 font-medium">✨ Terhubung Portofolio</span>
+                    )}
+                  </div>
+                  {catalogGames.length > 0 && (
+                    <select
+                      onChange={(e) => {
+                        const sel = catalogGames.find(g => g.id === e.target.value);
+                        if (sel) {
+                          setBulkGame(sel.title);
+                          setBulkPlatform(sel.platform);
+                          setBulkCategory(sel.category);
+                          const activeSeller = sel.sellers?.find((s: any) => s.is_selected) || sel.sellers?.[0];
+                          if (activeSeller) {
+                            setBulkCost(activeSeller.price_g2g_idr);
+                            setBulkSupplier(activeSeller.seller_name);
+                          }
+                        }
+                      }}
+                      className="w-full bg-zinc-900 border border-purple-500/40 rounded-xl px-3.5 py-2 text-purple-300 mb-2 focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="">-- Pilih dari Portofolio ({catalogGames.length} Game) --</option>
+                      {catalogGames.map(g => (
+                        <option key={g.id} value={g.id}>{g.title} ({g.platform})</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-zinc-400 mb-1">Game Target</label>
+                    <label className="block text-zinc-400 mb-1">Nama Judul</label>
                     <input
                       type="text"
                       value={bulkGame}
@@ -1633,6 +1750,35 @@ acc_alpha_03@outlook.com:PassAlpha789!`}
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-zinc-400">Game Terpilih</label>
+                    {catalogGames.length > 0 && (
+                      <span className="text-[10px] text-emerald-400 font-medium">✨ Auto-Fill Portofolio</span>
+                    )}
+                  </div>
+                  {catalogGames.length > 0 && (
+                    <select
+                      onChange={(e) => {
+                        const sel = catalogGames.find(g => g.id === e.target.value);
+                        if (sel) {
+                          setFormGame(sel.title);
+                          setFormPlatform(sel.platform);
+                          setFormPrice(sel.selling_price_shopee_idr);
+                        }
+                      }}
+                      className="w-full bg-zinc-900 border border-emerald-500/40 rounded-xl px-3.5 py-2 text-emerald-300 mb-2 focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="">-- Pilih dari Portofolio ({catalogGames.length} Game) --</option>
+                      {catalogGames.map(g => (
+                        <option key={g.id} value={g.id}>
+                          {g.title} ({g.platform}) - Rp {g.selling_price_shopee_idr.toLocaleString('id-ID')}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

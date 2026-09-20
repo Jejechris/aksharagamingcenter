@@ -184,39 +184,54 @@ export default function QuantPage() {
     try {
       const res = await fetch('/api/catalog');
       const json = await res.json();
-      if (json.status === 'success' && Array.isArray(json.data) && json.data.length > 0) {
+      if (json.status === 'success' && Array.isArray(json.data)) {
         setCatalogGames(json.data);
 
         if (applyToUI) {
-          const matched = json.data.find((g: any) =>
-            g.title.toLowerCase().includes('minecraft')
-          ) || json.data[0];
+          if (json.data.length > 0) {
+            const matched = json.data.find((g: any) => g.id === currentGameId) || json.data[0];
 
-          if (matched) {
-            setCurrentGameId(matched.id);
-            setGameTitle(matched.title);
-            setPlatform(matched.platform);
-            setCategory(matched.category);
-            setSellingPrice(matched.selling_price_shopee_idr);
-            setTargetMarginPct(matched.target_margin_pct);
+            if (matched) {
+              setCurrentGameId(matched.id);
+              setActivePreset(matched.id);
+              setGameTitle(matched.title);
+              setPlatform(matched.platform);
+              setCategory(matched.category);
+              setSellingPrice(matched.selling_price_shopee_idr);
+              setTargetMarginPct(matched.target_margin_pct);
 
-            if (Array.isArray(matched.sellers) && matched.sellers.length > 0) {
-              const mapped: SellerOption[] = matched.sellers.map((s: any) => ({
-                id: s.seller_id,
-                name: s.seller_name,
-                price_idr: s.price_g2g_idr,
-                rating_pct: s.rating_pct,
-                reviews: s.reviews_count,
-                delivery: s.delivery_speed || 'Instant Delivery',
-                is_selected: s.seller_id === matched.selected_seller_id,
-                tier: s.tier,
-                tier_label: s.tier_label,
-                tier_desc: s.tier_desc
-              }));
-              setSellers(mapped);
-              const sel = mapped.find(s => s.is_selected) || mapped[0];
-              setCogsG2gIdr(sel.price_idr);
+              if (Array.isArray(matched.sellers) && matched.sellers.length > 0) {
+                const mapped: SellerOption[] = matched.sellers.map((s: any) => ({
+                  id: s.seller_id || s.id,
+                  name: s.seller_name || s.name,
+                  price_idr: Number(s.price_g2g_idr || s.price_idr) || 100000,
+                  rating_pct: Number(s.rating_pct) || 99.0,
+                  reviews: Number(s.reviews_count || s.reviews) || 1000,
+                  delivery: s.delivery_speed || 'Instant Delivery',
+                  is_selected: (s.seller_id || s.id) === matched.selected_seller_id,
+                  tier: s.tier,
+                  tier_label: s.tier_label,
+                  tier_desc: s.tier_desc
+                }));
+                setSellers(mapped);
+                const sel = mapped.find(s => s.is_selected) || mapped[0];
+                setCogsG2gIdr(sel.price_idr);
+              } else {
+                setSellers([]);
+                setCogsG2gIdr(Math.round(matched.selling_price_shopee_idr * 0.7));
+              }
             }
+          } else {
+            // Clean empty state when catalog is empty
+            setCurrentGameId('');
+            setActivePreset('');
+            setGameTitle('Game Baru (Simulasi)');
+            setPlatform('Steam');
+            setCategory('Digital Key / Account');
+            setSellingPrice(150000);
+            setTargetMarginPct(25);
+            setSellers([]);
+            setCogsG2gIdr(100000);
           }
         }
         return json.data;
@@ -225,7 +240,7 @@ export default function QuantPage() {
       console.error('Failed to load initial catalog:', err);
     }
     return [];
-  }, []);
+  }, [currentGameId]);
 
   useEffect(() => {
     fetchCatalogData(true);
@@ -416,104 +431,51 @@ export default function QuantPage() {
     }
   };
 
-  const presets = [
-    { 
-      id: 'minecraft', 
-      catalogId: 'game-mc-01',
-      title: 'Minecraft: Java & Bedrock', 
-      platform: 'PC / Microsoft', 
-      category: 'Account (Full Access)',
-      price: 249900, 
-      g2gIdr: 186000, 
-      margin: 18, 
-      seller: 'HellenWong',
-      sellers: [
-        { id: 'g2g-hellenwong-mc', name: 'HellenWong', price_idr: 186000, rating_pct: 99.8, reviews: 32450, delivery: 'Instant Delivery', tier: 'ultra_safe', tier_label: '🛡️ Top Verified', tier_desc: 'Paling aman terverifikasi, rating 99.8%, 32k+ ulasan.', is_selected: true },
-        { id: 'g2g-mc-lowest', name: 'HellenWong_Hypixel', price_idr: 148100, rating_pct: 99.8, reviews: 32450, delivery: 'Instant Delivery', tier: 'lowest_price', tier_label: '⚡ Lowest Price', tier_desc: 'Harga paling kompetitif untuk akun full access, margin maksimal.', is_selected: false },
-        { id: 'g2g-mc-rising', name: 'HellenWong_TLauncher', price_idr: 18000, rating_pct: 99.8, reviews: 32450, delivery: 'Instant Delivery', tier: 'mid_level', tier_label: '⚖️ Mid-Level / Rising', tier_desc: 'Seller alternatif berkualitas dengan stok melimpah.', is_selected: false },
-      ]
-    },
-    { 
-      id: 'terraria', 
-      catalogId: 'game-terraria-02',
-      title: 'Terraria', 
-      platform: 'Steam', 
-      category: 'Account (Full Access)',
-      price: 39900, 
-      g2gIdr: 16900, 
-      margin: 39, 
-      seller: 'TAceOfSpades',
-      sellers: [
-        { id: 'g2g-hellenwong-tr', name: 'HellenWong', price_idr: 18000, rating_pct: 99.8, reviews: 32450, delivery: 'Instant Delivery', tier: 'ultra_safe', tier_label: '🛡️ Top Verified', tier_desc: 'Top verified supplier, full access + email asli terjamin aman.', is_selected: false },
-        { id: 'g2g-taceofspades-tr', name: 'TAceOfSpades', price_idr: 16900, rating_pct: 99.7, reviews: 18900, delivery: 'Instant Delivery', tier: 'lowest_price', tier_label: '⚡ Lowest Price', tier_desc: 'Harga modal terendah (Rp 16.900) dengan akun Steam full access.', is_selected: true },
-        { id: 'g2g-madangna-tr', name: 'madangna', price_idr: 18000, rating_pct: 99.4, reviews: 14200, delivery: 'Instant Delivery', tier: 'mid_level', tier_label: '⚖️ Mid-Level / Baru', tier_desc: 'Seller baru terbit bereputasi bagus, 0 jam main, pengiriman 3-5 menit.', is_selected: false },
-      ]
-    },
-    { 
-      id: 'wukong', 
-      catalogId: 'game-wukong-03',
-      title: 'Black Myth: Wukong', 
-      platform: 'Steam', 
-      category: 'Account (Full Access)',
-      price: 389000, 
-      g2gIdr: 288800, 
-      margin: 16, 
-      seller: 'FinanceWZ',
-      sellers: [
-        { id: 'g2g-hellenwong-wk', name: 'HellenWong', price_idr: 664600, rating_pct: 99.8, reviews: 32450, delivery: 'Instant Delivery', tier: 'ultra_safe', tier_label: '🛡️ Top Verified', tier_desc: 'Akun fresh 0 jam dengan garansi penuh toko verified bintang 5.', is_selected: false },
-        { id: 'g2g-financewz-wk', name: 'FinanceWZ', price_idr: 288800, rating_pct: 99.5, reviews: 8700, delivery: 'Instant Delivery', tier: 'lowest_price', tier_label: '⚡ Lowest Price', tier_desc: 'Harga modal termurah Rp 288.800, full access can change data.', is_selected: true },
-        { id: 'g2g-wukong-rising', name: 'HellenWong_SaveGame', price_idr: 722200, rating_pct: 99.8, reviews: 32450, delivery: 'Instant Delivery', tier: 'mid_level', tier_label: '⚖️ Mid-Level / Variasi', tier_desc: 'Seller variasi khusus dengan akun modifikasi/savegame aktif terverifikasi.', is_selected: false },
-      ]
-    },
-    { 
-      id: 'gtav', 
-      catalogId: 'game-gtav-04',
-      title: 'GTA V: Enhanced', 
-      platform: 'Rockstar / Steam', 
-      category: 'Account (Full Access)',
-      price: 269000, 
-      g2gIdr: 186000, 
-      margin: 16, 
-      seller: 'madangna',
-      sellers: [
-        { id: 'g2g-hellenwong-gta', name: 'HellenWong', price_idr: 198700, rating_pct: 99.8, reviews: 32450, delivery: 'Instant Delivery', tier: 'ultra_safe', tier_label: '🛡️ Top Verified', tier_desc: 'Top seller terverifikasi, akun GTA V + bonus 20 games gratis.', is_selected: false },
-        { id: 'g2g-madangna-gta', name: 'madangna', price_idr: 186000, rating_pct: 99.4, reviews: 14200, delivery: 'Instant Delivery', tier: 'lowest_price', tier_label: '⚡ Lowest Price', tier_desc: 'Harga modal termurah Rp 186.000, 0 jam main, data bisa diganti.', is_selected: true },
-        { id: 'g2g-gta-rising', name: 'madangna_FiveM', price_idr: 18000, rating_pct: 99.4, reviews: 14200, delivery: 'Instant Delivery', tier: 'mid_level', tier_label: '⚖️ Mid-Level / FiveM', tier_desc: 'Akun Social Club khusus FiveM dengan modal sangat ekonomis.', is_selected: false },
-      ]
-    },
-    { 
-      id: 'tf2', 
-      catalogId: 'game-tf2-05',
-      title: 'TF2 Supply Crate Key', 
-      platform: 'Steam Trade', 
-      category: 'In-Game Asset / Key',
-      price: 46900, 
-      g2gIdr: 32900, 
-      margin: 15, 
-      seller: 'Sharktech',
-      sellers: [
-        { id: 'g2g-sharktech-tf2', name: 'Sharktech', price_idr: 32900, rating_pct: 99.9, reviews: 41200, delivery: 'Instant Delivery', tier: 'ultra_safe', tier_label: '🛡️ Top Verified', tier_desc: 'Rating 99.9%, 41.200 ulasan, supplier likuiditas TF2 terbesar & paling aman.', is_selected: true },
-        { id: 'g2g-hellenwong-tf2', name: 'HellenWong', price_idr: 33000, rating_pct: 99.8, reviews: 32450, delivery: 'Instant Delivery', tier: 'lowest_price', tier_label: '⚡ Lowest Price', tier_desc: 'Harga bersaing Rp 33.000, online 24 jam nonstop.', is_selected: false },
-        { id: 'g2g-player-tf2', name: 'Player', price_idr: 33400, rating_pct: 99.8, reviews: 5400, delivery: 'Instant Delivery', tier: 'mid_level', tier_label: '⚖️ Mid-Level / Baru', tier_desc: 'Rising trader dengan pengiriman 5 menit dan 100% feedback positif.', is_selected: false },
-      ]
-    },
-    { 
-      id: 'fc25', 
-      catalogId: 'game-fc25-06',
-      title: 'EA SPORTS FC 25', 
-      platform: 'EA App / PC', 
-      category: 'Account (Full Access)',
-      price: 149000, 
-      g2gIdr: 87600, 
-      margin: 30, 
-      seller: 'krovler',
-      sellers: [
-        { id: 'g2g-hellenwong-fc', name: 'HellenWong', price_idr: 361200, rating_pct: 99.8, reviews: 32450, delivery: 'Instant Delivery', tier: 'ultra_safe', tier_label: '🛡️ Top Verified', tier_desc: 'Verified top seller, akun stabil dengan support penggantian kilat.', is_selected: false },
-        { id: 'g2g-krovler-fc', name: 'krovler', price_idr: 87600, rating_pct: 99.6, reviews: 11200, delivery: 'Instant Delivery', tier: 'lowest_price', tier_label: '⚡ Lowest Price', tier_desc: 'Harga paling murah Rp 87.600, email included, profit margin 30%+.', is_selected: true },
-        { id: 'g2g-lootkings-fc', name: 'LootKings', price_idr: 196900, rating_pct: 99.2, reviews: 9400, delivery: 'Instant Delivery', tier: 'mid_level', tier_label: '⚖️ Mid-Level / Baru', tier_desc: 'Akun Steam FC 25 instan dari seller mid-tier terpercaya.', is_selected: false },
-      ]
-    },
-  ];
+  // Dynamic presets derived directly from live active catalog in DB
+  const presets = useMemo(() => {
+    if (catalogGames && catalogGames.length > 0) {
+      return catalogGames.map((g) => {
+        const selectedSeller =
+          g.sellers?.find((s: any) => (s.seller_id || s.id) === g.selected_seller_id) ||
+          g.sellers?.[0] || {
+            seller_id: 'default',
+            seller_name: 'G2G Seller',
+            price_g2g_idr: 100000,
+            rating_pct: 99.0,
+            reviews_count: 1000,
+            delivery_speed: 'Instant Delivery',
+            tier: 'mid_level',
+            tier_label: '⚖️ Mid-Level',
+            tier_desc: ''
+          };
+
+        return {
+          id: g.id,
+          catalogId: g.id,
+          title: g.title,
+          platform: g.platform,
+          category: g.category || 'Digital Key / Account',
+          price: Number(g.selling_price_shopee_idr) || 100000,
+          g2gIdr: Number(selectedSeller.price_g2g_idr || selectedSeller.price_idr) || 100000,
+          margin: Number(g.target_margin_pct) || 20,
+          seller: selectedSeller.seller_name || selectedSeller.name || 'G2G Seller',
+          sellers: (g.sellers || []).map((s: any, idx: number) => ({
+            id: s.seller_id || s.id || `g2g-s-${idx}`,
+            name: s.seller_name || s.name || 'G2G Seller',
+            price_idr: Number(s.price_g2g_idr || s.price_idr) || 100000,
+            rating_pct: Number(s.rating_pct) || 99.5,
+            reviews: Number(s.reviews_count || s.reviews) || 1000,
+            delivery: s.delivery_speed || s.delivery || 'Instant Delivery',
+            tier: s.tier || 'mid_level',
+            tier_label: s.tier_label || '⚖️ Mid-Level',
+            tier_desc: s.tier_desc || '',
+            is_selected: (s.seller_id || s.id) === g.selected_seller_id,
+          }))
+        };
+      });
+    }
+    return [];
+  }, [catalogGames]);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
@@ -558,7 +520,7 @@ export default function QuantPage() {
 
   const isSwitchingGameRef = useRef(false);
 
-  const handlePreset = async (p: typeof presets[0]) => {
+  const handlePreset = async (p: any) => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
@@ -569,55 +531,21 @@ export default function QuantPage() {
     setTimeout(() => { isSwitchingGameRef.current = false; }, 1000);
 
     setActivePreset(p.id);
-
-    const fromLive = catalogGames.find(g => {
-      if (g.id === p.catalogId) return true;
-      const t = g.title.toLowerCase();
-      if (p.id === 'minecraft') return t.includes('minecraft');
-      if (p.id === 'terraria') return t.includes('terraria');
-      if (p.id === 'wukong') return t.includes('wukong') || t.includes('black myth');
-      if (p.id === 'gtav') return t.includes('grand theft') || t.includes('gta');
-      if (p.id === 'tf2') return t.includes('mann co') || t.includes('tf2') || t.includes('team fortress');
-      if (p.id === 'fc25') return t.includes('fc 25') || t.includes('fc25') || t.includes('ea sports fc');
-      return false;
-    });
-
-    if (fromLive) {
-      setCurrentGameId(fromLive.id);
-      setGameTitle(fromLive.title);
-      setPlatform(fromLive.platform);
-      setCategory(fromLive.category);
-      setSellingPrice(fromLive.selling_price_shopee_idr);
-      setTargetMarginPct(fromLive.target_margin_pct);
-      if (Array.isArray(fromLive.sellers) && fromLive.sellers.length > 0) {
-        const mapped: SellerOption[] = fromLive.sellers.map((s: any) => ({
-          id: s.seller_id,
-          name: s.seller_name,
-          price_idr: s.price_g2g_idr,
-          rating_pct: s.rating_pct,
-          reviews: s.reviews_count,
-          delivery: s.delivery_speed || 'Instant Delivery',
-          is_selected: s.seller_id === fromLive.selected_seller_id,
-          tier: s.tier,
-          tier_label: s.tier_label,
-          tier_desc: s.tier_desc
-        }));
-        setSellers(mapped);
-        const sel = mapped.find(s => s.is_selected) || mapped[0];
-        setCogsG2gIdr(sel.price_idr);
-        return;
-      }
-    }
-
-    setCurrentGameId(p.catalogId);
+    setCurrentGameId(p.catalogId || p.id);
     setGameTitle(p.title);
     setPlatform(p.platform);
     setCategory(p.category);
     setSellingPrice(p.price);
     setTargetMarginPct(p.margin);
-    setSellers(p.sellers);
-    const active = p.sellers.find(s => s.is_selected) || p.sellers[0];
-    setCogsG2gIdr(active.price_idr);
+
+    if (Array.isArray(p.sellers) && p.sellers.length > 0) {
+      setSellers(p.sellers);
+      const active = p.sellers.find((s: any) => s.is_selected) || p.sellers[0];
+      setCogsG2gIdr(active.price_idr);
+    } else {
+      setSellers([]);
+      setCogsG2gIdr(Math.round(p.price * 0.7));
+    }
   };
 
   const handleSelectTierStrategy = (tier: 'ultra_safe' | 'lowest_price' | 'mid_level') => {
@@ -827,29 +755,38 @@ export default function QuantPage() {
           <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {presets.map((p) => {
-            const live = catalogGames.find(g => g.id === p.catalogId || g.title.toLowerCase().includes(p.id));
-            const displayPrice = live ? live.selling_price_shopee_idr : p.price;
-            const displayMargin = live ? live.target_margin_pct : p.margin;
+          {presets.length === 0 ? (
+            <div className="p-4 rounded-xl border border-white/[0.06] bg-zinc-950/40 text-xs text-slate-400 flex items-center justify-between w-full">
+              <span>Portofolio masih kosong. Tambahkan game baru di <Link href="/dashboard/catalog" className="text-emerald-400 underline font-medium">Katalog Radar</Link> atau ketik langsung di bawah.</span>
+              <Link href="/dashboard/catalog" className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono hover:bg-emerald-500/20 whitespace-nowrap ml-4">
+                + Tambah Game
+              </Link>
+            </div>
+          ) : (
+            presets.map((p) => {
+              const live = catalogGames.find(g => g.id === p.catalogId || g.title.toLowerCase().includes(p.id));
+              const displayPrice = live ? live.selling_price_shopee_idr : p.price;
+              const displayMargin = live ? live.target_margin_pct : p.margin;
 
-            return (
-              <button
-                key={p.id}
-                onClick={() => handlePreset(p)}
-                className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-xs transition-all border ${
-                  activePreset === p.id 
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                    : 'bg-zinc-950/60 border-white/[0.06] text-slate-400 hover:text-slate-200 hover:border-white/[0.1]'
-                }`}
-              >
-                <div className="font-semibold text-left">{p.title.split(':')[0]}</div>
-                <div className="flex items-center gap-3 mt-1 font-mono text-[10px]">
-                  <span className={activePreset === p.id ? 'text-emerald-300' : 'text-slate-500'}>{formatRp(displayPrice)}</span>
-                  <span className={activePreset === p.id ? 'text-emerald-400 font-bold' : 'text-emerald-500/70'}>{displayMargin}%</span>
-                </div>
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => handlePreset(p)}
+                  className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-xs transition-all border ${
+                    activePreset === p.id 
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                      : 'bg-zinc-950/60 border-white/[0.06] text-slate-400 hover:text-slate-200 hover:border-white/[0.1]'
+                  }`}
+                >
+                  <div className="font-semibold text-left">{p.title.split(':')[0]}</div>
+                  <div className="flex items-center gap-3 mt-1 font-mono text-[10px]">
+                    <span className={activePreset === p.id ? 'text-emerald-300' : 'text-slate-500'}>{formatRp(displayPrice)}</span>
+                    <span className={activePreset === p.id ? 'text-emerald-400 font-bold' : 'text-emerald-500/70'}>{displayMargin}%</span>
+                  </div>
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -883,11 +820,42 @@ export default function QuantPage() {
         <div className="lg:col-span-8 space-y-7">
           
           <div className="v0-card rounded-2xl p-5 sm:p-6 space-y-5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                 <Tag className="w-4 h-4 text-emerald-400" /> Identitas Game & Lisensi
               </h2>
-              <span className="text-[10px] font-mono text-slate-500 bg-black/40 px-2 py-1 rounded-md border border-white/[0.06]">ID: {currentGameId}</span>
+              <div className="flex items-center gap-2">
+                {catalogGames.length > 0 && (
+                  <select
+                    value={currentGameId}
+                    onChange={(e) => {
+                      const selected = catalogGames.find(g => g.id === e.target.value);
+                      if (selected) {
+                        const p = presets.find(pr => pr.catalogId === selected.id) || {
+                          id: selected.id,
+                          catalogId: selected.id,
+                          title: selected.title,
+                          platform: selected.platform,
+                          category: selected.category,
+                          price: selected.selling_price_shopee_idr,
+                          margin: selected.target_margin_pct,
+                          sellers: selected.sellers
+                        };
+                        handlePreset(p);
+                      }
+                    }}
+                    className="text-[11px] font-mono bg-zinc-900 border border-white/[0.1] text-emerald-400 px-2 py-1 rounded-lg focus:outline-none"
+                  >
+                    <option value="" disabled>-- Pilih Portofolio ({catalogGames.length} Game) --</option>
+                    {catalogGames.map(g => (
+                      <option key={g.id} value={g.id} className="bg-zinc-950 text-white">
+                        {g.title} ({formatRp(g.selling_price_shopee_idr)})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <span className="text-[10px] font-mono text-slate-500 bg-black/40 px-2 py-1 rounded-md border border-white/[0.06]">ID: {currentGameId || 'NEW'}</span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-5">

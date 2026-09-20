@@ -39,6 +39,7 @@ import {
 export default function OperatorPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [data, setData] = useState<any>(null);
+  const [catalogGames, setCatalogGames] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
 
   // Quick Account Delivery Formatter State
@@ -107,9 +108,25 @@ export default function OperatorPage() {
     }
   };
 
+  const fetchCatalog = async () => {
+    try {
+      const res = await fetch("/api/catalog");
+      const json = await res.json();
+      if (json.status === "success" && Array.isArray(json.data)) {
+        setCatalogGames(json.data);
+        if (json.data.length > 0) {
+          setQuickGame(json.data[0].title);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load catalog into operator page:", e);
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
     fetchLedger();
+    fetchCatalog();
   }, []);
 
   const formatCurrency = (val: number) => 
@@ -708,7 +725,25 @@ export default function OperatorPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] font-mono uppercase tracking-widest text-slate-500 block mb-1.5">Game</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-widest text-slate-500">Game</label>
+                  {catalogGames.length > 0 && (
+                    <span className="text-[9px] font-mono text-emerald-400">Portofolio</span>
+                  )}
+                </div>
+                {catalogGames.length > 0 && (
+                  <select
+                    value={quickGame}
+                    onChange={(e) => setQuickGame(e.target.value)}
+                    className="w-full bg-zinc-950 border border-purple-500/30 rounded-xl px-3 py-2 text-xs font-mono text-purple-200 mb-2 focus:outline-none focus:border-purple-500"
+                  >
+                    {catalogGames.map((g) => (
+                      <option key={g.id} value={g.title}>
+                        {g.title} ({g.platform})
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <input
                   type="text"
                   value={quickGame}

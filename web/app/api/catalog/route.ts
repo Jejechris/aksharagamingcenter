@@ -278,7 +278,7 @@ export async function GET() {
   try {
     const dbCatalog = await getDbCatalog();
     let rawCatalog: any[];
-    if (dbCatalog && dbCatalog.length > 0) {
+    if (dbCatalog !== null) {
       rawCatalog = dbCatalog;
       inMemoryCatalogCache = dbCatalog;
     } else {

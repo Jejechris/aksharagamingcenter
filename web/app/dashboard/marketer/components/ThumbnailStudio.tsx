@@ -221,6 +221,24 @@ export default function ThumbnailStudio() {
     "#1897fe", "#141414", "#0f1e36", "#a82020"
   ]);
 
+  // Catalog Portfolio Games
+  const [catalogGames, setCatalogGames] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const res = await fetch("/api/catalog");
+        const json = await res.json();
+        if (json.status === "success" && Array.isArray(json.data)) {
+          setCatalogGames(json.data);
+        }
+      } catch (e) {
+        console.error("Failed to load catalog into ThumbnailStudio:", e);
+      }
+    }
+    loadCatalog();
+  }, []);
+
   // Smart Aspect Ratio Auto-Detector
   const detectImageAspectAndAutoFit = (url: string) => {
     if (!url) return;
@@ -899,7 +917,23 @@ export default function ThumbnailStudio() {
 
           {/* Quick 1-Click Game Shortcuts */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-            <span className="text-[11px] font-mono text-zinc-500 whitespace-nowrap mr-1">Rekomendasi Cepat:</span>
+            <span className="text-[11px] font-mono text-zinc-500 whitespace-nowrap mr-1">
+              {catalogGames.length > 0 ? "Portofolio Aktif:" : "Rekomendasi Cepat:"}
+            </span>
+            {catalogGames.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => {
+                  setAiSearchInput(g.title);
+                  handleAutonomousAiDesign(g.title);
+                }}
+                disabled={isGenerating}
+                className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-[11px] font-mono whitespace-nowrap transition-all flex items-center gap-1 disabled:opacity-50 font-semibold shadow-sm"
+              >
+                <span>🎮 {g.title.split(":")[0]}</span>
+              </button>
+            ))}
             {[
               { label: "inZOI", query: "inZOI" },
               { label: "Grand Theft Auto V", query: "Grand Theft Auto V" },
