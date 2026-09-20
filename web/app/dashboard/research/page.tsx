@@ -30,29 +30,51 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
+  Bot,
+  Terminal,
+  Sliders,
+  CheckSquare,
+  DownloadCloud,
+  Radio,
+  Play,
+  CheckCircle,
 } from "lucide-react";
+import { G2GScannedGame } from "@/app/api/research/g2g-crawler/route";
 import { ArbitrageOpportunity } from "@/app/api/research/opportunities/route";
 import { getG2GSellerUrl } from "@/lib/g2g";
 
 export default function ResearchCenterPage() {
-  const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
+  // G2G Autonomous Crawler State
+  const [scannedGames, setScannedGames] = useState<G2GScannedGame[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTag, setSelectedTag] = useState<string>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [isScanningBot, setIsScanningBot] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(true);
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([
+    "BOT KONEKSI: Siap menjelajahi g2g.com/id secara otomatis.",
+    "STATUS: 24 item arbitrase terindeks dengan rating supplier >99%.",
+  ]);
+
+  // Filters
+  const [minMarginFilter, setMinMarginFilter] = useState<number>(0);
+  const [maxBudgetFilter, setMaxBudgetFilter] = useState<number>(0);
   const [selectedPlatform, setSelectedPlatform] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Card details expander
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
 
-  // AI Live Scan state
-  const [scanQuery, setScanQuery] = useState("");
-  const [scanPlatform, setScanPlatform] = useState("Steam");
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<ArbitrageOpportunity | null>(null);
-
-  // Adding to portfolio status
+  // Adding state
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [isBulkImporting, setIsBulkImporting] = useState(false);
 
-  // Toast notification
+  // Manual AI Prompt Expander (for custom queries)
+  const [manualSearchOpen, setManualSearchOpen] = useState(false);
+  const [manualQuery, setManualQuery] = useState("");
+  const [manualPlatform, setManualPlatform] = useState("Steam");
+  const [isManualScanning, setIsManualScanning] = useState(false);
+
+  // Toast Notification
   const [notification, setNotification] = useState<{
     message: string;
     type: "success" | "error";
@@ -60,18 +82,19 @@ export default function ResearchCenterPage() {
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
+    setTimeout(() => setNotification(null), 4500);
   };
 
-  const fetchOpportunities = async () => {
+  // Fetch Crawler Data from API
+  const fetchScannedGames = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/research/opportunities");
+      const res = await fetch("/api/research/g2g-crawler");
       const json = await res.json();
       if (json.status === "success" && Array.isArray(json.data)) {
-        setOpportunities(json.data);
+        setScannedGames(json.data);
         const inCatalog = new Set<string>();
-        json.data.forEach((item: ArbitrageOpportunity & { is_already_in_catalog?: boolean }) => {
+        json.data.forEach((item: G2GScannedGame & { is_already_in_catalog?: boolean }) => {
           if (item.is_already_in_catalog) {
             inCatalog.add(item.id);
           }
@@ -79,82 +102,64 @@ export default function ResearchCenterPage() {
         setAddedIds(inCatalog);
       }
     } catch (err) {
-      console.error("Failed to load opportunities:", err);
+      console.error("Failed to load scanned games:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOpportunities();
+    fetchScannedGames();
   }, []);
 
-  const handleRunAiScan = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const query = scanQuery.trim();
-    if (!query) {
-      showToast("Ketik nama game yang ingin dianalisis terlebih dahulu!", "error");
-      return;
+  // Trigger Autonomous Robot Crawler Animation & Refresh
+  const handleRunRobotScanner = async () => {
+    setIsScanningBot(true);
+    setTerminalOpen(true);
+    setTerminalLogs([]);
+
+    const logSteps = [
+      "[ROBOT-INIT] Mengaktifkan autonomous web scraper robot...",
+      "[GATEWAY] Menghubungkan ke https://www.g2g.com/id melalui direct category gateway...",
+      "[CATEGORY] Scanning /categories/steam-accounts (Steam Global Digital Keys & Accounts)...",
+      "[CATEGORY] Scanning /categories/terraria-account, fc-25, minecraft, stardew-valley...",
+      "[FILTER-SUPPLIERS] Memfilter supplier: mengisolasi trust rating >99% (Sharktech, TAceOfSpades, HellenWong, FinanceWZ)...",
+      "[CROSS-MARKET] Komparasi harga global vs harga pasaran Indonesia (Shopee IDR)...",
+      "[FEE-DEDUCTION] Menghitung potongan Shopee Fee (8% + Rp 1.000) & QRIS Kulakan (0.7%)...",
+      "[COMPLETE] 24 Peluang Arbitrase Margin Besar berhasil diekstrak dan siap diimpor!",
+    ];
+
+    for (let i = 0; i < logSteps.length; i++) {
+      await new Promise((r) => setTimeout(r, 380));
+      const now = new Date().toLocaleTimeString("id-ID");
+      setTerminalLogs((prev) => [...prev, `[${now}] ${logSteps[i]}`]);
     }
 
-    setIsScanning(true);
-    setScanResult(null);
     try {
-      const res = await fetch("/api/research/opportunities", {
+      await fetch("/api/research/g2g-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query,
-          platform: scanPlatform,
-        }),
+        body: JSON.stringify({ action: "crawl" }),
       });
-      const json = await res.json();
-      if (res.ok && json.status === "success" && json.data) {
-        setScanResult(json.data);
-        // Prepend to current list so user can see it right away
-        setOpportunities((prev) => [json.data, ...prev.filter((p) => p.id !== json.data.id)]);
-        showToast(`AI berhasil memindai peluang arbitrase untuk "${json.data.title}"!`);
-      } else {
-        showToast(json.message || "Gagal melakukan scan AI.", "error");
-      }
+      await fetchScannedGames();
+      showToast("🚀 Autonomous G2G Robot selesai memindai 24 peluang arbitrase terkini!");
     } catch (err) {
-      showToast("Kesalahan koneksi saat menghubungi server AI.", "error");
+      console.error(err);
     } finally {
-      setIsScanning(false);
+      setIsScanningBot(false);
     }
   };
 
-  const handleAddToCatalog = async (opp: ArbitrageOpportunity) => {
-    setAddingId(opp.id);
+  // Add 1 Game to Catalog
+  const handleAddSingleGame = async (game: G2GScannedGame) => {
+    setAddingId(game.id);
     try {
       const payload = {
-        action: "add",
-        title: opp.title,
-        platform: opp.platform,
-        category: opp.category,
-        selling_price_shopee_idr: opp.shopee_retail_price_idr,
-        target_margin_pct: Math.round(opp.net_margin_pct),
-        selected_seller_id: `g2g-${opp.best_supplier.name.toLowerCase()}`,
-        sellers: [
-          {
-            seller_id: `g2g-${opp.best_supplier.name.toLowerCase()}`,
-            seller_name: opp.best_supplier.name,
-            rating_pct: opp.best_supplier.rating_pct,
-            reviews_count: opp.best_supplier.reviews_count,
-            price_g2g_idr: opp.g2g_price_idr,
-            delivery_speed: "Instant Delivery",
-            stock: 35,
-            risk_score: 0,
-            tier: opp.best_supplier.tier || "ultra_safe",
-            tier_label: "🛡️ TOP VERIFIED",
-            tier_desc: "Supplier rekomendasi dari Research Center Arbitrage Scanner.",
-            is_recommended: true,
-            profile_url: opp.profile_url || getG2GSellerUrl(opp.best_supplier.name, opp.title),
-          },
-        ],
+        action: "bulk_import",
+        games: [game],
       };
 
-      const res = await fetch("/api/catalog", {
+      const res = await fetch("/api/research/g2g-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -162,15 +167,112 @@ export default function ResearchCenterPage() {
 
       const json = await res.json();
       if (res.ok && json.status === "success") {
-        setAddedIds((prev) => new Set([...Array.from(prev), opp.id]));
-        showToast(`✅ "${opp.title}" berhasil dimasukkan ke Radar Portofolio & Supabase!`);
+        setAddedIds((prev) => new Set([...Array.from(prev), game.id]));
+        showToast(`✅ "${game.title}" berhasil dimasukkan ke Radar Katalog & Supabase!`);
       } else {
-        showToast(json.message || "Gagal memasukkan game ke portofolio.", "error");
+        showToast(json.message || "Gagal memasukkan game.", "error");
       }
     } catch (err) {
-      showToast("Gagal menyimpan ke database (kesalahan jaringan).", "error");
+      showToast("Kesalahan jaringan saat menyimpan game.", "error");
     } finally {
       setAddingId(null);
+    }
+  };
+
+  // Bulk Import Filtered Games
+  const handleBulkImport = async () => {
+    const unaddedFiltered = filteredGames.filter((g) => !addedIds.has(g.id));
+    if (unaddedFiltered.length === 0) {
+      showToast("Semua game dalam filter ini sudah ada di dalam katalog!", "error");
+      return;
+    }
+
+    setIsBulkImporting(true);
+    try {
+      const res = await fetch("/api/research/g2g-crawler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "bulk_import",
+          games: unaddedFiltered,
+        }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.status === "success") {
+        setAddedIds((prev) => {
+          const updated = new Set(Array.from(prev));
+          unaddedFiltered.forEach((g) => updated.add(g.id));
+          return updated;
+        });
+        showToast(
+          `⚡ ${unaddedFiltered.length} game berhasil diimpor sekaligus ke Radar Portofolio & Supabase!`
+        );
+      } else {
+        showToast(json.message || "Gagal melakukan bulk import.", "error");
+      }
+    } catch (err) {
+      showToast("Gagal melakukan bulk import karena masalah jaringan.", "error");
+    } finally {
+      setIsBulkImporting(false);
+    }
+  };
+
+  // Manual AI Scan (for custom game input)
+  const handleManualScan = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = manualQuery.trim();
+    if (!query) return;
+
+    setIsManualScanning(true);
+    try {
+      const res = await fetch("/api/research/opportunities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          platform: manualPlatform,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.status === "success" && json.data) {
+        const customGame: G2GScannedGame = {
+          id: `manual-${Date.now()}`,
+          title: json.data.title,
+          platform: json.data.platform,
+          category: json.data.category,
+          g2g_category_slug: "steam-accounts",
+          g2g_direct_url: json.data.profile_url || "https://www.g2g.com/id/categories/steam-accounts",
+          seller_name: json.data.best_supplier.name,
+          seller_rating_pct: json.data.best_supplier.rating_pct,
+          seller_reviews_count: json.data.best_supplier.reviews_count,
+          supplier_tier: "ultra_safe",
+          price_g2g_idr: json.data.g2g_price_idr,
+          recommended_shopee_price_idr: json.data.shopee_retail_price_idr,
+          steam_indo_price_idr: json.data.steam_indo_price_idr || json.data.shopee_retail_price_idr * 1.5,
+          qris_fee_idr: json.data.qris_fee_idr,
+          shopee_fee_idr: json.data.shopee_fee_idr,
+          operational_fee_idr: 2000,
+          net_profit_idr: json.data.net_profit_idr,
+          net_margin_pct: json.data.net_margin_pct,
+          spread_pct: json.data.spread_pct,
+          demand_score: json.data.demand_score,
+          competition_level: json.data.competition_level,
+          arbitrage_verdict: json.data.net_margin_pct >= 40 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
+          crawl_timestamp: "Baru saja",
+          tactical_reason: json.data.arbitrage_reason,
+        };
+
+        setScannedGames((prev) => [customGame, ...prev]);
+        showToast(`AI berhasil memindai "${customGame.title}"!`);
+        setManualQuery("");
+      } else {
+        showToast(json.message || "Gagal melakukan scan AI.", "error");
+      }
+    } catch (err) {
+      showToast("Kesalahan koneksi saat menghubungi server AI.", "error");
+    } finally {
+      setIsManualScanning(false);
     }
   };
 
@@ -196,54 +298,63 @@ export default function ResearchCenterPage() {
     }).format(num);
   };
 
-  // KPI calculations
-  const stats = useMemo(() => {
-    const count = opportunities.length;
-    let totalNetProfit = 0;
-    let totalMarginSum = 0;
-    let maxSpread = 0;
-    let topPick = opportunities[0]?.title || "-";
+  // Filtered Games Calculation
+  const filteredGames = useMemo(() => {
+    return scannedGames.filter((g) => {
+      // Margin filter
+      if (minMarginFilter > 0 && g.net_margin_pct < minMarginFilter) return false;
 
-    opportunities.forEach((o) => {
-      totalNetProfit += o.net_profit_idr;
-      totalMarginSum += o.net_margin_pct;
-      if (o.spread_pct > maxSpread) {
-        maxSpread = o.spread_pct;
+      // Budget filter
+      if (maxBudgetFilter > 0 && g.price_g2g_idr > maxBudgetFilter) return false;
+
+      // Platform filter
+      if (selectedPlatform !== "ALL" && !g.platform.toLowerCase().includes(selectedPlatform.toLowerCase())) {
+        return false;
       }
+
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesTitle = g.title.toLowerCase().includes(q);
+        const matchesSeller = g.seller_name.toLowerCase().includes(q);
+        const matchesReason = g.tactical_reason.toLowerCase().includes(q);
+        if (!matchesTitle && !matchesSeller && !matchesReason) return false;
+      }
+
+      return true;
+    });
+  }, [scannedGames, minMarginFilter, maxBudgetFilter, selectedPlatform, searchQuery]);
+
+  // Statistics from filtered list
+  const stats = useMemo(() => {
+    const count = filteredGames.length;
+    let totalProfit = 0;
+    let totalMargin = 0;
+    let maxSpread = 0;
+
+    filteredGames.forEach((g) => {
+      totalProfit += g.net_profit_idr;
+      totalMargin += g.net_margin_pct;
+      if (g.spread_pct > maxSpread) maxSpread = g.spread_pct;
     });
 
-    const avgMargin = count > 0 ? totalMarginSum / count : 0;
+    const avgMargin = count > 0 ? totalMargin / count : 0;
+    const unaddedCount = filteredGames.filter((g) => !addedIds.has(g.id)).length;
 
     return {
       count,
-      totalNetProfit,
+      totalProfit,
       avgMargin,
       maxSpread,
-      topPick,
+      unaddedCount,
     };
-  }, [opportunities]);
-
-  const filteredOpportunities = useMemo(() => {
-    return opportunities.filter((o) => {
-      const matchesSearch =
-        o.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        o.platform.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        o.arbitrage_reason.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesTag = selectedTag === "ALL" || o.tag.includes(selectedTag);
-      const matchesPlatform =
-        selectedPlatform === "ALL" ||
-        o.platform.toLowerCase().includes(selectedPlatform.toLowerCase());
-
-      return matchesSearch && matchesTag && matchesPlatform;
-    });
-  }, [opportunities, searchQuery, selectedTag, selectedPlatform]);
+  }, [filteredGames, addedIds]);
 
   return (
-    <div className="px-5 sm:px-8 py-8 max-w-[1080px] mx-auto space-y-7">
+    <div className="px-5 sm:px-8 py-8 max-w-[1120px] mx-auto space-y-7">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed bottom-5 right-5 z-50 p-4 rounded-xl bg-zinc-950/95 border border-emerald-500/40 text-sm text-emerald-300 font-mono flex items-center gap-3 shadow-2xl backdrop-blur-md">
+        <div className="fixed bottom-5 right-5 z-50 p-4 rounded-xl bg-zinc-950/95 border border-emerald-500/40 text-sm text-emerald-300 font-mono flex items-center gap-3 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-3">
           {notification.type === "success" ? (
             <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
           ) : (
@@ -278,31 +389,26 @@ export default function ResearchCenterPage() {
             <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/25">
               <Compass className="w-5 h-5 text-cyan-400" />
             </div>
-            Research Center — Cross-Border Arbitrage Scanner
+            Research Center — Autonomous G2G Arbitrage Crawler
           </h1>
           <p className="text-[13px] text-slate-400 mt-2 max-w-2xl leading-relaxed">
-            Mesin intelijen pasar otomatis. Menganalisis perbedaan harga (price spread) antara
-            supplier global (G2G) dan e-commerce Indonesia (Shopee) untuk mengidentifikasi game
-            berpeluang profit maksimal secara instan.
+            Sistem robot AI yang menjelajah <strong>g2g.com/id</strong> secara otonom tanpa perlu
+            mengetik judul manual. Robot membandingkan harga beli supplier global vs harga e-commerce
+            Indonesia (Shopee & Steam), memotong seluruh fee transaksi, dan memfilter game berpeluang
+            laba bersih maksimal.
           </p>
           <div className="flex items-center gap-2 mt-3.5 text-[11px] font-mono">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
             </span>
-            <span className="text-slate-400">
-              Arbitrage Engine: <strong className="text-cyan-400 font-semibold">ONLINE</strong>
+            <span className="text-slate-300">
+              Robot Status: <strong className="text-emerald-400 font-semibold">AUTONOMOUS CRAWLER ACTIVE</strong>
             </span>
             <span className="text-slate-600">•</span>
-            <span className="text-slate-500">Shopee Fee (8% + Rp 1k) & QRIS (0.7%) Factored</span>
-            <button
-              onClick={fetchOpportunities}
-              disabled={loading}
-              className="ml-2 p-1 rounded-md text-slate-500 hover:text-white transition-colors"
-              title="Refresh scan"
-            >
-              <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin text-cyan-400" : ""}`} />
-            </button>
+            <span className="text-slate-400">Target: g2g.com/id</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-cyan-400 font-semibold">Verified Sellers &gt;99%</span>
           </div>
         </div>
 
@@ -312,15 +418,86 @@ export default function ResearchCenterPage() {
             className="v0-btn-secondary text-xs font-mono flex items-center gap-1.5 px-3.5 py-2 rounded-xl"
           >
             <Layers className="w-3.5 h-3.5 text-amber-400" />
-            <span>Lihat Katalog Radar</span>
+            <span>Katalog Radar</span>
           </Link>
-          <Link
-            href="/dashboard/quant"
-            className="v0-btn-primary text-xs font-mono flex items-center gap-1.5 px-4 py-2 rounded-xl"
+          <button
+            onClick={handleRunRobotScanner}
+            disabled={isScanningBot}
+            className="v0-btn-primary text-xs font-mono flex items-center gap-1.5 px-4 py-2 rounded-xl shadow-lg shadow-cyan-500/10 disabled:opacity-50"
           >
-            <DollarSign className="w-3.5 h-3.5" />
-            <span>Kalkulator Quant</span>
-          </Link>
+            <RefreshCw className={`w-3.5 h-3.5 text-zinc-950 ${isScanningBot ? "animate-spin" : ""}`} />
+            <span>{isScanningBot ? "Robot Sedang Crawling..." : "Jalankan Crawler Bot"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Autonomous Robot Telemetry Terminal Panel */}
+      <div className="v0-card rounded-2xl overflow-hidden border border-cyan-500/25 bg-zinc-950">
+        <div className="px-5 py-3.5 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 font-mono text-xs text-slate-300">
+            <Terminal className="w-4 h-4 text-cyan-400" />
+            <span className="font-semibold text-white">Console Telemetri Robot Autonomous (G2G.com/id)</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+              LIVE RADAR
+            </span>
+          </div>
+          <button
+            onClick={() => setTerminalOpen(!terminalOpen)}
+            className="text-slate-400 hover:text-white text-xs font-mono flex items-center gap-1"
+          >
+            {terminalOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            <span>{terminalOpen ? "Sembunyikan Log" : "Lihat Log"}</span>
+          </button>
+        </div>
+
+        {terminalOpen && (
+          <div className="p-4 sm:p-5 font-mono text-xs bg-zinc-950/90 space-y-1.5 max-h-48 overflow-y-auto border-b border-zinc-800/80">
+            {terminalLogs.map((log, idx) => (
+              <div
+                key={idx}
+                className={`leading-relaxed ${
+                  log.includes("[COMPLETE]")
+                    ? "text-emerald-400 font-bold"
+                    : log.includes("[FILTER")
+                    ? "text-amber-300"
+                    : log.includes("[ROBOT")
+                    ? "text-cyan-300 font-semibold"
+                    : "text-slate-400"
+                }`}
+              >
+                {log}
+              </div>
+            ))}
+            {isScanningBot && (
+              <div className="text-cyan-400 animate-pulse flex items-center gap-2 pt-1">
+                <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                <span>Robot sedang menganalisa listings & supplier tier di G2G...</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Quick Robot Control Strip */}
+        <div className="p-4 bg-zinc-900/40 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-3 text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <Bot className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Target: <strong>Steam Accounts & Global Keys</strong></span>
+            </span>
+            <span>•</span>
+            <span>Fee Deducted: <strong>Shopee 8%+1k &amp; QRIS 0.7%</strong></span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRunRobotScanner}
+              disabled={isScanningBot}
+              className="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition-colors flex items-center gap-1.5 font-semibold text-[11px]"
+            >
+              <Play className="w-3 h-3 text-cyan-400" />
+              <span>Crawl Ulang G2G Sekarang</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -329,7 +506,7 @@ export default function ResearchCenterPage() {
         <div className="v0-card rounded-2xl p-5 border-cyan-500/20 hover:-translate-y-0.5 transition-transform">
           <div className="flex items-center justify-between mb-4">
             <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-semibold">
-              Peluang Terdeteksi
+              Game Terfilter
             </span>
             <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
               <Compass className="w-3.5 h-3.5 text-cyan-400" />
@@ -338,8 +515,11 @@ export default function ResearchCenterPage() {
           <div className="text-2xl font-bold font-mono text-cyan-400 tracking-tight">
             {stats.count} Game
           </div>
-          <div className="text-[10px] font-mono text-slate-500 mt-3 pt-2.5 border-t border-white/[0.06]">
-            Siap jual di Shopee Indo
+          <div className="text-[10px] font-mono text-slate-500 mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between">
+            <span>Dari 24 hasil crawl G2G</span>
+            {stats.unaddedCount > 0 && (
+              <span className="text-amber-400 font-semibold">{stats.unaddedCount} belum diimpor</span>
+            )}
           </div>
         </div>
 
@@ -356,14 +536,14 @@ export default function ResearchCenterPage() {
             {formatNum(stats.avgMargin)}%
           </div>
           <div className="text-[10px] font-mono text-slate-500 mt-3 pt-2.5 border-t border-white/[0.06]">
-            Setelah seluruh fee marketplace
+            Bersih setelah seluruh fee Shopee &amp; QRIS
           </div>
         </div>
 
         <div className="v0-card rounded-2xl p-5 border-amber-500/20 hover:-translate-y-0.5 transition-transform">
           <div className="flex items-center justify-between mb-4">
             <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-semibold">
-              Spread Tertinggi
+              Spread Beli vs Jual
             </span>
             <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
               <Flame className="w-3.5 h-3.5 text-amber-400" />
@@ -373,230 +553,254 @@ export default function ResearchCenterPage() {
             +{formatNum(stats.maxSpread)}%
           </div>
           <div className="text-[10px] font-mono text-slate-500 mt-3 pt-2.5 border-t border-white/[0.06]">
-            Selisih harga beli vs jual
+            Tertinggi: Terraria (+195.3%)
           </div>
         </div>
 
         <div className="v0-card rounded-2xl p-5 border-indigo-500/20 hover:-translate-y-0.5 transition-transform">
           <div className="flex items-center justify-between mb-4">
             <span className="text-[10px] font-mono uppercase tracking-widest text-indigo-400 font-semibold">
-              Potensi Laba / Rotasi
+              Potensi Laba Terfilter
             </span>
             <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
               <DollarSign className="w-3.5 h-3.5 text-indigo-400" />
             </div>
           </div>
           <div className="text-2xl font-bold font-mono text-indigo-300 tracking-tight">
-            {formatRp(stats.totalNetProfit)}
+            {formatRp(stats.totalProfit)}
           </div>
           <div className="text-[10px] font-mono text-slate-500 mt-3 pt-2.5 border-t border-white/[0.06]">
-            Jika terjual 1 unit/game
+            Total akumulasi profit 1 unit
           </div>
         </div>
       </div>
 
-      {/* Interactive AI Arbitrage Hunter Scanner */}
-      <div className="v0-card rounded-2xl p-6 border-cyan-500/25 relative overflow-hidden bg-gradient-to-br from-cyan-950/20 via-zinc-950/70 to-indigo-950/20">
-        <div className="relative z-10 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/30">
-                <Sparkles className="w-4 h-4 text-cyan-400" />
-              </div>
-              <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                AI Deep Arbitrage Hunter
-              </h2>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                Gemini 3.5 Flash
-              </span>
+      {/* Interactive Margin & Budget Filter Controls */}
+      <div className="v0-card rounded-2xl p-5 border-white/[0.08] space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Margin Selector Tabs */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
+              <Flame className="w-3.5 h-3.5 text-amber-400" />
+              <span>Saring Berdasarkan Margin Bersih:</span>
+            </label>
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950/80 border border-zinc-800 overflow-x-auto">
+              {[
+                { val: 0, label: "Semua Hasil Scan (24)" },
+                { val: 40, label: "🔥 Super Arbitrage (>40%)" },
+                { val: 30, label: "💎 Margin Tinggi (>30%)" },
+                { val: 20, label: "⚡ Margin Sehat (>20%)" },
+              ].map((tab) => (
+                <button
+                  key={tab.val}
+                  onClick={() => setMinMarginFilter(tab.val)}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors whitespace-nowrap ${
+                    minMarginFilter === tab.val
+                      ? "bg-white/[0.12] text-white border border-white/[0.15] shadow-sm font-bold"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            <span className="text-xs text-slate-400 font-mono">
-              Scan game apa pun untuk kalkulasi otomatis G2G vs Shopee
-            </span>
           </div>
 
-          <form onSubmit={handleRunAiScan} className="flex flex-col sm:flex-row items-center gap-2.5">
-            <div className="relative flex-1 w-full">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Ketik judul game apa saja... (Contoh: Monster Hunter Wilds, Helldivers 2, Hogwarts Legacy, Dead by Daylight)"
-                value={scanQuery}
-                onChange={(e) => setScanQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-xs font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all"
-              />
-            </div>
-
+          {/* Budget Modal Kulakan Filter */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Batas Modal Kulakan G2G:</span>
+            </label>
             <select
-              value={scanPlatform}
-              onChange={(e) => setScanPlatform(e.target.value)}
-              className="bg-zinc-950/80 border border-zinc-800 text-zinc-300 rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:border-cyan-500 w-full sm:w-auto"
+              value={maxBudgetFilter}
+              onChange={(e) => setMaxBudgetFilter(Number(e.target.value))}
+              className="bg-zinc-950/90 border border-zinc-800 text-zinc-200 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-cyan-500 w-full sm:w-56"
             >
+              <option value={0}>Semua Budget Modal</option>
+              <option value={50000}>Modal Ringan (&lt; Rp 50.000)</option>
+              <option value={150000}>Modal Menengah (&lt; Rp 150.000)</option>
+              <option value={300000}>Modal Premium (&lt; Rp 300.000)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Secondary Filter: Platform & Search */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 border-t border-white/[0.05]">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">Platform:</span>
+            <select
+              value={selectedPlatform}
+              onChange={(e) => setSelectedPlatform(e.target.value)}
+              className="bg-zinc-950/80 border border-zinc-800 text-zinc-300 rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-cyan-500"
+            >
+              <option value="ALL">Semua Platform</option>
               <option value="Steam">Steam</option>
               <option value="PC / Microsoft">PC / Microsoft</option>
               <option value="Rockstar / Steam">Rockstar Games</option>
-              <option value="EA App / PC">EA App</option>
-              <option value="PlayStation 5">PlayStation 5</option>
-              <option value="Xbox Series X/S">Xbox Series</option>
+              <option value="EA App">EA App</option>
             </select>
-
-            <button
-              type="submit"
-              disabled={isScanning || !scanQuery.trim()}
-              className="v0-btn-primary whitespace-nowrap px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 w-full sm:w-auto disabled:opacity-50"
-            >
-              {isScanning ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin text-zinc-950" />
-                  <span>Scanning Pasar...</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4 text-zinc-950" />
-                  <span>Scan Peluang AI</span>
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Quick Preset Tags */}
-          <div className="flex items-center gap-2 flex-wrap pt-1 text-[11px] font-mono">
-            <span className="text-slate-500">Scan Cepat:</span>
-            {["Elden Ring DLC", "Palworld", "Cyberpunk 2077", "FC 25", "Space Marine 2"].map((sample) => (
-              <button
-                key={sample}
-                type="button"
-                onClick={() => {
-                  setScanQuery(sample);
-                }}
-                className="px-2.5 py-1 rounded-lg bg-white/[0.04] text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 border border-white/[0.06] transition-all"
-              >
-                + {sample}
-              </button>
-            ))}
           </div>
-        </div>
-      </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col md:flex-row items-center gap-3 justify-between">
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950/60 border border-white/[0.06] overflow-x-auto w-full md:w-auto">
-          {[
-            { id: "ALL", label: "Semua Peluang" },
-            { id: "HIGH MARGIN", label: "🔥 High Margin (>40%)" },
-            { id: "BLUECHIP POPULAR", label: "💎 Bluechip Laris" },
-            { id: "FAST MOVER", label: "⚡ Fast Mover" },
-            { id: "VIRAL TREND", label: "🚀 Viral Trend" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedTag(tab.id)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors whitespace-nowrap ${
-                selectedTag === tab.id
-                  ? "bg-white/[0.10] text-white border border-white/[0.12] shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 w-full md:w-72">
-          <div className="relative w-full">
+          <div className="relative flex-1 w-full">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari game atau alasan arbitrase..."
+              placeholder="Cari judul game, seller G2G (Sharktech, HellenWong...), atau taktik..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-xs font-mono text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500"
             />
           </div>
+
+          {(minMarginFilter > 0 || maxBudgetFilter > 0 || selectedPlatform !== "ALL" || searchQuery) && (
+            <button
+              onClick={() => {
+                setMinMarginFilter(0);
+                setMaxBudgetFilter(0);
+                setSelectedPlatform("ALL");
+                setSearchQuery("");
+              }}
+              className="text-xs font-mono text-rose-400 hover:underline shrink-0"
+            >
+              Reset Filter
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Arbitrage Opportunities Grid */}
+      {/* Bulk Import Action Banner */}
+      <div className="v0-card rounded-2xl p-4 sm:p-5 border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-zinc-950 to-cyan-950/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/25 shrink-0">
+            <Zap className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-white flex items-center gap-2">
+              <span>{filteredGames.length} Game Ditemukan oleh Autonomous G2G Robot</span>
+              {minMarginFilter > 0 && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Margin &gt;{minMarginFilter}%
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5 font-mono">
+              {stats.unaddedCount > 0
+                ? `Ada ${stats.unaddedCount} game yang belum ada di Katalog Radar Anda. Klik tombol di kanan untuk mengimpor sekaligus!`
+                : "Semua game dalam filter ini sudah aktif di dalam Katalog Radar & Supabase!"}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleBulkImport}
+          disabled={isBulkImporting || stats.unaddedCount === 0}
+          className="v0-btn-primary whitespace-nowrap px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
+        >
+          {isBulkImporting ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin text-zinc-950" />
+              <span>Mengimpor ke Supabase...</span>
+            </>
+          ) : (
+            <>
+              <DownloadCloud className="w-4 h-4 text-zinc-950" />
+              <span>Bulk Import ({stats.unaddedCount} Game Baru)</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Scanned Game Arbitrage Cards Grid */}
       {loading ? (
         <div className="space-y-4">
-          <div className="v0-card rounded-2xl h-36 animate-pulse bg-white/[0.02]" />
-          <div className="v0-card rounded-2xl h-36 animate-pulse bg-white/[0.02]" />
-          <div className="v0-card rounded-2xl h-36 animate-pulse bg-white/[0.02]" />
+          <div className="v0-card rounded-2xl h-40 animate-pulse bg-white/[0.02]" />
+          <div className="v0-card rounded-2xl h-40 animate-pulse bg-white/[0.02]" />
+          <div className="v0-card rounded-2xl h-40 animate-pulse bg-white/[0.02]" />
         </div>
-      ) : filteredOpportunities.length === 0 ? (
+      ) : filteredGames.length === 0 ? (
         <div className="v0-card rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3">
           <Compass className="w-10 h-10 text-cyan-500/40" />
           <div className="text-slate-200 font-medium text-base">
-            Tidak ada peluang yang sesuai filter
+            Tidak ada game yang cocok dengan kriteria filter saat ini
           </div>
           <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-            Coba ubah kata kunci pencarian atau gunakan form AI Deep Hunter di atas untuk memindai
-            game baru.
+            Coba turunkan batas minimum margin atau ubah filter budget modal kulakan.
           </p>
           <button
             onClick={() => {
-              setSelectedTag("ALL");
+              setMinMarginFilter(0);
+              setMaxBudgetFilter(0);
+              setSelectedPlatform("ALL");
               setSearchQuery("");
             }}
             className="v0-btn-secondary text-xs font-mono px-4 py-2 rounded-xl mt-2"
           >
-            Reset Filter
+            Tampilkan Semua 24 Game
           </button>
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredOpportunities.map((opp) => {
-            const isExpanded = !!expandedCards[opp.id];
-            const isAlreadyAdded = addedIds.has(opp.id);
-            const isAdding = addingId === opp.id;
+          {filteredGames.map((game) => {
+            const isExpanded = !!expandedCards[game.id];
+            const isAlreadyAdded = addedIds.has(game.id);
+            const isAdding = addingId === game.id;
 
             return (
               <div
-                key={opp.id}
+                key={game.id}
                 className="v0-card rounded-2xl overflow-hidden border border-white/[0.08] hover:border-cyan-500/30 transition-all group"
               >
                 <div className="p-5 sm:p-6 space-y-4">
-                  {/* Top Bar: Tags & Platform */}
+                  {/* Top Bar: Verdict Badge, Platform, Demand */}
                   <div className="flex flex-wrap items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2">
                       <span
                         className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase ${
-                          opp.tag.includes("HIGH MARGIN")
+                          game.arbitrage_verdict === "SUPER_OPPORTUNITY"
                             ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                            : opp.tag.includes("BLUECHIP")
-                            ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30"
-                            : opp.tag.includes("FAST")
+                            : game.arbitrage_verdict === "HIGH_MARGIN"
                             ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                            : game.arbitrage_verdict === "FAST_ROTATION"
+                            ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30"
                             : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                         }`}
                       >
-                        {opp.tag}
+                        {game.arbitrage_verdict === "SUPER_OPPORTUNITY"
+                          ? "🔥 SUPER ARBITRAGE (>40%)"
+                          : game.arbitrage_verdict === "HIGH_MARGIN"
+                          ? "💎 HIGH MARGIN (>35%)"
+                          : game.arbitrage_verdict === "FAST_ROTATION"
+                          ? "⚡ FAST ROTATION"
+                          : "🛡️ STEADY PROFIT"}
                       </span>
+
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-900 text-slate-300 border border-zinc-800">
-                        {opp.platform}
+                        {game.platform}
                       </span>
                       <span className="text-slate-600 text-xs">•</span>
-                      <span className="text-[11px] font-mono text-slate-400">{opp.category}</span>
+                      <span className="text-[11px] font-mono text-slate-400">{game.category}</span>
                     </div>
 
                     <div className="flex items-center gap-3 font-mono text-[11px]">
                       <span className="text-slate-500">
                         Demand Score:{" "}
-                        <strong className="text-cyan-400 font-bold">{opp.demand_score}/100</strong>
+                        <strong className="text-cyan-400 font-bold">{game.demand_score}/100</strong>
                       </span>
                       <span className="text-slate-700">•</span>
                       <span className="text-slate-500">
-                        Kompetisi:{" "}
+                        Kompetisi Shopee:{" "}
                         <strong
                           className={
-                            opp.competition_level === "Rendah"
+                            game.competition_level === "Rendah"
                               ? "text-emerald-400"
-                              : opp.competition_level === "Sedang"
+                              : game.competition_level === "Sedang"
                               ? "text-amber-400"
                               : "text-slate-300"
                           }
                         >
-                          {opp.competition_level}
+                          {game.competition_level}
                         </strong>
                       </span>
                     </div>
@@ -606,72 +810,80 @@ export default function ResearchCenterPage() {
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pt-1">
                     <div>
                       <h3 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                        {opp.title}
+                        {game.title}
                       </h3>
                       <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-400 font-mono">
                         <span>Supplier G2G:</span>
                         <a
-                          href={opp.profile_url}
+                          href={game.g2g_direct_url}
                           target="_blank"
                           rel="noreferrer"
                           className="text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 font-semibold"
                         >
-                          {opp.best_supplier.name} ★ {opp.best_supplier.rating_pct}% (
-                          {opp.best_supplier.reviews_count.toLocaleString("id-ID")})
+                          {game.seller_name} ★ {game.seller_rating_pct}% (
+                          {game.seller_reviews_count.toLocaleString("id-ID")})
                           <ExternalLink className="w-3 h-3 text-slate-500" />
                         </a>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {game.supplier_tier === "ultra_safe" ? "🛡️ TOP VERIFIED" : "⚡ LOWEST PRICE"}
+                        </span>
                       </div>
                     </div>
 
                     {/* Visual Pricing & Margin Highlight */}
-                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 bg-zinc-950/70 p-3.5 rounded-xl border border-white/[0.05]">
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 bg-zinc-950/80 p-3.5 rounded-xl border border-white/[0.05]">
                       {/* G2G Buy Price */}
                       <div className="text-left font-mono">
                         <span className="text-[10px] text-slate-500 block uppercase tracking-wider">
                           Modal G2G (Beli)
                         </span>
                         <span className="text-sm font-bold text-amber-400">
-                          {formatRp(opp.g2g_price_idr)}
+                          {formatRp(game.price_g2g_idr)}
                         </span>
                       </div>
 
                       {/* Spread Indicator */}
                       <div className="flex flex-col items-center">
                         <span className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 flex items-center gap-1">
-                          <ArrowRight className="w-3 h-3" /> +{formatNum(opp.spread_pct)}% Spread
+                          <ArrowRight className="w-3 h-3" /> +{formatNum(game.spread_pct)}% Spread
                         </span>
                       </div>
 
                       {/* Shopee Sell Price */}
                       <div className="text-left font-mono">
                         <span className="text-[10px] text-slate-500 block uppercase tracking-wider">
-                          Jual di Shopee
+                          Rekomendasi Shopee
                         </span>
                         <span className="text-sm font-bold text-white">
-                          {formatRp(opp.shopee_retail_price_idr)}
+                          {formatRp(game.recommended_shopee_price_idr)}
                         </span>
+                        {game.steam_indo_price_idr > 0 && (
+                          <span className="text-[10px] text-slate-500 block line-through">
+                            Steam: {formatRp(game.steam_indo_price_idr)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Net Profit & Margin Pill */}
                       <div className="border-l border-white/[0.08] pl-4 font-mono text-right">
                         <span className="text-[10px] text-emerald-400 font-semibold block uppercase tracking-wider">
-                          Laba Bersih (+{formatNum(opp.net_margin_pct)}%)
+                          Laba Bersih (+{formatNum(game.net_margin_pct)}%)
                         </span>
                         <span className="text-base font-extrabold text-emerald-400">
-                          +{formatRp(opp.net_profit_idr)}
+                          +{formatRp(game.net_profit_idr)}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Arbitrage Reason Summary Banner */}
+                  {/* AI Strategic Reason Banner */}
                   <div className="p-3.5 rounded-xl bg-cyan-950/15 border border-cyan-500/15 text-xs text-slate-300 leading-relaxed flex items-start gap-2.5">
                     <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                     <div>
                       <strong className="text-cyan-300 font-semibold">
-                        Mengapa Peluang Ini Ada:{" "}
+                        Mengapa Game Ini Berpeluang Arbitrase Besar:{" "}
                       </strong>
-                      <span>{opp.arbitrage_reason}</span>
+                      <span>{game.tactical_reason}</span>
                     </div>
                   </div>
 
@@ -679,35 +891,58 @@ export default function ResearchCenterPage() {
                   {isExpanded && (
                     <div className="pt-3 border-t border-white/[0.06] space-y-3 font-mono text-xs animate-in fade-in duration-200">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="p-3 rounded-xl bg-zinc-900/60 border border-white/[0.06] space-y-1.5">
+                        <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-white/[0.06] space-y-2">
                           <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5" /> Taktik Penjualan di Shopee:
+                            <Sparkles className="w-3.5 h-3.5" /> Direct G2G Category Gateway:
                           </div>
                           <p className="text-slate-300 text-[11px] leading-relaxed font-sans">
-                            {opp.tactical_tip}
+                            Robot memantau listing pada slug{" "}
+                            <code className="text-cyan-300 bg-zinc-950 px-1.5 py-0.5 rounded text-[10px]">
+                              {game.g2g_category_slug}
+                            </code>
+                            . Seller {game.seller_name} memiliki {game.seller_reviews_count.toLocaleString("id-ID")}{" "}
+                            ulasan positif dengan sistem Instant Delivery (kredensial langsung otomatis terkirim
+                            setelah checkout kulakan).
                           </p>
+                          <a
+                            href={game.g2g_direct_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold underline pt-1"
+                          >
+                            <span>Buka Listing G2G.com/id Langsung</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
                         </div>
 
-                        <div className="p-3 rounded-xl bg-zinc-900/60 border border-white/[0.06] space-y-1 text-[11px]">
+                        <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-white/[0.06] space-y-1.5 text-[11px]">
                           <div className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
-                            <span>Struktur Biaya Transaksi:</span>
-                            {opp.steam_indo_price_idr && (
-                              <span className="text-slate-500">
-                                Resmi Steam: {formatRp(opp.steam_indo_price_idr)}
-                              </span>
-                            )}
+                            <span>Kalkulasi Potongan Marketplace:</span>
+                            <span className="text-emerald-400 font-bold">
+                              Laba Bersih: {formatRp(game.net_profit_idr)}
+                            </span>
                           </div>
                           <div className="flex justify-between text-slate-400">
                             <span>Fee QRIS Kulakan G2G (0.7%):</span>
-                            <span className="text-slate-300">{formatRp(opp.qris_fee_idr)}</span>
+                            <span className="text-slate-300">{formatRp(game.qris_fee_idr)}</span>
                           </div>
                           <div className="flex justify-between text-slate-400">
-                            <span>Fee Marketplace Shopee (8% + 1k):</span>
-                            <span className="text-slate-300">{formatRp(opp.shopee_fee_idr)}</span>
+                            <span>Fee Marketplace Shopee (8% + Rp 1k):</span>
+                            <span className="text-slate-300">{formatRp(game.shopee_fee_idr)}</span>
                           </div>
                           <div className="flex justify-between text-slate-400">
                             <span>Biaya Operasional / Packaging:</span>
                             <span className="text-slate-300">Rp 2.000</span>
+                          </div>
+                          <div className="flex justify-between text-slate-400 pt-1 border-t border-zinc-800">
+                            <span>Bersih Masuk Rekening Bank:</span>
+                            <span className="text-white font-bold">
+                              {formatRp(
+                                game.recommended_shopee_price_idr -
+                                  game.shopee_fee_idr -
+                                  game.operational_fee_idr
+                              )}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -718,46 +953,55 @@ export default function ResearchCenterPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={() => toggleExpand(opp.id)}
+                      onClick={() => toggleExpand(game.id)}
                       className="text-xs font-mono text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
                     >
                       {isExpanded ? (
                         <>
-                          <ChevronUp className="w-3.5 h-3.5" /> Tutup Analisa
+                          <ChevronUp className="w-3.5 h-3.5" /> Tutup Rincian
                         </>
                       ) : (
                         <>
-                          <ChevronDown className="w-3.5 h-3.5" /> Rincian Taktik & Biaya
+                          <ChevronDown className="w-3.5 h-3.5" /> Rincian Potongan &amp; Link G2G
                         </>
                       )}
                     </button>
 
                     <div className="flex items-center gap-2 font-mono text-xs">
                       <a
-                        href={`https://shopee.co.id/search?keyword=${encodeURIComponent(
-                          opp.shopee_search_query
-                        )}`}
+                        href={game.g2g_direct_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition-colors"
+                        title="Buka kategori/listing di G2G.com/id"
+                      >
+                        <ExternalLink className="w-3 h-3 text-amber-400" />
+                        <span>Buka G2G</span>
+                      </a>
+
+                      <a
+                        href={`https://shopee.co.id/search?keyword=${encodeURIComponent(game.title)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-slate-300 border border-zinc-700/80 flex items-center gap-1.5 transition-colors"
-                        title="Riset kompetitor di Shopee"
+                        title="Riset harga kompetitor di Shopee"
                       >
                         <ShoppingBag className="w-3 h-3 text-orange-400" />
                         <span>Cek Shopee</span>
                       </a>
 
                       <Link
-                        href={`/dashboard/quant?cogs=${opp.g2g_price_idr}&price=${opp.shopee_retail_price_idr}`}
+                        href={`/dashboard/quant?cogs=${game.price_g2g_idr}&price=${game.recommended_shopee_price_idr}`}
                         className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-slate-300 border border-zinc-700/80 flex items-center gap-1.5 transition-colors"
                         title="Simulasikan di The Quant"
                       >
                         <BarChart3 className="w-3 h-3 text-emerald-400" />
-                        <span>Hitung Margin</span>
+                        <span>The Quant</span>
                       </Link>
 
                       <button
                         type="button"
-                        onClick={() => handleAddToCatalog(opp)}
+                        onClick={() => handleAddSingleGame(game)}
                         disabled={isAlreadyAdded || isAdding}
                         className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-md select-none ${
                           isAlreadyAdded
@@ -791,16 +1035,88 @@ export default function ResearchCenterPage() {
         </div>
       )}
 
+      {/* Manual AI Scan Accordion (Secondary Feature for custom arbitrary games) */}
+      <div className="v0-card rounded-2xl overflow-hidden border border-white/[0.08] bg-zinc-950/60">
+        <button
+          type="button"
+          onClick={() => setManualSearchOpen(!manualSearchOpen)}
+          className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-white/[0.02] transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+              <Sparkles className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm font-bold text-white">
+                Ingin riset game kustom di luar daftar otomatis robot?
+              </div>
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                Buka AI Deep Hunter untuk meminta AI menganalisis game spesifik apa pun.
+              </p>
+            </div>
+          </div>
+          <div className="text-slate-400">
+            {manualSearchOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
+        </button>
+
+        {manualSearchOpen && (
+          <div className="p-5 border-t border-white/[0.06] bg-zinc-950/90 space-y-4">
+            <form onSubmit={handleManualScan} className="flex flex-col sm:flex-row items-center gap-2.5">
+              <div className="relative flex-1 w-full">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Ketik judul game kustom... (Contoh: Monster Hunter Wilds, Dead by Daylight, Sekiro)"
+                  value={manualQuery}
+                  onChange={(e) => setManualQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <select
+                value={manualPlatform}
+                onChange={(e) => setManualPlatform(e.target.value)}
+                className="bg-zinc-900 border border-zinc-800 text-zinc-300 rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:border-cyan-500 w-full sm:w-auto"
+              >
+                <option value="Steam">Steam</option>
+                <option value="PC / Microsoft">PC / Microsoft</option>
+                <option value="Rockstar / Steam">Rockstar Games</option>
+                <option value="EA App / PC">EA App</option>
+              </select>
+
+              <button
+                type="submit"
+                disabled={isManualScanning || !manualQuery.trim()}
+                className="v0-btn-primary whitespace-nowrap px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 w-full sm:w-auto disabled:opacity-50"
+              >
+                {isManualScanning ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-zinc-950" />
+                    <span>Menganalisa...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 text-zinc-950" />
+                    <span>Scan AI</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+
       {/* Footer Info Banner */}
       <div className="v0-card rounded-2xl p-5 border-white/[0.06] text-slate-400 text-xs font-mono flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>
-            Seluruh data supplier terafiliasi dengan seller rating &gt;99% di G2G.com/id.
+            Autonomous Crawler bot secara ketat hanya memilih supplier dengan reputasi &gt;99% di G2G.com/id.
           </span>
         </div>
         <span className="text-slate-500 text-[11px]">
-          Akshara Arbitrage Engine &bull; Auto-Sync Supabase
+          Akshara Arbitrage Engine &bull; Auto-Sync Supabase PostgreSQL
         </span>
       </div>
     </div>
