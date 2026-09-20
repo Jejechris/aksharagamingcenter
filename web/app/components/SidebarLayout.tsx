@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import OperationsHealthWidget from "./OperationsHealthWidget";
 import {
   Shield,
   Home,
@@ -20,6 +19,8 @@ import {
   Terminal,
   Zap,
   Send,
+  Activity,
+  ChevronRight,
 } from "lucide-react";
 
 interface NavItem {
@@ -101,6 +102,16 @@ const navSections: NavSection[] = [
         label: "Customer Support",
         href: "/dashboard/support",
         icon: <Headphones className="w-4 h-4 shrink-0 text-sky-400" />,
+      },
+    ],
+  },
+  {
+    title: "SYSTEM",
+    items: [
+      {
+        label: "Operations Health",
+        href: "/dashboard/health",
+        icon: <Activity className="w-4 h-4 shrink-0 text-emerald-400" />,
       },
     ],
   },
@@ -229,8 +240,31 @@ export default function SidebarLayout({
           ))}
         </nav>
 
-        {/* Operations Health Telemetry */}
-        <OperationsHealthWidget />
+        {/* Operations Health Status Quick Link */}
+        <div className="px-3 pb-2 pt-2 border-t border-white/[0.05] shrink-0">
+          <Link
+            href="/dashboard/health"
+            className={[
+              "flex items-center justify-between px-3 py-2 rounded-lg border transition-all duration-150 w-full group",
+              isActive("/dashboard/health")
+                ? "bg-white/[0.08] text-white border-white/[0.12]"
+                : "bg-white/[0.02] text-slate-400 hover:text-white hover:bg-white/[0.05] border-white/[0.05]"
+            ].join(" ")}
+          >
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+              </span>
+              <span className="text-[12px] font-mono text-slate-300 group-hover:text-white">
+                DB Operations
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-emerald-400 font-semibold flex items-center gap-1">
+              ⚡ Health <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-slate-300" />
+            </span>
+          </Link>
+        </div>
 
         {/* Footer */}
         <div className="px-4 py-3 border-t border-white/[0.05] shrink-0">
