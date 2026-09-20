@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { getDbCatalog, saveDbGame, deleteDbGame } from "@/lib/db";
 
 const catalogPath = path.resolve(process.cwd(), "..", "output", "active_catalog.json");
 const bundledCatalogPath = path.resolve(process.cwd(), "data", "active_catalog.json");
@@ -275,7 +276,14 @@ function calculateItemMetrics(item: any) {
 
 export async function GET() {
   try {
-    const rawCatalog = getCatalogData();
+    const dbCatalog = await getDbCatalog();
+    let rawCatalog: any[];
+    if (dbCatalog && dbCatalog.length > 0) {
+      rawCatalog = dbCatalog;
+      inMemoryCatalogCache = dbCatalog;
+    } else {
+      rawCatalog = getCatalogData();
+    }
     const enriched = rawCatalog.map(calculateItemMetrics);
     return NextResponse.json({
       status: "success",
@@ -295,6 +303,9 @@ export async function POST(req: Request) {
     // Direct whole catalog replacement
     if (Array.isArray(body)) {
       saveCatalogData(body);
+      Promise.all(body.map((g: any) => saveDbGame(g))).catch((e) =>
+        console.warn("Supabase bulk save warning:", e)
+      );
       return NextResponse.json({ status: "success", message: "Catalog replaced", count: body.length });
     }
 
@@ -356,6 +367,7 @@ export async function POST(req: Request) {
       }
 
       saveCatalogData(catalog);
+      await saveDbGame(targetGame);
       return NextResponse.json({
         status: "success",
         message: `Seller added to ${targetGame.title}`,
@@ -402,6 +414,7 @@ export async function POST(req: Request) {
       }
 
       saveCatalogData(catalog);
+      await saveDbGame(targetGame);
       return NextResponse.json({
         status: "success",
         message: `Seller "${targetGame.sellers[sIdx].seller_name}" berhasil diperbarui`,
@@ -464,6 +477,7 @@ export async function POST(req: Request) {
         }
 
         saveCatalogData(catalog);
+        await saveDbGame(existing);
         return NextResponse.json({
           status: "success",
           message: `Game "${existing.title}" updated successfully`,
@@ -501,6 +515,7 @@ export async function POST(req: Request) {
 
         catalog.push(newItem);
         saveCatalogData(catalog);
+        await saveDbGame(newItem);
         return NextResponse.json({
           status: "success",
           message: `Game "${newItem.title}" added to portfolio`,
@@ -650,6 +665,7 @@ export async function PATCH(req: Request) {
     }
 
     saveCatalogData(catalog);
+    await saveDbGame(game);
 
     return NextResponse.json({
       status: "success",
@@ -675,6 +691,7 @@ export async function DELETE(req: Request) {
     if (targetIdx >= 0) {
       catalog.splice(targetIdx, 1);
       saveCatalogData(catalog);
+      await deleteDbGame(gameId);
       return NextResponse.json({ status: "success", message: "Game deleted and saved to disk" });
     }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { getDbVault, saveDbVaultItem, deleteDbVaultItem } from "@/lib/db";
 
 const DATA_FILE = path.resolve(process.cwd(), "data", "inventory_vault.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "inventory_vault.json");
@@ -109,7 +110,14 @@ export async function GET(req: Request) {
     const game = searchParams.get("game");
     const status = searchParams.get("status");
 
-    const allItems = getVault();
+    const dbVault = await getDbVault();
+    let allItems: VaultItem[];
+    if (dbVault && dbVault.length > 0) {
+      allItems = dbVault;
+      inMemoryVaultCache = dbVault;
+    } else {
+      allItems = getVault();
+    }
     let filtered = allItems;
 
     if (game) {
@@ -231,6 +239,9 @@ export async function POST(req: Request) {
       }
 
       saveVault(vault);
+      Promise.all(addedItems.map((item) => saveDbVaultItem(item))).catch((e) =>
+        console.warn("Supabase vault bulk save notice:", e)
+      );
 
       return NextResponse.json({
         status: "success",
@@ -258,6 +269,7 @@ export async function POST(req: Request) {
 
     vault.unshift(newItem);
     saveVault(vault);
+    await saveDbVaultItem(newItem);
 
     return NextResponse.json({
       status: "success",
@@ -295,6 +307,7 @@ export async function PATCH(req: Request) {
       item.dispatched_at = new Date().toISOString().replace("T", " ").substring(0, 19);
 
       saveVault(vault);
+      await saveDbVaultItem(item);
 
       return NextResponse.json({
         status: "success",
@@ -322,6 +335,7 @@ export async function PATCH(req: Request) {
       }
 
       saveVault(vault);
+      await saveDbVaultItem(item);
 
       return NextResponse.json({
         status: "success",
@@ -348,6 +362,7 @@ export async function DELETE(req: Request) {
     let vault = getVault();
     vault = vault.filter(item => item.id !== id);
     saveVault(vault);
+    await deleteDbVaultItem(id);
 
     return NextResponse.json({
       status: "success",

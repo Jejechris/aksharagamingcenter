@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { getDbOrders, saveDbOrder, deleteDbOrder, getDbVault, saveDbVaultItem } from "@/lib/db";
 
 const DATA_FILE = path.resolve(process.cwd(), "data", "autonomous_orders.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "autonomous_orders.json");
@@ -175,7 +176,14 @@ Akshara Gaming Center Official`;
 
 export async function GET() {
   try {
-    const orders = getOrders();
+    const dbOrders = await getDbOrders();
+    let orders: any[];
+    if (dbOrders && dbOrders.length > 0) {
+      orders = dbOrders;
+      inMemoryOrdersCache = dbOrders;
+    } else {
+      orders = getOrders();
+    }
     const totalOrders = orders.length;
     const dispatchedWA = orders.filter((o: any) => o.dispatched_channels?.includes("WhatsApp")).length;
     const dispatchedGmail = orders.filter((o: any) => o.dispatched_channels?.includes("Gmail")).length;
@@ -224,6 +232,28 @@ function claimFromVault(gameTitle: string, orderId: string): { username: string;
   return null;
 }
 
+async function claimFromVaultUnified(gameTitle: string, orderId: string): Promise<{ username: string; password: string; vault_id: string } | null> {
+  try {
+    const dbVault = await getDbVault();
+    if (dbVault && dbVault.length > 0) {
+      const idx = dbVault.findIndex(
+        (v: any) => v.status === "AVAILABLE" && v.game_title.toLowerCase().includes(gameTitle.toLowerCase())
+      );
+      if (idx !== -1) {
+        const item = dbVault[idx];
+        item.status = "DISPATCHED";
+        item.assigned_order_id = orderId;
+        item.dispatched_at = new Date().toISOString().replace("T", " ").substring(0, 19);
+        await saveDbVaultItem(item);
+        return { username: item.username, password: item.password, vault_id: item.id };
+      }
+    }
+  } catch (e) {
+    console.warn("Db vault claim notice:", e);
+  }
+  return claimFromVault(gameTitle, orderId);
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -250,7 +280,7 @@ export async function POST(req: Request) {
     let sourceMode = body.mode || (body.use_vault ? "BUFFER_VAULT" : "JUST_IN_TIME");
 
     if (body.use_vault || (!username && !password)) {
-      const vaultClaim = claimFromVault(gameTitle, orderId);
+      const vaultClaim = await claimFromVaultUnified(gameTitle, orderId);
       if (vaultClaim) {
         username = vaultClaim.username;
         password = vaultClaim.password;
@@ -307,6 +337,7 @@ export async function POST(req: Request) {
     // Prepend new order to list
     orders.unshift(newOrder);
     saveOrders(orders);
+    await saveDbOrder(newOrder);
 
     return NextResponse.json({
       status: "success",
@@ -347,6 +378,7 @@ export async function PATCH(req: Request) {
     }
 
     saveOrders(orders);
+    await saveDbOrder(order);
 
     return NextResponse.json({
       status: "success",
@@ -370,6 +402,7 @@ export async function DELETE(req: Request) {
     let orders = getOrders();
     orders = orders.filter((o: any) => o.id !== id && o.order_id !== id);
     saveOrders(orders);
+    await deleteDbOrder(id);
 
     return NextResponse.json({
       status: "success",
