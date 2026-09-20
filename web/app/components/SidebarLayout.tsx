@@ -21,6 +21,7 @@ import {
   Send,
   Activity,
   ChevronRight,
+  Compass,
 } from "lucide-react";
 
 interface NavItem {
@@ -57,6 +58,11 @@ const navSections: NavSection[] = [
         label: "Radar Katalog",
         href: "/dashboard/catalog",
         icon: <Store className="w-4 h-4 shrink-0 text-amber-400" />,
+      },
+      {
+        label: "Research Center",
+        href: "/dashboard/research",
+        icon: <Compass className="w-4 h-4 shrink-0 text-cyan-400" />,
       },
       {
         label: "Profit Calculator",
