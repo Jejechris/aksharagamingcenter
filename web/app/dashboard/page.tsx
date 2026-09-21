@@ -21,6 +21,7 @@ import {
   Store,
   Sparkles,
   Zap,
+  Compass,
 } from "lucide-react";
 
 function formatRp(value: number) {
@@ -216,6 +217,18 @@ export default function AdminDashboardPage() {
       iconBox: "bg-emerald-500/10 border-emerald-500/20",
       dot: "bg-emerald-400",
       statClass: "text-emerald-400 border-emerald-500/20 bg-emerald-500/8",
+    },
+    {
+      title: "Research Center",
+      route: "/dashboard/research",
+      icon: <Compass className="w-5 h-5 text-cyan-400" />,
+      number: "09",
+      desc: "Autonomous G2G Robot: Crawling otomatis peluang arbitrase margin tinggi (>40%) & bulk import ke katalog.",
+      stat: "Robot Crawler",
+      cardClass: "card-division-quant",
+      iconBox: "bg-cyan-500/10 border-cyan-500/20",
+      dot: "bg-cyan-400",
+      statClass: "text-cyan-400 border-cyan-500/20 bg-cyan-500/8",
     },
   ];
 
@@ -421,7 +434,7 @@ export default function AdminDashboardPage() {
       <div>
         <div className="flex items-center gap-4 mb-4">
           <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">
-            6 Divisi Operasional
+            Divisi &amp; Modul Operasional
           </h2>
           <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
         </div>

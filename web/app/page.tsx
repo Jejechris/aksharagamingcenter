@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -116,7 +116,7 @@ export default function CommandLandingPage() {
 
         {/* Title */}
         <h1 className="leading-none mb-3">
-          <span className="block text-[72px] sm:text-[96px] font-black tracking-[-0.04em] text-white leading-[0.9]">
+          <span className="block text-[54px] sm:text-[80px] md:text-[96px] font-black tracking-[-0.04em] text-white leading-[0.9]">
             Akshara
           </span>
           <span className="block text-2xl sm:text-3xl font-mono font-normal text-slate-500 tracking-tight mt-2">
@@ -382,7 +382,7 @@ export default function CommandLandingPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleVerifyWarranty} className="max-w-xl mx-auto flex gap-2.5 mb-5">
+          <form onSubmit={handleVerifyWarranty} className="max-w-xl mx-auto flex flex-col sm:flex-row gap-2.5 mb-5">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-zinc-600 absolute left-3.5 top-1/2 -translate-y-1/2 shrink-0" />
               <input

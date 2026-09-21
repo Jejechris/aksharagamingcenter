@@ -739,7 +739,7 @@ export default function QuantPage() {
       </div>
 
       {saveStatus === 'saved' && (
-        <div className="fixed bottom-5 right-5 z-50 p-4 rounded-xl bg-emerald-950/90 border border-emerald-500/30 text-sm text-emerald-300 font-mono flex items-center gap-3 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-5 left-5 right-5 sm:left-auto sm:right-5 sm:max-w-md z-50 p-4 rounded-xl bg-emerald-950/90 border border-emerald-500/30 text-sm text-emerald-300 font-mono flex items-center gap-3 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{saveMessage}</span>
           <Link href="/dashboard/catalog" className="underline hover:text-white ml-2">Lihat Radar &rarr;</Link>
@@ -1209,30 +1209,32 @@ export default function QuantPage() {
                 <Activity className="w-4 h-4 text-emerald-400" /> Sensitivitas Harga
               </h3>
             </div>
-            <table className="w-full text-xs font-mono text-left">
-              <thead className="bg-black/20 border-b border-white/[0.06]">
-                <tr>
-                  <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest">Skenario</th>
-                  <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest">Harga</th>
-                  <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest">Profit</th>
-                  <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest text-right">Margin</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {sensitivityScenarios.map((sc: any) => (
-                  <tr key={sc.delta} className={sc.isCurrent ? 'bg-emerald-500/5' : 'hover:bg-white/[0.02]'}>
-                    <td className="px-5 py-3">
-                      {sc.delta === 0 ? <span className="text-emerald-400 font-bold">CURRENT</span> : <span className="text-slate-400">{sc.delta > 0 ? '+' : ''}{formatRp(sc.delta)}</span>}
-                    </td>
-                    <td className="px-5 py-3 text-slate-200">{formatRp(sc.price)}</td>
-                    <td className={`px-5 py-3 ${sc.profit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRp(sc.profit)}</td>
-                    <td className={`px-5 py-3 text-right ${sc.margin >= 20 ? 'text-emerald-400' : sc.margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
-                      {formatNum(sc.margin)}%
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs font-mono text-left min-w-[320px]">
+                <thead className="bg-black/20 border-b border-white/[0.06]">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest">Skenario</th>
+                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest">Harga</th>
+                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest">Profit</th>
+                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest text-right">Margin</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {sensitivityScenarios.map((sc: any) => (
+                    <tr key={sc.delta} className={sc.isCurrent ? 'bg-emerald-500/5' : 'hover:bg-white/[0.02]'}>
+                      <td className="px-5 py-3">
+                        {sc.delta === 0 ? <span className="text-emerald-400 font-bold">CURRENT</span> : <span className="text-slate-400">{sc.delta > 0 ? '+' : ''}{formatRp(sc.delta)}</span>}
+                      </td>
+                      <td className="px-5 py-3 text-slate-200">{formatRp(sc.price)}</td>
+                      <td className={`px-5 py-3 ${sc.profit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRp(sc.profit)}</td>
+                      <td className={`px-5 py-3 text-right ${sc.margin >= 20 ? 'text-emerald-400' : sc.margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
+                        {formatNum(sc.margin)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
         </div>

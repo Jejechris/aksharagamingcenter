@@ -412,7 +412,7 @@ export default function OperatorPage() {
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left font-mono">
+          <table className="w-full text-xs text-left font-mono min-w-[700px]">
             <thead className="text-[10px] text-slate-500 uppercase tracking-widest bg-black/40 border-b border-white/[0.06]">
               <tr>
                 <th className="w-10 px-4 py-3 text-center">Pilih</th>

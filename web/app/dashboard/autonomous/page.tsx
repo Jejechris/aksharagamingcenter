@@ -1074,7 +1074,7 @@ export default function AutonomousFulfillmentPage() {
             {/* Vault Inventory Table */}
             <div className="v0-card rounded-2xl border border-zinc-800/80 bg-zinc-900/40 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono">
+                <table className="w-full text-left text-xs font-mono min-w-[680px]">
                   <thead className="bg-zinc-950/80 text-zinc-400 border-b border-zinc-800 uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="p-3.5">ID Unit & Game</th>

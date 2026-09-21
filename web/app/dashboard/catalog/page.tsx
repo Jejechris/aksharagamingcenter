@@ -536,7 +536,7 @@ export default function CatalogDashboardPage() {
     <div className="px-5 sm:px-8 py-8 max-w-[960px] mx-auto space-y-7">
       
       {notification && (
-        <div className="fixed bottom-5 right-5 z-50 p-4 rounded-xl bg-emerald-950/90 border border-emerald-500/30 text-sm text-emerald-300 font-mono flex items-center gap-3 shadow-xl backdrop-blur-md">
+        <div className="fixed bottom-5 left-5 right-5 sm:left-auto sm:right-5 sm:max-w-md z-50 p-4 rounded-xl bg-emerald-950/90 border border-emerald-500/30 text-sm text-emerald-300 font-mono flex items-center gap-3 shadow-xl backdrop-blur-md">
           {notification.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />}
           <span className={notification.type === 'error' ? 'text-rose-300' : ''}>{notification.message}</span>
           <button onClick={() => setNotification(null)} className="ml-2 hover:opacity-75">&times;</button>
@@ -1054,7 +1054,7 @@ export default function CatalogDashboardPage() {
                     )}
 
                     <div className="overflow-x-auto rounded-xl border border-white/5">
-                      <table className="w-full text-left text-xs font-mono">
+                      <table className="w-full text-left text-xs font-mono min-w-[650px]">
                         <thead className="bg-white/5 border-b border-white/5">
                           <tr className="text-slate-400 text-[10px] uppercase tracking-widest">
                             <th className="px-4 py-3 font-semibold">Status</th>
@@ -1195,7 +1195,7 @@ export default function CatalogDashboardPage() {
       {/* EDIT SELLER MODAL */}
       {editingSellerData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="v0-card rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl border-amber-500/30 bg-zinc-950">
+          <div className="v0-card rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-5 shadow-2xl border-amber-500/30 bg-zinc-950">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm font-mono">
                 <Pencil className="w-4 h-4" />
@@ -1315,7 +1315,7 @@ export default function CatalogDashboardPage() {
 
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="v0-card rounded-2xl p-6 w-full max-w-lg shadow-2xl border-white/10">
+          <div className="v0-card rounded-2xl p-5 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl border-white/10">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/5">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Plus className="w-5 h-5 text-amber-400" /> Tambah Game

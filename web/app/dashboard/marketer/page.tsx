@@ -869,44 +869,46 @@ export default function MarketerPage() {
                   <span className="text-[10px] font-mono text-slate-400 bg-zinc-900 px-2 py-0.5 rounded-md">{vouchers.length} Kode Aktif</span>
                 </div>
 
-                <table className="w-full text-xs font-mono">
-                  <thead className="border-b border-white/[0.06] bg-zinc-950/60">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Kode</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Diskon</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Min. Belanja</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/[0.04]">
-                    {vouchers.map((v) => (
-                      <tr key={v.code} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="px-4 py-3 font-bold text-white flex items-center gap-2">
-                          {v.code}
-                          <button
-                            type="button"
-                            onClick={() => copyText(v.code, () => {
-                              setCopiedCode(v.code);
-                              setTimeout(() => setCopiedCode(null), 2000);
-                            })}
-                            className="text-slate-500 hover:text-white transition-colors"
-                          >
-                            {copiedCode === v.code ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-fuchsia-300 font-bold">{v.discount}</td>
-                        <td className="px-4 py-3 text-slate-400">{v.minOrder}</td>
-                        <td className="px-4 py-3">
-                          {v.status === "ACTIVE" ? (
-                            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">AKTIF</span>
-                          ) : (
-                            <span className="text-[10px] text-slate-500 bg-zinc-900 px-2 py-0.5 rounded-md">EXPIRED</span>
-                          )}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs font-mono min-w-[320px]">
+                    <thead className="border-b border-white/[0.06] bg-zinc-950/60">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Kode</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Diskon</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Min. Belanja</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.04]">
+                      {vouchers.map((v) => (
+                        <tr key={v.code} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="px-4 py-3 font-bold text-white flex items-center gap-2">
+                            {v.code}
+                            <button
+                              type="button"
+                              onClick={() => copyText(v.code, () => {
+                                setCopiedCode(v.code);
+                                setTimeout(() => setCopiedCode(null), 2000);
+                              })}
+                              className="text-slate-500 hover:text-white transition-colors"
+                            >
+                              {copiedCode === v.code ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-fuchsia-300 font-bold">{v.discount}</td>
+                          <td className="px-4 py-3 text-slate-400">{v.minOrder}</td>
+                          <td className="px-4 py-3">
+                            {v.status === "ACTIVE" ? (
+                              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">AKTIF</span>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 bg-zinc-900 px-2 py-0.5 rounded-md">EXPIRED</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 

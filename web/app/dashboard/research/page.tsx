@@ -354,7 +354,7 @@ export default function ResearchCenterPage() {
     <div className="px-5 sm:px-8 py-8 max-w-[1120px] mx-auto space-y-7">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed bottom-5 right-5 z-50 p-4 rounded-xl bg-zinc-950/95 border border-emerald-500/40 text-sm text-emerald-300 font-mono flex items-center gap-3 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-3">
+        <div className="fixed bottom-5 left-5 right-5 sm:left-auto sm:right-5 sm:max-w-md z-50 p-4 rounded-xl bg-zinc-950/95 border border-emerald-500/40 text-sm text-emerald-300 font-mono flex items-center gap-3 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-3">
           {notification.type === "success" ? (
             <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
           ) : (
@@ -967,7 +967,7 @@ export default function ResearchCenterPage() {
                       )}
                     </button>
 
-                    <div className="flex items-center gap-2 font-mono text-xs">
+                    <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
                       <a
                         href={game.g2g_direct_url}
                         target="_blank"
