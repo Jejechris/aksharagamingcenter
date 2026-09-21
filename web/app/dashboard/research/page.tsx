@@ -42,6 +42,7 @@ import {
 import { G2GScannedGame } from "@/app/api/research/g2g-crawler/route";
 import { ArbitrageOpportunity } from "@/app/api/research/opportunities/route";
 import { getG2GSellerUrl } from "@/lib/g2g";
+import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
 
 export default function ResearchCenterPage() {
   // G2G Autonomous Crawler State
@@ -73,6 +74,32 @@ export default function ResearchCenterPage() {
   const [manualQuery, setManualQuery] = useState("");
   const [manualPlatform, setManualPlatform] = useState("Steam");
   const [isManualScanning, setIsManualScanning] = useState(false);
+
+  // Shopee Competitor Modal
+  const [competitorModalGame, setCompetitorModalGame] = useState<G2GScannedGame | null>(null);
+
+  const handleApplyCompetitorPriceInResearch = (newPrice: number) => {
+    if (!competitorModalGame) return;
+    setScannedGames((prev) =>
+      prev.map((g) => {
+        if (g.id === competitorModalGame.id) {
+          const qris = Math.round(g.price_g2g_idr * 0.007);
+          const shopee = Math.round(newPrice * 0.08) + 1000;
+          const profit = newPrice - g.price_g2g_idr - qris - shopee - 2000;
+          const margin = newPrice > 0 ? (profit / newPrice) * 100 : 0;
+          return {
+            ...g,
+            recommended_shopee_price_idr: newPrice,
+            shopee_fee_idr: shopee,
+            net_profit_idr: profit,
+            net_margin_pct: Number(margin.toFixed(1)),
+          };
+        }
+        return g;
+      })
+    );
+    showToast(`✅ Rekomendasi harga "${competitorModalGame.title}" disesuaikan ke ${formatRp(newPrice)}!`);
+  };
 
   // Toast Notification
   const [notification, setNotification] = useState<{
@@ -979,15 +1006,25 @@ export default function ResearchCenterPage() {
                         <span>Buka G2G</span>
                       </a>
 
+                      <button
+                        type="button"
+                        onClick={() => setCompetitorModalGame(game)}
+                        className="px-3 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Radar Kompetitor Shopee & AI Pricing Advisor"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5 text-orange-400" />
+                        <span>Radar Kompetitor</span>
+                      </button>
+
                       <a
                         href={`https://shopee.co.id/search?keyword=${encodeURIComponent(game.title)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-slate-300 border border-zinc-700/80 flex items-center gap-1.5 transition-colors"
-                        title="Riset harga kompetitor di Shopee"
+                        title="Riset harga kompetitor langsung di Shopee"
                       >
-                        <ShoppingBag className="w-3 h-3 text-orange-400" />
-                        <span>Cek Shopee</span>
+                        <ExternalLink className="w-3 h-3 text-slate-400" />
+                        <span>Shopee ↗</span>
                       </a>
 
                       <Link
@@ -1119,6 +1156,19 @@ export default function ResearchCenterPage() {
           Akshara Arbitrage Engine &bull; Auto-Sync Supabase PostgreSQL
         </span>
       </div>
+
+      {/* Shopee Competitor Intelligence Modal */}
+      {competitorModalGame && (
+        <ShopeeCompetitorModal
+          isOpen={!!competitorModalGame}
+          onClose={() => setCompetitorModalGame(null)}
+          gameTitle={competitorModalGame.title}
+          platform={competitorModalGame.platform}
+          currentPriceIdr={competitorModalGame.recommended_shopee_price_idr}
+          costG2gIdr={competitorModalGame.price_g2g_idr}
+          onApplyPrice={handleApplyCompetitorPriceInResearch}
+        />
+      )}
     </div>
   );
 }

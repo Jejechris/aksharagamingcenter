@@ -8,9 +8,10 @@ import {
   Check, Filter, Search, Sliders, ChevronDown, ChevronUp,
   Cpu, Trash2, ArrowUpRight, ShieldAlert, Sparkles, Star,
   Award, QrCode, Zap, Layers, BarChart3, CheckCircle2, Clock, Save,
-  Pencil, FileText, Download, Upload, Database
+  Pencil, FileText, Download, Upload, Database, ShoppingBag
 } from 'lucide-react';
 import { getG2GSellerUrl, getG2GGameCategoryUrl } from '@/lib/g2g';
+import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
 
 interface Seller {
   seller_id: string;
@@ -97,6 +98,41 @@ export default function CatalogDashboardPage() {
 
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [editingPriceVal, setEditingPriceVal] = useState<number>(0);
+
+  // Shopee Competitor Intelligence Modal State
+  const [competitorModalGame, setCompetitorModalGame] = useState<{
+    gameId: string;
+    title: string;
+    platform: string;
+    price: number;
+    cogs: number;
+  } | null>(null);
+
+  const handleApplyCompetitorPrice = async (newPrice: number) => {
+    if (!competitorModalGame) return;
+    const gId = competitorModalGame.gameId;
+    try {
+      const res = await fetch('/api/catalog', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          game_id: gId,
+          selling_price_shopee_idr: newPrice
+        })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const updated = json.data;
+        const next = games.map(g => g.id === gId ? updated : g);
+        updateCatalogState(next);
+        showToast(`✅ Harga Shopee "${competitorModalGame.title}" disesuaikan ke ${formatRp(newPrice)} berdasarkan rekomendasi kompetitor!`);
+      } else {
+        showToast('Gagal memperbarui harga.', 'error');
+      }
+    } catch (e) {
+      showToast('Gagal memperbarui harga (kesalahan jaringan).', 'error');
+    }
+  };
 
   const [drawerAddSellerGameId, setDrawerAddSellerGameId] = useState<string | null>(null);
   const [drawerSellerName, setDrawerSellerName] = useState('');
@@ -845,6 +881,22 @@ export default function CatalogDashboardPage() {
                     </div>
 
                     <div className="flex items-center gap-1.5 ml-2">
+                      <button
+                        type="button"
+                        onClick={() => setCompetitorModalGame({
+                          gameId: game.id,
+                          title: game.title,
+                          platform: game.platform,
+                          price: game.selling_price_shopee_idr,
+                          cogs: selectedSeller?.price_g2g_idr || 0,
+                        })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 border border-orange-500/30 transition-all"
+                        title="Cek Radar Kompetitor Shopee & Rekomendasi Harga AI"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5 text-orange-400" />
+                        <span className="hidden sm:inline">Kompetitor</span>
+                      </button>
+
                       <Link
                         href="/dashboard/quant"
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all"
@@ -1491,6 +1543,19 @@ export default function CatalogDashboardPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Shopee Competitor Intelligence Modal */}
+      {competitorModalGame && (
+        <ShopeeCompetitorModal
+          isOpen={!!competitorModalGame}
+          onClose={() => setCompetitorModalGame(null)}
+          gameTitle={competitorModalGame.title}
+          platform={competitorModalGame.platform}
+          currentPriceIdr={competitorModalGame.price}
+          costG2gIdr={competitorModalGame.cogs}
+          onApplyPrice={handleApplyCompetitorPrice}
+        />
       )}
 
     </div>

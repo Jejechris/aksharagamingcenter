@@ -7,9 +7,10 @@ import {
   TrendingUp, Calculator, Zap, ChevronRight, QrCode, ShieldCheck, 
   ExternalLink, Layers, Sparkles, Plus, Check, Save, RotateCcw,
   Store, AlertCircle, Info, Tag, CheckCircle2, RefreshCw, Trash2,
-  ChevronDown, ChevronUp, Pencil, FileText
+  ChevronDown, ChevronUp, Pencil, FileText, ShoppingBag
 } from 'lucide-react';
 import { getG2GSellerUrl } from '@/lib/g2g';
+import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
 
 interface SellerOption {
   id: string;
@@ -39,6 +40,7 @@ interface CatalogItem {
 export default function QuantPage() {
   // Mode Selection: 'fixed_price' (Mode A) vs 'target_margin' (Mode B)
   const [calcMode, setCalcMode] = useState<'fixed_price' | 'target_margin'>('fixed_price');
+  const [isCompetitorModalOpen, setIsCompetitorModalOpen] = useState(false);
 
   // Active Catalog Games from persistent DB
   const [catalogGames, setCatalogGames] = useState<CatalogItem[]>([]);
@@ -928,10 +930,19 @@ export default function QuantPage() {
           </div>
 
           <div className="v0-card rounded-2xl p-5 sm:p-6 space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-emerald-400" /> Parameter Penjualan
               </h2>
+              <button
+                type="button"
+                onClick={() => setIsCompetitorModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-semibold bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 transition-all shadow-sm"
+                title="Cek Radar Kompetitor Shopee & AI Pricing Advisor"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 text-orange-400" />
+                <span>Radar Kompetitor Shopee</span>
+              </button>
             </div>
 
             {calcMode === 'fixed_price' ? (
@@ -1425,6 +1436,23 @@ export default function QuantPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Shopee Competitor Intelligence Modal */}
+      {isCompetitorModalOpen && (
+        <ShopeeCompetitorModal
+          isOpen={isCompetitorModalOpen}
+          onClose={() => setIsCompetitorModalOpen(false)}
+          gameTitle={gameTitle}
+          platform={platform}
+          currentPriceIdr={sellingPrice}
+          costG2gIdr={cogsG2gIdr}
+          onApplyPrice={(newPrice) => {
+            setSellingPrice(newPrice);
+            setPulse(true);
+            setTimeout(() => setPulse(false), 800);
+          }}
+        />
       )}
     </div>
   );
