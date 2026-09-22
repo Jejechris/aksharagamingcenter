@@ -22,6 +22,7 @@ import {
   Sparkles,
   Zap,
   Compass,
+  Key,
 } from "lucide-react";
 
 function formatRp(value: number) {
@@ -229,6 +230,18 @@ export default function AdminDashboardPage() {
       iconBox: "bg-cyan-500/10 border-cyan-500/20",
       dot: "bg-cyan-400",
       statClass: "text-cyan-400 border-cyan-500/20 bg-cyan-500/8",
+    },
+    {
+      title: "Eneba CDKey Terminal",
+      route: "/dashboard/eneba",
+      icon: <Key className="w-5 h-5 text-violet-400" />,
+      number: "10",
+      desc: "Official Digital Key Radar: Kurasi CDKey Steam/Xbox/GOG resmi bergaransi 0% Hackback & pembayaran QRIS 0.7%.",
+      stat: "0% Hackback",
+      cardClass: "card-division-quant",
+      iconBox: "bg-violet-500/10 border-violet-500/20",
+      dot: "bg-violet-400",
+      statClass: "text-violet-400 border-violet-500/20 bg-violet-500/8",
     },
   ];
 

@@ -65,6 +65,11 @@ const navSections: NavSection[] = [
         icon: <Compass className="w-4 h-4 shrink-0 text-cyan-400" />,
       },
       {
+        label: "Eneba CDKey",
+        href: "/dashboard/eneba",
+        icon: <Zap className="w-4 h-4 shrink-0 text-violet-400" />,
+      },
+      {
         label: "Profit Calculator",
         href: "/dashboard/quant",
         icon: <Calculator className="w-4 h-4 shrink-0 text-emerald-400" />,
