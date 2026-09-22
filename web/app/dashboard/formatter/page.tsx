@@ -75,8 +75,13 @@ export default function FormatterPage() {
     loadCatalog();
   }, []);
 
-  const handleLoadSample = (sampleType: "terraria" | "minecraft" | "gtav") => {
-    if (sampleType === "terraria") {
+  const handleLoadSample = (sampleType: "terraria" | "minecraft" | "gtav" | "eneba_cdkey") => {
+    if (sampleType === "eneba_cdkey") {
+      setGameTitle("Terraria");
+      setPlatform("Steam");
+      setBuyerName("Kak Dimas");
+      setRawCredentials("E387N-98Q2B-T7Y9P | Eneba Official Steam Key (Global)");
+    } else if (sampleType === "terraria") {
       setGameTitle("Terraria");
       setPlatform("Steam");
       setBuyerName("Kak Dimas");
@@ -310,18 +315,41 @@ export default function FormatterPage() {
 
           {/* Raw Credentials */}
           <div>
-            <div className="flex items-center gap-4 mb-3">
+            <div className="flex items-center justify-between gap-4 mb-2">
               <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap flex items-center gap-2">
                 <Key className="w-3.5 h-3.5 text-purple-400" />
-                Raw Credentials
+                Raw Credentials / CDKey
               </h2>
-              <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
+              <div className="flex items-center gap-1.5 font-mono text-[10px] overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => handleLoadSample("eneba_cdkey")}
+                  className="px-2 py-0.5 rounded-md bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 border border-violet-500/30 transition-colors font-bold whitespace-nowrap flex items-center gap-1"
+                >
+                  <Sparkles className="w-3 h-3 text-violet-400" />
+                  <span>Eneba CDKey</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoadSample("terraria")}
+                  className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-slate-300 border border-zinc-700/80 transition-colors whitespace-nowrap"
+                >
+                  Terraria Akun
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoadSample("minecraft")}
+                  className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-slate-300 border border-zinc-700/80 transition-colors whitespace-nowrap"
+                >
+                  Minecraft
+                </button>
+              </div>
             </div>
             <textarea
               rows={4}
               value={rawCredentials}
               onChange={(e) => setRawCredentials(e.target.value)}
-              placeholder={"Contoh:\nsteve_miner@outlook.com:PasswordSuperAman123!\n\natau:\nUsername: gamer_id\nPassword: secret_pass\nMail: full_access"}
+              placeholder={"Contoh CDKey:\nE387N-98Q2B-T7Y9P | Eneba Official Steam Key\n\natau Akun:\nusername:password | mail_access: full"}
               className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-purple-500/60 focus:ring-1 focus:ring-purple-500/30 transition-all resize-none"
               required
             />
@@ -471,47 +499,86 @@ export default function FormatterPage() {
 
               {/* Credentials */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3">
-                  <div className="min-w-0 pr-3">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600 block mb-0.5">Email / Username</span>
-                    <span className="text-xs font-mono text-slate-200 truncate block select-all font-semibold">
-                      {parsedData.parsed_user || "(tidak terdeteksi)"}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(parsedData.parsed_user, "user")}
-                    className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/40 text-slate-500 hover:text-purple-300 transition-all shrink-0"
-                    title="Salin Username"
-                  >
-                    {copiedUser ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
+                {parsedData.parsed_password?.toLowerCase().includes("redeem") ||
+                parsedData.parsed_password?.toLowerCase().includes("cdkey") ||
+                parsedData.parsed_password?.toLowerCase().includes("0% hackback") ? (
+                  <>
+                    <div className="flex items-center justify-between bg-violet-950/20 border border-violet-500/30 rounded-xl px-4 py-3">
+                      <div className="min-w-0 pr-3">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-violet-400 block mb-0.5">Kode Redeem / Digital CDKey</span>
+                        <span className="text-sm font-mono text-violet-200 truncate block select-all font-bold">
+                          {parsedData.parsed_user || "(tidak terdeteksi)"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(parsedData.parsed_user, "user")}
+                        className="p-1.5 rounded-lg bg-violet-950/80 border border-violet-500/40 hover:border-violet-400 text-violet-300 hover:text-white transition-all shrink-0"
+                        title="Salin Kode Redeem"
+                      >
+                        {copiedUser ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
 
-                <div className="flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3">
-                  <div className="min-w-0 pr-3">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600 block mb-0.5">Password</span>
-                    <span className="text-xs font-mono text-purple-300 truncate block select-all font-semibold">
-                      {showPassword ? parsedData.parsed_password || "(kosong)" : "••••••••••••"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-slate-500 hover:text-slate-300 transition-all"
-                    >
-                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(parsedData.parsed_password, "pass")}
-                      className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/40 text-slate-500 hover:text-purple-300 transition-all"
-                    >
-                      {copiedPass ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
+                    <div className="flex items-center justify-between bg-zinc-950/80 border border-violet-500/20 rounded-xl px-4 py-2.5">
+                      <div className="min-w-0 pr-3">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 block mb-0.5">Tipe Lisensi &amp; Keamanan</span>
+                        <span className="text-xs font-mono text-emerald-400 font-semibold flex items-center gap-1.5">
+                          <span>🛡️ 0% Hackback</span>
+                          <span className="text-slate-500">•</span>
+                          <span className="text-slate-300 font-normal">Aktivasi permanen di akun pribadi</span>
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30 font-bold shrink-0">
+                        OFFICIAL KEY
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3">
+                      <div className="min-w-0 pr-3">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600 block mb-0.5">Email / Username</span>
+                        <span className="text-xs font-mono text-slate-200 truncate block select-all font-semibold">
+                          {parsedData.parsed_user || "(tidak terdeteksi)"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(parsedData.parsed_user, "user")}
+                        className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/40 text-slate-500 hover:text-purple-300 transition-all shrink-0"
+                        title="Salin Username"
+                      >
+                        {copiedUser ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3">
+                      <div className="min-w-0 pr-3">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600 block mb-0.5">Password</span>
+                        <span className="text-xs font-mono text-purple-300 truncate block select-all font-semibold">
+                          {showPassword ? parsedData.parsed_password || "(kosong)" : "••••••••••••"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-slate-500 hover:text-slate-300 transition-all"
+                        >
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(parsedData.parsed_password, "pass")}
+                          className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/40 text-slate-500 hover:text-purple-300 transition-all"
+                        >
+                          {copiedPass ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {parsedData.additional_info && (
                   <div className="text-[11px] font-mono text-slate-400 bg-zinc-950/80 rounded-xl px-4 py-2.5 border border-zinc-800 flex items-start gap-2">

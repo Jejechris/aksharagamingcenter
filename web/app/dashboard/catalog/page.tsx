@@ -11,6 +11,7 @@ import {
   Pencil, FileText, Download, Upload, Database, ShoppingBag
 } from 'lucide-react';
 import { getG2GSellerUrl, getG2GGameCategoryUrl } from '@/lib/g2g';
+import { getEnebaSearchUrl } from '@/lib/eneba';
 import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
 
 interface Seller {
@@ -69,6 +70,12 @@ export default function CatalogDashboardPage() {
   const getValidSellerUrl = (seller?: Seller, gameTitle?: string) => {
     if (seller?.profile_url && !seller.profile_url.includes("search?q=") && !seller.profile_url.includes("/search")) {
       return seller.profile_url;
+    }
+    if (seller?.profile_url?.includes("eneba.com")) {
+      return seller.profile_url;
+    }
+    if (seller?.seller_name?.toLowerCase().includes("eneba") || seller?.tier_label?.includes("ENEBA")) {
+      return getEnebaSearchUrl(gameTitle || "");
     }
     return getG2GSellerUrl(seller?.seller_name || "", gameTitle);
   };
@@ -804,21 +811,47 @@ export default function CatalogDashboardPage() {
                     <h3 className="text-base font-bold text-white tracking-tight">
                       {game.title}
                     </h3>
-                    <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
-                      <span className="flex items-center gap-1.5">
-                        Supplier:{" "}
-                        <a
-                          href={getValidSellerUrl(selectedSeller, game.title)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-amber-400 hover:text-amber-300 font-bold inline-flex items-center gap-1 transition-colors"
-                        >
-                          {selectedSeller?.seller_name}
-                          <ExternalLink className="w-3 h-3 text-amber-500/70" />
-                        </a>
-                      </span>
-                      <span>•</span>
-                      <span>★ {selectedSeller?.rating_pct}% ({selectedSeller?.reviews_count.toLocaleString('id-ID')} ulasan)</span>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 font-mono">
+                      {selectedSeller?.profile_url?.includes("eneba.com") ||
+                      selectedSeller?.seller_name?.toLowerCase().includes("eneba") ||
+                      selectedSeller?.tier_label?.includes("ENEBA") ? (
+                        <>
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-violet-300 font-semibold">Supplier Eneba:</span>
+                            <a
+                              href={getValidSellerUrl(selectedSeller, game.title)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-violet-400 hover:text-violet-300 font-bold inline-flex items-center gap-1 transition-colors"
+                            >
+                              {selectedSeller?.seller_name}
+                              <ExternalLink className="w-3 h-3 text-violet-400" />
+                            </a>
+                          </span>
+                          <span>•</span>
+                          <span>★ {selectedSeller?.rating_pct}% ({selectedSeller?.reviews_count.toLocaleString('id-ID')} ulasan)</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30 font-bold">
+                            ⚡ ENEBA DIGITAL CDKEY (0% HACKBACK)
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex items-center gap-1.5">
+                            Supplier:{" "}
+                            <a
+                              href={getValidSellerUrl(selectedSeller, game.title)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-amber-400 hover:text-amber-300 font-bold inline-flex items-center gap-1 transition-colors"
+                            >
+                              {selectedSeller?.seller_name}
+                              <ExternalLink className="w-3 h-3 text-amber-500/70" />
+                            </a>
+                          </span>
+                          <span>•</span>
+                          <span>★ {selectedSeller?.rating_pct}% ({selectedSeller?.reviews_count.toLocaleString('id-ID')} ulasan)</span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -1111,7 +1144,7 @@ export default function CatalogDashboardPage() {
                           <tr className="text-slate-400 text-[10px] uppercase tracking-widest">
                             <th className="px-4 py-3 font-semibold">Status</th>
                             <th className="px-4 py-3 font-semibold">Tier</th>
-                            <th className="px-4 py-3 font-semibold">Seller G2G</th>
+                            <th className="px-4 py-3 font-semibold">Seller G2G / Eneba</th>
                             <th className="px-4 py-3 font-semibold">Reputasi</th>
                             <th className="px-4 py-3 font-semibold">Harga (IDR)</th>
                             <th className="px-4 py-3 font-semibold">Laba Bersih</th>
@@ -1128,16 +1161,17 @@ export default function CatalogDashboardPage() {
                             })
                             .map((s) => {
                               const isSelected = s.seller_id === game.selected_seller_id;
+                              const isEneba = s.profile_url?.includes("eneba.com") || s.seller_name?.toLowerCase().includes("eneba") || s.tier_label?.includes("ENEBA");
                               const qris = Math.round(s.price_g2g_idr * 0.007);
                               const netCost = s.price_g2g_idr + qris + Math.round(game.selling_price_shopee_idr * 0.08) + 1000 + 2000;
                               const profit = game.selling_price_shopee_idr - netCost;
                               const margin = game.selling_price_shopee_idr > 0 ? (profit / game.selling_price_shopee_idr) * 100 : 0;
 
                               return (
-                                <tr key={s.seller_id} className={`hover:bg-white/[0.02] transition-colors ${isSelected ? 'bg-amber-500/5' : ''}`}>
+                                <tr key={s.seller_id} className={`hover:bg-white/[0.02] transition-colors ${isSelected ? (isEneba ? 'bg-violet-500/10' : 'bg-amber-500/5') : ''}`}>
                                   <td className="px-4 py-3">
                                     {isSelected ? (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold">
+                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${isEneba ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'} text-[10px] font-bold`}>
                                         <Check className="w-3 h-3" /> AKTIF
                                       </span>
                                     ) : (
@@ -1145,7 +1179,9 @@ export default function CatalogDashboardPage() {
                                     )}
                                   </td>
                                   <td className="px-4 py-3">
-                                    {s.tier === 'ultra_safe' ? (
+                                    {isEneba ? (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-500/15 text-violet-300 border border-violet-500/30">⚡ ENEBA</span>
+                                    ) : s.tier === 'ultra_safe' ? (
                                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🛡️ TOP</span>
                                     ) : s.tier === 'lowest_price' ? (
                                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">⚡ LOW</span>
@@ -1161,10 +1197,10 @@ export default function CatalogDashboardPage() {
                                         href={getValidSellerUrl(s, game.title)}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-slate-200 hover:text-amber-400 font-semibold inline-flex items-center gap-1 transition-colors"
+                                        className={`${isEneba ? 'text-violet-300 hover:text-violet-200' : 'text-slate-200 hover:text-amber-400'} font-semibold inline-flex items-center gap-1 transition-colors`}
                                       >
                                         <span>{s.seller_name}</span>
-                                        <ExternalLink className="w-3 h-3 text-slate-500" />
+                                        <ExternalLink className={`w-3 h-3 ${isEneba ? 'text-violet-400' : 'text-slate-500'}`} />
                                       </a>
                                     </div>
                                   </td>

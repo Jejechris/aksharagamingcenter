@@ -56,6 +56,7 @@ export default function ResearchCenterPage() {
   ]);
 
   // Filters
+  const [sourceFilter, setSourceFilter] = useState<"ALL" | "ENEBA" | "G2G">("ALL");
   const [minMarginFilter, setMinMarginFilter] = useState<number>(0);
   const [maxBudgetFilter, setMaxBudgetFilter] = useState<number>(0);
   const [selectedPlatform, setSelectedPlatform] = useState<string>("ALL");
@@ -112,22 +113,41 @@ export default function ResearchCenterPage() {
     setTimeout(() => setNotification(null), 4500);
   };
 
-  // Fetch Crawler Data from API
+  // Fetch Crawler Data from both G2G and Eneba APIs
   const fetchScannedGames = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/research/g2g-crawler");
-      const json = await res.json();
-      if (json.status === "success" && Array.isArray(json.data)) {
-        setScannedGames(json.data);
-        const inCatalog = new Set<string>();
-        json.data.forEach((item: G2GScannedGame & { is_already_in_catalog?: boolean }) => {
-          if (item.is_already_in_catalog) {
-            inCatalog.add(item.id);
-          }
+      const [g2gRes, enebaRes] = await Promise.all([
+        fetch("/api/research/g2g-crawler"),
+        fetch("/api/research/eneba-crawler"),
+      ]);
+      const g2gJson = await g2gRes.json();
+      const enebaJson = await enebaRes.json();
+
+      let combined: any[] = [];
+      const inCatalog = new Set<string>();
+
+      if (g2gJson.status === "success" && Array.isArray(g2gJson.data)) {
+        g2gJson.data.forEach((item: any) => {
+          combined.push({ ...item, source_marketplace: "G2G" });
+          if (item.is_already_in_catalog) inCatalog.add(item.id);
         });
-        setAddedIds(inCatalog);
       }
+
+      if (enebaJson.status === "success" && Array.isArray(enebaJson.data)) {
+        enebaJson.data.forEach((item: any) => {
+          combined.push({
+            ...item,
+            price_g2g_idr: item.price_eneba_idr,
+            g2g_direct_url: item.eneba_direct_url,
+            g2g_category_slug: "eneba-cdkey",
+            source_marketplace: "ENEBA",
+          });
+        });
+      }
+
+      setScannedGames(combined);
+      setAddedIds(inCatalog);
     } catch (err) {
       console.error("Failed to load scanned games:", err);
     } finally {
@@ -177,16 +197,17 @@ export default function ResearchCenterPage() {
     }
   };
 
-  // Add 1 Game to Catalog
-  const handleAddSingleGame = async (game: G2GScannedGame) => {
+  // Add 1 Game to Catalog (supports both Eneba and G2G)
+  const handleAddSingleGame = async (game: any) => {
     setAddingId(game.id);
     try {
-      const payload = {
-        action: "bulk_import",
-        games: [game],
-      };
+      const isEneba = game.source_marketplace === "ENEBA";
+      const endpoint = isEneba ? "/api/research/eneba-crawler" : "/api/research/g2g-crawler";
+      const payload = isEneba
+        ? { action: "single_import", game }
+        : { action: "bulk_import", games: [game] };
 
-      const res = await fetch("/api/research/g2g-crawler", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -195,7 +216,9 @@ export default function ResearchCenterPage() {
       const json = await res.json();
       if (res.ok && json.status === "success") {
         setAddedIds((prev) => new Set([...Array.from(prev), game.id]));
-        showToast(`✅ "${game.title}" berhasil dimasukkan ke Radar Katalog & Supabase!`);
+        showToast(
+          `✅ "${game.title}" (${isEneba ? "Eneba CDKey" : "G2G"}) berhasil dimasukkan ke Radar Katalog & Supabase!`
+        );
       } else {
         showToast(json.message || "Gagal memasukkan game.", "error");
       }
@@ -216,28 +239,43 @@ export default function ResearchCenterPage() {
 
     setIsBulkImporting(true);
     try {
-      const res = await fetch("/api/research/g2g-crawler", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "bulk_import",
-          games: unaddedFiltered,
-        }),
+      const enebaGames = unaddedFiltered.filter((g: any) => g.source_marketplace === "ENEBA");
+      const g2gGames = unaddedFiltered.filter((g: any) => g.source_marketplace !== "ENEBA");
+
+      let successCount = 0;
+
+      if (enebaGames.length > 0) {
+        for (const eg of enebaGames) {
+          const res = await fetch("/api/research/eneba-crawler", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "single_import", game: eg }),
+          });
+          if (res.ok) successCount++;
+        }
+      }
+
+      if (g2gGames.length > 0) {
+        const res = await fetch("/api/research/g2g-crawler", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "bulk_import",
+            games: g2gGames,
+          }),
+        });
+        if (res.ok) successCount += g2gGames.length;
+      }
+
+      setAddedIds((prev) => {
+        const updated = new Set(Array.from(prev));
+        unaddedFiltered.forEach((g) => updated.add(g.id));
+        return updated;
       });
 
-      const json = await res.json();
-      if (res.ok && json.status === "success") {
-        setAddedIds((prev) => {
-          const updated = new Set(Array.from(prev));
-          unaddedFiltered.forEach((g) => updated.add(g.id));
-          return updated;
-        });
-        showToast(
-          `⚡ ${unaddedFiltered.length} game berhasil diimpor sekaligus ke Radar Portofolio & Supabase!`
-        );
-      } else {
-        showToast(json.message || "Gagal melakukan bulk import.", "error");
-      }
+      showToast(
+        `⚡ ${successCount} game berhasil diimpor sekaligus ke Radar Portofolio & Supabase!`
+      );
     } catch (err) {
       showToast("Gagal melakukan bulk import karena masalah jaringan.", "error");
     } finally {
@@ -328,6 +366,10 @@ export default function ResearchCenterPage() {
   // Filtered Games Calculation
   const filteredGames = useMemo(() => {
     return scannedGames.filter((g) => {
+      // Source Marketplace filter (ALL vs ENEBA vs G2G)
+      if (sourceFilter === "ENEBA" && (g as any).source_marketplace !== "ENEBA") return false;
+      if (sourceFilter === "G2G" && (g as any).source_marketplace === "ENEBA") return false;
+
       // Margin filter
       if (minMarginFilter > 0 && g.net_margin_pct < minMarginFilter) return false;
 
@@ -350,7 +392,7 @@ export default function ResearchCenterPage() {
 
       return true;
     });
-  }, [scannedGames, minMarginFilter, maxBudgetFilter, selectedPlatform, searchQuery]);
+  }, [scannedGames, sourceFilter, minMarginFilter, maxBudgetFilter, selectedPlatform, searchQuery]);
 
   // Statistics from filtered list
   const stats = useMemo(() => {
@@ -604,6 +646,53 @@ export default function ResearchCenterPage() {
 
       {/* Interactive Margin & Budget Filter Controls */}
       <div className="v0-card rounded-2xl p-5 border-white/[0.08] space-y-4">
+        {/* Supplier Source Switcher */}
+        <div className="space-y-1.5 pb-3 border-b border-white/[0.06]">
+          <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-violet-400" />
+              <span>Pilih Channel Supplier Arbitrase:</span>
+            </span>
+            <span className="text-[10px] text-slate-500 font-mono">QRIS / DANA Ready</span>
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setSourceFilter("ALL")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-semibold transition-all border ${
+                sourceFilter === "ALL"
+                  ? "bg-white/10 text-white border-white/20 shadow-sm"
+                  : "bg-zinc-950/80 text-slate-400 border-zinc-800 hover:text-white"
+              }`}
+            >
+              🔥 Semua Supplier ({scannedGames.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSourceFilter("ENEBA")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all border flex items-center gap-1.5 ${
+                sourceFilter === "ENEBA"
+                  ? "bg-violet-600/25 text-violet-200 border-violet-500/60 shadow-lg shadow-violet-500/15"
+                  : "bg-zinc-950/80 text-violet-400 border-violet-500/20 hover:bg-violet-500/10"
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-violet-400" />
+              <span>⚡ Eneba (Khusus Digital Key / CDKey - 0% Hackback)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSourceFilter("G2G")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all border flex items-center gap-1.5 ${
+                sourceFilter === "G2G"
+                  ? "bg-amber-500/25 text-amber-200 border-amber-500/60 shadow-lg shadow-amber-500/15"
+                  : "bg-zinc-950/80 text-amber-400 border-amber-500/20 hover:bg-amber-500/10"
+              }`}
+            >
+              <span>🎮 G2G (Akun Steam &amp; Global)</span>
+            </button>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Margin Selector Tabs */}
           <div className="space-y-1.5">
@@ -613,7 +702,7 @@ export default function ResearchCenterPage() {
             </label>
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950/80 border border-zinc-800 overflow-x-auto">
               {[
-                { val: 0, label: "Semua Hasil Scan (24)" },
+                { val: 0, label: `Semua (${filteredGames.length})` },
                 { val: 40, label: "🔥 Super Arbitrage (>40%)" },
                 { val: 30, label: "💎 Margin Tinggi (>30%)" },
                 { val: 20, label: "⚡ Margin Sehat (>20%)" },
@@ -704,7 +793,15 @@ export default function ResearchCenterPage() {
           </div>
           <div>
             <div className="text-sm font-bold text-white flex items-center gap-2">
-              <span>{filteredGames.length} Game Ditemukan oleh Autonomous G2G Robot</span>
+              <span>
+                {filteredGames.length} Peluang Arbitrase (
+                {sourceFilter === "ENEBA"
+                  ? "Eneba Digital CDKey"
+                  : sourceFilter === "G2G"
+                  ? "G2G Akun"
+                  : "Eneba CDKey & G2G"}
+                ) Ditemukan
+              </span>
               {minMarginFilter > 0 && (
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   Margin &gt;{minMarginFilter}%
@@ -783,6 +880,18 @@ export default function ResearchCenterPage() {
                   {/* Top Bar: Verdict Badge, Platform, Demand */}
                   <div className="flex flex-wrap items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2">
+                      {/* Marketplace Source Badge */}
+                      {(game as any).source_marketplace === "ENEBA" ? (
+                        <span className="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase bg-violet-500/15 text-violet-300 border border-violet-500/30 flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-violet-400" />
+                          ENEBA DIGITAL CDKEY
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                          G2G AKUN / ARBITRASE
+                        </span>
+                      )}
+
                       <span
                         className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase ${
                           game.arbitrage_verdict === "SUPER_OPPORTUNITY"
@@ -838,33 +947,63 @@ export default function ResearchCenterPage() {
                     <div>
                       <h3 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
                         {game.title}
+                        {(game as any).key_type && (
+                          <span className="text-[11px] font-mono font-normal px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                            {(game as any).key_type}
+                          </span>
+                        )}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-400 font-mono">
-                        <span>Supplier G2G:</span>
-                        <a
-                          href={game.g2g_direct_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 font-semibold"
-                        >
-                          {game.seller_name} ★ {game.seller_rating_pct}% (
-                          {game.seller_reviews_count.toLocaleString("id-ID")})
-                          <ExternalLink className="w-3 h-3 text-slate-500" />
-                        </a>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          {game.supplier_tier === "ultra_safe" ? "🛡️ TOP VERIFIED" : "⚡ LOWEST PRICE"}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-slate-400 font-mono">
+                        {(game as any).source_marketplace === "ENEBA" ? (
+                          <>
+                            <span className="text-violet-300 font-semibold">Supplier Eneba:</span>
+                            <a
+                              href={(game as any).eneba_direct_url || game.g2g_direct_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-violet-400 hover:text-violet-300 hover:underline flex items-center gap-1 font-semibold"
+                            >
+                              {game.seller_name} ★ {game.seller_rating_pct}% (
+                              {game.seller_reviews_count.toLocaleString("id-ID")})
+                              <ExternalLink className="w-3 h-3 text-slate-500" />
+                            </a>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30 font-bold">
+                              🛡️ 0% HACKBACK (REDEEM CODE RESMI)
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Supplier G2G:</span>
+                            <a
+                              href={game.g2g_direct_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 font-semibold"
+                            >
+                              {game.seller_name} ★ {game.seller_rating_pct}% (
+                              {game.seller_reviews_count.toLocaleString("id-ID")})
+                              <ExternalLink className="w-3 h-3 text-slate-500" />
+                            </a>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              {game.supplier_tier === "ultra_safe" ? "🛡️ TOP VERIFIED" : "⚡ LOWEST PRICE"}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
 
                     {/* Visual Pricing & Margin Highlight */}
                     <div className="flex flex-wrap items-center gap-4 sm:gap-6 bg-zinc-950/80 p-3.5 rounded-xl border border-white/[0.05]">
-                      {/* G2G Buy Price */}
+                      {/* Buy Price */}
                       <div className="text-left font-mono">
                         <span className="text-[10px] text-slate-500 block uppercase tracking-wider">
-                          Modal G2G (Beli)
+                          {(game as any).source_marketplace === "ENEBA" ? "Modal Eneba (Beli)" : "Modal G2G (Beli)"}
                         </span>
-                        <span className="text-sm font-bold text-amber-400">
+                        <span
+                          className={`text-sm font-bold ${
+                            (game as any).source_marketplace === "ENEBA" ? "text-violet-400" : "text-amber-400"
+                          }`}
+                        >
                           {formatRp(game.price_g2g_idr)}
                         </span>
                       </div>
@@ -918,29 +1057,57 @@ export default function ResearchCenterPage() {
                   {isExpanded && (
                     <div className="pt-3 border-t border-white/[0.06] space-y-3 font-mono text-xs animate-in fade-in duration-200">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-white/[0.06] space-y-2">
-                          <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5" /> Direct G2G Category Gateway:
+                        {(game as any).source_marketplace === "ENEBA" ? (
+                          <div className="p-3.5 rounded-xl bg-violet-950/30 border border-violet-500/20 space-y-2">
+                            <div className="text-[11px] font-bold text-violet-300 flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-violet-400" /> Direct Eneba CDKey Gateway:
+                            </div>
+                            <p className="text-slate-300 text-[11px] leading-relaxed font-sans">
+                              Digital Key resmi bergaransi 0% hackback. Merchant Eneba:{" "}
+                              <strong className="text-white">{game.seller_name}</strong> (Rating {game.seller_rating_pct}%).
+                              Format kode lisensi digital langsung di-redeem oleh pembeli tanpa risiko akun/password pihak ketiga.
+                            </p>
+                            {(game as any).instant_redeem_guide && (
+                              <div className="p-2.5 rounded-lg bg-zinc-950/90 border border-violet-500/30 text-[11px] text-violet-200">
+                                <span className="font-semibold text-violet-300 block mb-1">Panduan Aktivasi Pembeli:</span>
+                                <span className="text-slate-300 font-sans text-xs">{(game as any).instant_redeem_guide}</span>
+                              </div>
+                            )}
+                            <a
+                              href={(game as any).eneba_direct_url || game.g2g_direct_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 font-semibold underline pt-1"
+                            >
+                              <span>Buka Penawaran di Eneba.com/id Langsung</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
                           </div>
-                          <p className="text-slate-300 text-[11px] leading-relaxed font-sans">
-                            Robot memantau listing pada slug{" "}
-                            <code className="text-cyan-300 bg-zinc-950 px-1.5 py-0.5 rounded text-[10px]">
-                              {game.g2g_category_slug}
-                            </code>
-                            . Seller {game.seller_name} memiliki {game.seller_reviews_count.toLocaleString("id-ID")}{" "}
-                            ulasan positif dengan sistem Instant Delivery (kredensial langsung otomatis terkirim
-                            setelah checkout kulakan).
-                          </p>
-                          <a
-                            href={game.g2g_direct_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold underline pt-1"
-                          >
-                            <span>Buka Listing G2G.com/id Langsung</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
+                        ) : (
+                          <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-white/[0.06] space-y-2">
+                            <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5" /> Direct G2G Category Gateway:
+                            </div>
+                            <p className="text-slate-300 text-[11px] leading-relaxed font-sans">
+                              Robot memantau listing pada slug{" "}
+                              <code className="text-cyan-300 bg-zinc-950 px-1.5 py-0.5 rounded text-[10px]">
+                                {game.g2g_category_slug}
+                              </code>
+                              . Seller {game.seller_name} memiliki {game.seller_reviews_count.toLocaleString("id-ID")}{" "}
+                              ulasan positif dengan sistem Instant Delivery (kredensial langsung otomatis terkirim
+                              setelah checkout kulakan).
+                            </p>
+                            <a
+                              href={game.g2g_direct_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold underline pt-1"
+                            >
+                              <span>Buka Listing G2G.com/id Langsung</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
 
                         <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-white/[0.06] space-y-1.5 text-[11px]">
                           <div className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
@@ -950,7 +1117,11 @@ export default function ResearchCenterPage() {
                             </span>
                           </div>
                           <div className="flex justify-between text-slate-400">
-                            <span>Fee QRIS Kulakan G2G (0.7%):</span>
+                            <span>
+                              {(game as any).source_marketplace === "ENEBA"
+                                ? "Fee QRIS Kulakan Eneba (0.7%):"
+                                : "Fee QRIS Kulakan G2G (0.7%):"}
+                            </span>
                             <span className="text-slate-300">{formatRp(game.qris_fee_idr)}</span>
                           </div>
                           <div className="flex justify-between text-slate-400">
@@ -989,22 +1160,38 @@ export default function ResearchCenterPage() {
                         </>
                       ) : (
                         <>
-                          <ChevronDown className="w-3.5 h-3.5" /> Rincian Potongan &amp; Link G2G
+                          <ChevronDown className="w-3.5 h-3.5" />{" "}
+                          {(game as any).source_marketplace === "ENEBA"
+                            ? "Rincian Potongan & Link Eneba"
+                            : "Rincian Potongan & Link G2G"}
                         </>
                       )}
                     </button>
 
                     <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                      <a
-                        href={game.g2g_direct_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition-colors"
-                        title="Buka kategori/listing di G2G.com/id"
-                      >
-                        <ExternalLink className="w-3 h-3 text-amber-400" />
-                        <span>Buka G2G</span>
-                      </a>
+                      {(game as any).source_marketplace === "ENEBA" ? (
+                        <a
+                          href={(game as any).eneba_direct_url || game.g2g_direct_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-lg bg-violet-950/70 hover:bg-violet-900/80 text-violet-200 border border-violet-500/40 flex items-center gap-1.5 transition-colors"
+                          title="Buka listing game resmi di Eneba.com/id"
+                        >
+                          <Zap className="w-3 h-3 text-violet-400" />
+                          <span>Buka Eneba</span>
+                        </a>
+                      ) : (
+                        <a
+                          href={game.g2g_direct_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition-colors"
+                          title="Buka kategori/listing di G2G.com/id"
+                        >
+                          <ExternalLink className="w-3 h-3 text-amber-400" />
+                          <span>Buka G2G</span>
+                        </a>
+                      )}
 
                       <button
                         type="button"
@@ -1043,6 +1230,8 @@ export default function ResearchCenterPage() {
                         className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-md select-none ${
                           isAlreadyAdded
                             ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-default"
+                            : (game as any).source_marketplace === "ENEBA"
+                            ? "bg-violet-600 hover:bg-violet-500 text-white shadow-violet-500/20 cursor-pointer"
                             : "v0-btn-primary hover:shadow-cyan-500/10 cursor-pointer"
                         }`}
                       >
@@ -1059,7 +1248,11 @@ export default function ResearchCenterPage() {
                         ) : (
                           <>
                             <Plus className="w-3.5 h-3.5" />
-                            <span>+ Masukkan ke Katalog</span>
+                            <span>
+                              {(game as any).source_marketplace === "ENEBA"
+                                ? "+ Ambil CDKey Eneba"
+                                : "+ Masukkan ke Katalog"}
+                            </span>
                           </>
                         )}
                       </button>
