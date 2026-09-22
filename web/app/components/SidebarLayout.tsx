@@ -22,6 +22,7 @@ import {
   Activity,
   ChevronRight,
   Compass,
+  PackageSearch,
 } from "lucide-react";
 
 interface NavItem {
@@ -108,6 +109,11 @@ const navSections: NavSection[] = [
         label: "Marketer Hub",
         href: "/dashboard/marketer",
         icon: <FileText className="w-4 h-4 shrink-0 text-fuchsia-400" />,
+      },
+      {
+        label: "Stock Sentry",
+        href: "/dashboard/stock",
+        icon: <PackageSearch className="w-4 h-4 shrink-0 text-amber-400" />,
       },
       {
         label: "Customer Support",

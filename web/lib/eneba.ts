@@ -18,7 +18,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Terraria",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-terraria-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=terraria",
     searchSlug: "terraria",
     estimatedPriceIdr: 42000,
   },
@@ -26,7 +26,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Stardew Valley",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-stardew-valley-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=stardew+valley",
     searchSlug: "stardew-valley",
     estimatedPriceIdr: 58000,
   },
@@ -34,7 +34,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Hollow Knight",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-hollow-knight-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=hollow+knight",
     searchSlug: "hollow-knight",
     estimatedPriceIdr: 49000,
   },
@@ -42,7 +42,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Don't Starve Together",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-don-t-starve-together-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=don-t-starve-together",
     searchSlug: "dont-starve-together",
     estimatedPriceIdr: 35000,
   },
@@ -50,7 +50,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Project Zomboid",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-project-zomboid-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=project+zomboid",
     searchSlug: "project-zomboid",
     estimatedPriceIdr: 72000,
   },
@@ -58,7 +58,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "The Witcher 3: Wild Hunt Complete Edition",
     platform: "GOG / Steam",
     keyType: "GOG Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/gog-the-witcher-3-wild-hunt-game-of-the-year-edition-gog-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=witcher+3",
     searchSlug: "witcher-3-wild-hunt",
     estimatedPriceIdr: 68000,
   },
@@ -66,7 +66,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Cyberpunk 2077",
     platform: "GOG / Steam",
     keyType: "GOG Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/gog-cyberpunk-2077-gog-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=cyberpunk+2077",
     searchSlug: "cyberpunk-2077",
     estimatedPriceIdr: 245000,
   },
@@ -74,7 +74,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Minecraft: Java & Bedrock Edition",
     platform: "PC / Microsoft",
     keyType: "Xbox Live / Microsoft Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/xbox-minecraft-java-bedrock-edition-pc-xbox-live-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=minecraft+java+bedrock",
     searchSlug: "minecraft-java-bedrock",
     estimatedPriceIdr: 198000,
   },
@@ -82,7 +82,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Grand Theft Auto V: Premium Edition",
     platform: "Rockstar Games",
     keyType: "Rockstar Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/rockstar-grand-theft-auto-v-premium-online-edition-rockstar-games-launcher-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=grand+theft+auto+v",
     searchSlug: "gta-v-premium",
     estimatedPriceIdr: 155000,
   },
@@ -90,7 +90,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Red Dead Redemption 2",
     platform: "Rockstar Games",
     keyType: "Rockstar Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/rockstar-red-dead-redemption-2-rockstar-games-launcher-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=red+dead+redemption+2",
     searchSlug: "red-dead-redemption-2",
     estimatedPriceIdr: 185000,
   },
@@ -98,7 +98,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Lethal Company",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-lethal-company-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=lethal+company",
     searchSlug: "lethal-company",
     estimatedPriceIdr: 45000,
   },
@@ -106,7 +106,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Phasmophobia",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-phasmophobia-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=phasmophobia",
     searchSlug: "phasmophobia",
     estimatedPriceIdr: 55000,
   },
@@ -114,7 +114,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Palworld",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-palworld-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=palworld",
     searchSlug: "palworld",
     estimatedPriceIdr: 125000,
   },
@@ -122,7 +122,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Elden Ring",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-elden-ring-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=elden+ring",
     searchSlug: "elden-ring",
     estimatedPriceIdr: 385000,
   },
@@ -130,7 +130,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "EA SPORTS FC 25 Standard Edition",
     platform: "EA App / PC",
     keyType: "EA App Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/ea-app-ea-sports-fc-25-standard-edition-ea-app-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=fc+25",
     searchSlug: "fc-25",
     estimatedPriceIdr: 165000,
   },
@@ -138,7 +138,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Euro Truck Simulator 2",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-euro-truck-simulator-2-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=euro+truck+simulator+2",
     searchSlug: "euro-truck-simulator-2",
     estimatedPriceIdr: 39000,
   },
@@ -146,7 +146,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Assetto Corsa",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-assetto-corsa-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=assetto+corsa",
     searchSlug: "assetto-corsa",
     estimatedPriceIdr: 34000,
   },
@@ -154,22 +154,23 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     title: "Left 4 Dead 2",
     platform: "Steam",
     keyType: "Steam Key (Global)",
-    defaultUrl: "https://www.eneba.com/id/steam-left-4-dead-2-steam-key-global",
+    defaultUrl: "https://www.eneba.com/store/all?text=left+4+dead+2",
     searchSlug: "left-4-dead-2",
     estimatedPriceIdr: 29000,
   }
 };
 
 /**
- * Mendapatkan URL pencarian langsung Eneba untuk judul game tertentu
+ * Mendapatkan URL pencarian langsung Eneba untuk judul game tertentu.
+ * Format ini 100% aman (tidak pernah 404) dan langsung menampilkan perbandingan harga semua merchant Eneba.
  */
 export function getEnebaSearchUrl(gameTitle: string): string {
-  if (!gameTitle) return "https://www.eneba.com/id/store/all";
+  if (!gameTitle) return "https://www.eneba.com/store/all";
   const clean = gameTitle
     .replace(/[:&]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return `https://www.eneba.com/id/store/all?text=${encodeURIComponent(clean)}`;
+  return `https://www.eneba.com/store/all?text=${encodeURIComponent(clean)}`;
 }
 
 /**

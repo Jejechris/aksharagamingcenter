@@ -23,6 +23,7 @@ import {
   Zap,
   Compass,
   Key,
+  PackageSearch,
 } from "lucide-react";
 
 function formatRp(value: number) {
@@ -242,6 +243,18 @@ export default function AdminDashboardPage() {
       iconBox: "bg-violet-500/10 border-violet-500/20",
       dot: "bg-violet-400",
       statClass: "text-violet-400 border-violet-500/20 bg-violet-500/8",
+    },
+    {
+      title: "Stock Sentry",
+      route: "/dashboard/stock",
+      icon: <PackageSearch className="w-5 h-5 text-amber-400" />,
+      number: "11",
+      desc: "Live Reseller Stock Radar: Monitor stok supplier G2G & Eneba real-time, cegah penalti Shopee akibat stok habis & auto-failover.",
+      stat: "Anti-Misskom Sync",
+      cardClass: "card-division-catalog",
+      iconBox: "bg-amber-500/10 border-amber-500/20",
+      dot: "bg-amber-400",
+      statClass: "text-amber-400 border-amber-500/20 bg-amber-500/8",
     },
   ];
 

@@ -63,6 +63,21 @@ function getCatalogData(): any[] {
     }
   }
 
+  // 5. Fallback to starter catalog backup
+  const starterBackupPath = path.resolve(process.cwd(), "data", "starter_catalog_backup.json");
+  if (fs.existsSync(starterBackupPath)) {
+    try {
+      const raw = fs.readFileSync(starterBackupPath, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        inMemoryCatalogCache = parsed;
+        return parsed;
+      }
+    } catch (e) {
+      console.error("Error reading starterBackupPath:", e);
+    }
+  }
+
   if (inMemoryCatalogCache !== null) {
     return inMemoryCatalogCache;
   }
@@ -645,12 +660,24 @@ export async function PATCH(req: Request) {
             rating_pct: Number(editData.rating_pct ?? prev.rating_pct),
             reviews_count: Number(editData.reviews_count ?? editData.reviews ?? prev.reviews_count),
             delivery_speed: editData.delivery_speed || editData.delivery || prev.delivery_speed,
+            stock: editData.stock !== undefined ? Math.max(0, Number(editData.stock)) : prev.stock,
             profile_url: editData.profile_url || prev.profile_url,
           };
 
           if (editData.is_selected || body.set_selected) {
             game.selected_seller_id = targetSellerId;
           }
+        }
+      }
+    }
+
+    // Direct Action: update_stock for a specific seller
+    if (body.action === "update_stock") {
+      const targetSellerId = body.seller_id;
+      if (targetSellerId && Array.isArray(game.sellers)) {
+        const sIdx = game.sellers.findIndex((s: any) => s.seller_id === targetSellerId);
+        if (sIdx >= 0) {
+          game.sellers[sIdx].stock = Math.max(0, Number(body.stock ?? 0));
         }
       }
     }
