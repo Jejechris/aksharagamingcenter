@@ -151,6 +151,19 @@ export default function CatalogDashboardPage() {
   const [isSubmittingDrawerSeller, setIsSubmittingDrawerSeller] = useState(false);
   const [isSubmittingGame, setIsSubmittingGame] = useState(false);
 
+  // Link Auto-Detector & Inspector State
+  const [detectorUrl, setDetectorUrl] = useState('');
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [detectedData, setDetectedData] = useState<any | null>(null);
+  const [showDetectorModal, setShowDetectorModal] = useState(false);
+  const [isApplyingDetected, setIsApplyingDetected] = useState(false);
+
+  // Drawer link detector state
+  const [drawerListingUrl, setDrawerListingUrl] = useState('');
+  const [isDetectingDrawer, setIsDetectingDrawer] = useState(false);
+  const [drawerDetectedStock, setDrawerDetectedStock] = useState<number | null>(null);
+  const [drawerDetectedUrl, setDrawerDetectedUrl] = useState<string | null>(null);
+
   // Synchronize state & localStorage cleanly without redundant server writes
   const updateCatalogState = (nextGames: CatalogGame[]) => {
     setGames(nextGames);
@@ -178,7 +191,8 @@ export default function CatalogDashboardPage() {
             tier_label: drawerSellerTier === 'ultra_safe' ? '🛡️ TOP VERIFIED' : drawerSellerTier === 'lowest_price' ? '⚡ LOWEST PRICE' : '⚖️ MID-LEVEL',
             tier_desc: 'Seller kustom baru ditambahkan dari Catalog Radar.',
             is_recommended: false,
-            profile_url: getG2GSellerUrl(drawerSellerName.trim(), gameTitle)
+            stock: drawerDetectedStock !== null ? drawerDetectedStock : 100,
+            profile_url: drawerDetectedUrl || getG2GSellerUrl(drawerSellerName.trim(), gameTitle)
           },
           set_selected: drawerSetSelected
         })
@@ -191,6 +205,9 @@ export default function CatalogDashboardPage() {
         updateCatalogState(next);
         setDrawerAddSellerGameId(null);
         setDrawerSellerName('');
+        setDrawerListingUrl('');
+        setDrawerDetectedStock(null);
+        setDrawerDetectedUrl(null);
         showToast(`✅ Seller "${drawerSellerName}" berhasil ditambahkan ke ${gameTitle} & tersimpan permanen!`);
       } else {
         showToast('Gagal menambahkan seller.', 'error');
@@ -199,6 +216,160 @@ export default function CatalogDashboardPage() {
       showToast('Terjadi kesalahan jaringan.', 'error');
     } finally {
       setIsSubmittingDrawerSeller(false);
+    }
+  };
+
+  const handleDetectLink = async (targetUrl?: string) => {
+    const urlToTest = (targetUrl !== undefined ? targetUrl : detectorUrl).trim();
+    if (!urlToTest) {
+      showToast('Harap masukkan URL listing G2G atau Eneba.', 'error');
+      return;
+    }
+    try {
+      setIsDetecting(true);
+      setShowDetectorModal(true);
+      const res = await fetch('/api/inventory/detect-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlToTest }),
+      });
+      const json = await res.json();
+      if (json.status === 'success') {
+        setDetectedData(json.data);
+        showToast(
+          `✅ Berhasil deteksi: ${json.data.clean_title} • Stok Faktual G2G: ${json.data.real_stock.toLocaleString()} Unit`
+        );
+      } else {
+        setDetectedData(null);
+        showToast(json.message || 'Gagal mendeteksi link.', 'error');
+      }
+    } catch (err) {
+      showToast('Terjadi kesalahan saat menghubungi server G2G SLS.', 'error');
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  const handleDetectInDrawer = async (gameTitle: string) => {
+    if (!drawerListingUrl.trim()) {
+      showToast('Masukkan link listing G2G / Eneba terlebih dahulu.', 'error');
+      return;
+    }
+    try {
+      setIsDetectingDrawer(true);
+      const res = await fetch('/api/inventory/detect-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: drawerListingUrl.trim() }),
+      });
+      const json = await res.json();
+      if (json.status === 'success') {
+        const d = json.data;
+        if (d.seller_name) setDrawerSellerName(d.seller_name);
+        if (d.price_idr) setDrawerSellerPrice(d.price_idr);
+        if (d.rating_pct) setDrawerSellerRating(d.rating_pct);
+        if (d.reviews_count) setDrawerSellerReviews(d.reviews_count);
+        setDrawerDetectedStock(d.real_stock);
+        setDrawerDetectedUrl(d.profile_url || drawerListingUrl.trim());
+        showToast(`✅ Deteksi sukses: Toko ${d.seller_name} • Stok Real: ${d.real_stock.toLocaleString()} Unit!`);
+      } else {
+        showToast(json.message || 'Gagal mendeteksi link.', 'error');
+      }
+    } catch (e) {
+      showToast('Gagal mendeteksi link seller.', 'error');
+    } finally {
+      setIsDetectingDrawer(false);
+    }
+  };
+
+  const handleApplyDetectedToCatalog = async () => {
+    if (!detectedData) return;
+    try {
+      setIsApplyingDetected(true);
+      if (detectedData.matching_game_id) {
+        const res = await fetch('/api/catalog', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'add_seller',
+            game_id: detectedData.matching_game_id,
+            new_seller: {
+              seller_name: detectedData.seller_name,
+              price_g2g_idr: detectedData.price_idr,
+              rating_pct: detectedData.rating_pct,
+              reviews_count: detectedData.reviews_count,
+              delivery_speed: detectedData.delivery_speed,
+              stock: detectedData.real_stock,
+              is_recommended: true,
+              profile_url: detectedData.profile_url,
+              tier: 'mid_level',
+              tier_label: '⚖️ Seller Live G2G',
+              tier_desc: `Terdeteksi live dari G2G Offer ${detectedData.offer_id}`,
+            },
+            set_selected: true,
+          }),
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+          const catRes = await fetch('/api/catalog');
+          const catJson = await catRes.json();
+          if (catJson.status === 'success' && Array.isArray(catJson.data)) {
+            updateCatalogState(catJson.data);
+          }
+          showToast(
+            `✅ Seller "${detectedData.seller_name}" dengan stok live ${detectedData.real_stock.toLocaleString()} unit berhasil diterapkan ke ${detectedData.matching_game_title}!`
+          );
+          setShowDetectorModal(false);
+        } else {
+          showToast(json.message || 'Gagal menerapkan seller.', 'error');
+        }
+      } else {
+        const res = await fetch('/api/catalog', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'add',
+            title: detectedData.clean_title,
+            platform: detectedData.platform,
+            category: detectedData.category,
+            selling_price_shopee_idr: detectedData.recommended_shopee_price_idr,
+            target_margin_pct: 25,
+            sellers: [
+              {
+                seller_name: detectedData.seller_name,
+                price_g2g_idr: detectedData.price_idr,
+                rating_pct: detectedData.rating_pct,
+                reviews_count: detectedData.reviews_count,
+                delivery_speed: detectedData.delivery_speed,
+                stock: detectedData.real_stock,
+                is_recommended: true,
+                profile_url: detectedData.profile_url,
+                tier: 'lowest_price',
+                tier_label: '⚡ Lowest Live Price',
+                tier_desc: `Penawaran live G2G Offer ${detectedData.offer_id}`,
+              },
+            ],
+          }),
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+          const catRes = await fetch('/api/catalog');
+          const catJson = await catRes.json();
+          if (catJson.status === 'success' && Array.isArray(catJson.data)) {
+            updateCatalogState(catJson.data);
+          }
+          showToast(
+            `✅ Game baru "${detectedData.clean_title}" berhasil dibuat dengan stok live ${detectedData.real_stock.toLocaleString()} unit!`
+          );
+          setShowDetectorModal(false);
+        } else {
+          showToast(json.message || 'Gagal membuat produk baru.', 'error');
+        }
+      }
+    } catch (err) {
+      showToast('Terjadi kesalahan saat menerapkan produk.', 'error');
+    } finally {
+      setIsApplyingDetected(false);
     }
   };
 
@@ -648,6 +819,19 @@ export default function CatalogDashboardPage() {
           <button
             type="button"
             onClick={() => {
+              setDetectorUrl('');
+              setDetectedData(null);
+              setShowDetectorModal(true);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30 text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-950/40 transition-all cursor-pointer"
+            title="Deteksi live link G2G / Eneba & verifikasi stok asli"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Detektor Live Link</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setNewTitle('');
               setResearchedSellers([]);
               setResearchSummary('');
@@ -704,6 +888,32 @@ export default function CatalogDashboardPage() {
           </div>
           <div className="text-2xl font-bold font-mono text-amber-400 tracking-tight">{formatNum(portfolioStats.avgMargin)}%</div>
           <div className="text-[10px] font-mono text-slate-600 mt-3 pt-2.5 border-t border-white/[0.06]">Target minimal: 15%</div>
+        </div>
+      </div>
+
+      {/* QUICK LINK DETECTOR BAR */}
+      <div className="p-3.5 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/30 via-zinc-900/80 to-purple-950/30 flex flex-col md:flex-row items-stretch md:items-center gap-3 shadow-lg">
+        <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 shrink-0">
+          <Zap className="w-4 h-4 text-indigo-400 animate-pulse" />
+          <span>DETEKTOR LIVE LINK G2G / ENEBA:</span>
+        </div>
+        <div className="flex-1 flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Paste link listing G2G atau Eneba (contoh: https://www.g2g.com/.../offer/G1703129821471UK atau ID: G1737050259610GZ)..."
+            value={detectorUrl}
+            onChange={(e) => setDetectorUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleDetectLink()}
+            className="flex-1 px-3.5 py-2 rounded-xl bg-zinc-950 border border-zinc-700/80 text-zinc-200 text-xs font-mono placeholder-zinc-500 focus:outline-none focus:border-indigo-400"
+          />
+          <button
+            onClick={() => handleDetectLink()}
+            disabled={isDetecting || !detectorUrl.trim()}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs transition-colors shrink-0 flex items-center gap-1.5 shadow-md shadow-indigo-900/30 cursor-pointer"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>{isDetecting ? "Mendeteksi..." : "Deteksi Faktual Live"}</span>
+          </button>
         </div>
       </div>
 
@@ -850,6 +1060,13 @@ export default function CatalogDashboardPage() {
                           </span>
                           <span>•</span>
                           <span>★ {selectedSeller?.rating_pct}% ({selectedSeller?.reviews_count.toLocaleString('id-ID')} ulasan)</span>
+                          <span>•</span>
+                          <span className={`inline-flex items-center gap-1 font-bold ${
+                            (selectedSeller?.stock ?? 0) === 0 ? 'text-rose-400' :
+                            (selectedSeller?.stock ?? 0) <= 4 ? 'text-amber-400' : 'text-emerald-400'
+                          }`}>
+                            📦 Stok Live: {(selectedSeller?.stock ?? 0).toLocaleString('id-ID')} Unit
+                          </span>
                         </>
                       )}
                     </div>
@@ -884,7 +1101,7 @@ export default function CatalogDashboardPage() {
                           title="Klik untuk ubah harga"
                         >
                           <span>{formatRp(game.selling_price_shopee_idr)}</span>
-                          <Sliders className="w-3 h-3 text-slate-600 group-hover/price:text-amber-400 transition-colors" />
+                          <Sliders className="w-3.5 h-3.5 text-slate-600 group-hover/price:text-amber-400 transition-colors" />
                         </div>
                       )}
                     </div>
@@ -914,6 +1131,19 @@ export default function CatalogDashboardPage() {
                     </div>
 
                     <div className="flex items-center gap-1.5 ml-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = selectedSeller?.profile_url || getValidSellerUrl(selectedSeller, game.title);
+                          handleDetectLink(url);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all cursor-pointer"
+                        title="Inspeksi link asli & verifikasi stok live di G2G"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="hidden sm:inline">Inspeksi Link</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => setCompetitorModalGame({
@@ -1050,6 +1280,39 @@ export default function CatalogDashboardPage() {
                           </div>
                         </div>
 
+                        {/* Link Auto-Detector Input Bar inside Drawer */}
+                        <div className="p-3 rounded-lg border border-indigo-500/30 bg-indigo-950/20 space-y-2">
+                          <label className="text-[11px] font-semibold text-indigo-300 flex items-center gap-1.5 font-mono">
+                            <Zap className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                            Paste Link Listing G2G (Deteksi Otomatis Toko, Harga & Stok Live)
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="https://www.g2g.com/.../offer/G1703129821471UK atau ID: G1737050259610GZ"
+                              value={drawerListingUrl}
+                              onChange={(e) => setDrawerListingUrl(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && handleDetectInDrawer(game.title)}
+                              className="flex-1 bg-zinc-900 border border-indigo-500/40 rounded-lg px-3 py-1.5 text-xs text-zinc-100 font-mono placeholder-zinc-500 focus:outline-none focus:border-indigo-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDetectInDrawer(game.title)}
+                              disabled={isDetectingDrawer || !drawerListingUrl.trim()}
+                              className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer shrink-0"
+                            >
+                              {isDetectingDrawer ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                              <span>{isDetectingDrawer ? "Mendeteksi..." : "⚡ Deteksi"}</span>
+                            </button>
+                          </div>
+                          {drawerDetectedStock !== null && (
+                            <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5 pt-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Terdeteksi Faktual: Stok Live <strong>{drawerDetectedStock.toLocaleString()} Unit</strong> (Tersinkronisasi)</span>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                           <div>
                             <label className="text-[11px] text-slate-400 block mb-1">Nama Toko G2G</label>
@@ -1139,13 +1402,14 @@ export default function CatalogDashboardPage() {
                     )}
 
                     <div className="overflow-x-auto rounded-xl border border-white/5">
-                      <table className="w-full text-left text-xs font-mono min-w-[650px]">
+                      <table className="w-full text-left text-xs font-mono min-w-[720px]">
                         <thead className="bg-white/5 border-b border-white/5">
                           <tr className="text-slate-400 text-[10px] uppercase tracking-widest">
                             <th className="px-4 py-3 font-semibold">Status</th>
                             <th className="px-4 py-3 font-semibold">Tier</th>
                             <th className="px-4 py-3 font-semibold">Seller G2G / Eneba</th>
                             <th className="px-4 py-3 font-semibold">Reputasi</th>
+                            <th className="px-4 py-3 font-semibold">Stok Live</th>
                             <th className="px-4 py-3 font-semibold">Harga (IDR)</th>
                             <th className="px-4 py-3 font-semibold">Laba Bersih</th>
                             <th className="px-4 py-3 font-semibold">Margin</th>
@@ -1207,6 +1471,15 @@ export default function CatalogDashboardPage() {
                                   <td className="px-4 py-3 text-slate-300">
                                     ★ {s.rating_pct}% <span className="text-slate-500">({s.reviews_count.toLocaleString('id-ID')})</span>
                                   </td>
+                                  <td className="px-4 py-3 font-mono font-bold">
+                                    <span className={
+                                      (s.stock ?? 0) === 0 ? 'text-rose-400 font-bold' :
+                                      (s.stock ?? 0) <= 4 ? 'text-amber-400 font-bold' :
+                                      'text-emerald-400 font-bold'
+                                    }>
+                                      {(s.stock ?? 0).toLocaleString('id-ID')} Unit
+                                    </span>
+                                  </td>
                                   <td className="px-4 py-3 text-slate-200 font-semibold">
                                     {formatRp(s.price_g2g_idr)}
                                   </td>
@@ -1220,6 +1493,19 @@ export default function CatalogDashboardPage() {
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end gap-2">
+                                      {/* Inspeksi Link & Deteksi Live */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const url = s.profile_url || getValidSellerUrl(s, game.title);
+                                          handleDetectLink(url);
+                                        }}
+                                        className="p-1 rounded-md text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors cursor-pointer"
+                                        title="Inspeksi link asli & verifikasi stok live di G2G"
+                                      >
+                                        <Zap className="w-3.5 h-3.5" />
+                                      </button>
+
                                       {/* Edit Seller Button */}
                                       <button
                                         type="button"
@@ -1417,6 +1703,61 @@ export default function CatalogDashboardPage() {
             </div>
 
             <form onSubmit={handleCreateGame} className="space-y-4 text-sm font-mono">
+              {/* Link Auto-Detector in Tambah Game Modal */}
+              <div className="p-3 rounded-xl border border-indigo-500/30 bg-indigo-950/20 space-y-2">
+                <label className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5 font-mono">
+                  <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                  Atau Paste Link G2G / Eneba (Auto-Deteksi Game, Seller & Stok)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Contoh: https://www.g2g.com/.../offer/G1703129821471UK atau Eneba URL"
+                    value={detectorUrl}
+                    onChange={(e) => setDetectorUrl(e.target.value)}
+                    className="flex-1 bg-zinc-900 border border-indigo-500/40 rounded-xl px-3 py-2 text-xs text-zinc-100 font-mono placeholder-zinc-500 focus:outline-none focus:border-indigo-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!detectorUrl.trim()) return;
+                      try {
+                        setIsDetecting(true);
+                        const res = await fetch("/api/inventory/detect-link", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ url: detectorUrl.trim() }),
+                        });
+                        const json = await res.json();
+                        if (json.status === "success") {
+                          const d = json.data;
+                          setNewTitle(d.clean_title);
+                          setNewPlatform(d.platform);
+                          setNewCategory(d.category);
+                          setNewSellerName(d.seller_name);
+                          setNewSellerPrice(d.price_idr);
+                          setNewSellerRating(d.rating_pct);
+                          setNewSellerReviews(d.reviews_count);
+                          setNewSellingPrice(d.recommended_shopee_price_idr);
+                          showToast(`✅ Data terdeteksi otomatis! Stok Live: ${d.real_stock.toLocaleString()} Unit`);
+                        } else {
+                          showToast(json.message || "Gagal mendeteksi link.", "error");
+                        }
+                      } catch (e) {
+                        showToast("Gagal mendeteksi link.", "error");
+                      } finally {
+                        setIsDetecting(false);
+                      }
+                    }}
+                    disabled={isDetecting || !detectorUrl.trim()}
+                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs font-sans flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer shrink-0"
+                  >
+                    {isDetecting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    <span>⚡ Deteksi</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="space-y-1.5 font-sans">
                 <label className="text-xs text-slate-400 font-medium">Nama Game Lengkap</label>
                 <div className="flex gap-2">
@@ -1592,6 +1933,201 @@ export default function CatalogDashboardPage() {
           costG2gIdr={competitorModalGame.cogs}
           onApplyPrice={handleApplyCompetitorPrice}
         />
+      )}
+
+      {/* LINK AUTO-DETECTOR & INSPECTOR MODAL */}
+      {showDetectorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="v0-card rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-5 shadow-2xl border-indigo-500/30 bg-zinc-950">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm font-mono">
+                <Zap className="w-4 h-4" />
+                <span>Detektor & Inspektur Live Link G2G / Eneba</span>
+              </div>
+              <button
+                onClick={() => setShowDetectorModal(false)}
+                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Input Bar */}
+            <div className="space-y-2">
+              <label className="text-xs text-slate-400 font-mono">
+                URL Listing G2G (Offer URL) atau Eneba:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Paste link listing... (e.g. https://www.g2g.com/.../offer/G...)"
+                  value={detectorUrl}
+                  onChange={(e) => setDetectorUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleDetectLink()}
+                  className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-400"
+                />
+                <button
+                  onClick={() => handleDetectLink()}
+                  disabled={isDetecting || !detectorUrl.trim()}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+                >
+                  {isDetecting ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Search className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isDetecting ? "Mendeteksi..." : "Deteksi"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Loading Indicator */}
+            {isDetecting && (
+              <div className="p-8 text-center rounded-xl border border-zinc-800 bg-zinc-950/50 space-y-3">
+                <RefreshCw className="w-8 h-8 animate-spin mx-auto text-indigo-400" />
+                <p className="text-xs text-zinc-300 font-mono">
+                  Menghubungi server resmi SLS G2G (sls.g2g.com)...
+                </p>
+                <p className="text-[11px] text-zinc-500">
+                  Mengekstrak data stok live, status online seller, kepuasan, dan harga modal riil...
+                </p>
+              </div>
+            )}
+
+            {/* Detected Card */}
+            {!isDetecting && detectedData && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl border border-indigo-500/30 bg-indigo-950/20 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                          {detectedData.platform}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                          {detectedData.category}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                          Offer ID: {detectedData.offer_id}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-base text-zinc-100">
+                        {detectedData.clean_title}
+                      </h4>
+                      <p className="text-[11px] text-zinc-400 truncate max-w-md">
+                        {detectedData.raw_title}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-indigo-500/20 text-xs font-mono">
+                    <div className="bg-zinc-900/80 p-2.5 rounded-lg border border-zinc-800">
+                      <div className="text-[10px] text-zinc-500">SELLER</div>
+                      <div className="font-semibold text-zinc-200 truncate flex items-center gap-1">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            detectedData.is_online ? "bg-emerald-400" : "bg-zinc-500"
+                          }`}
+                        />
+                        {detectedData.seller_name}
+                      </div>
+                      <div className="text-[10px] text-zinc-400">
+                        ⭐ {detectedData.rating_pct}%
+                      </div>
+                    </div>
+
+                    <div className="bg-zinc-900/80 p-2.5 rounded-lg border border-zinc-800">
+                      <div className="text-[10px] text-zinc-500">STOK LIVE G2G</div>
+                      <div
+                        className={`text-base font-bold ${
+                          detectedData.real_stock === 0
+                            ? "text-rose-400"
+                            : detectedData.real_stock <= 4
+                            ? "text-amber-400"
+                            : "text-emerald-400"
+                        }`}
+                      >
+                        {detectedData.real_stock.toLocaleString()}{" "}
+                        <span className="text-[10px] font-normal">Unit</span>
+                      </div>
+                      <div className="text-[10px] text-emerald-400">
+                        {detectedData.status === "live" ? "🟢 Live Listing" : "🔴 Delisted"}
+                      </div>
+                    </div>
+
+                    <div className="bg-zinc-900/80 p-2.5 rounded-lg border border-zinc-800">
+                      <div className="text-[10px] text-zinc-500">MODAL G2G</div>
+                      <div className="font-bold text-zinc-200">
+                        {formatRp(detectedData.price_idr)}
+                      </div>
+                      <div className="text-[10px] text-zinc-400">
+                        ${detectedData.price_usd} USD
+                      </div>
+                    </div>
+
+                    <div className="bg-zinc-900/80 p-2.5 rounded-lg border border-zinc-800">
+                      <div className="text-[10px] text-zinc-500">REK. JUAL SHOPEE</div>
+                      <div className="font-bold text-amber-300">
+                        {formatRp(detectedData.recommended_shopee_price_idr)}
+                      </div>
+                      <div className="text-[10px] text-zinc-400">+25-30% Margin</div>
+                    </div>
+                  </div>
+
+                  {/* Matching Catalog Info */}
+                  <div className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800 text-xs">
+                    {detectedData.matching_game_id ? (
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-emerald-300 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          Cocok dengan katalog: <strong>{detectedData.matching_game_title}</strong>
+                        </span>
+                        <span className="text-[11px] text-zinc-400">
+                          {detectedData.is_existing_seller
+                            ? "ℹ️ Seller ini sudah ada di game ini"
+                            : "✨ Seller baru untuk game ini"}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-zinc-300 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <span>Game baru terdeteksi! Siap ditambahkan sebagai produk baru di katalog.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <a
+                    href={detectedData.profile_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <span>Buka Listing Asli di G2G</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+
+                  <button
+                    onClick={handleApplyDetectedToCatalog}
+                    disabled={isApplyingDetected}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>
+                      {isApplyingDetected
+                        ? "Menerapkan..."
+                        : detectedData.matching_game_id
+                        ? "⚡ Terapkan Seller Ini ke Katalog"
+                        : "➕ Tambahkan Produk Baru ke Katalog"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
     </div>
