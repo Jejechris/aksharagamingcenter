@@ -340,6 +340,13 @@ export default function EnebaTerminalPage() {
             Keuntungan maksimal tanpa risiko komplain (<strong className="text-emerald-400 font-semibold">0% Hackback</strong>) karena kode langsung di-redeem ke akun pribadi pembeli. Mendukung pembayaran lokal Indonesia via <strong className="text-white">QRIS (Fee 0.7%)</strong>, DANA, dan OVO.
           </p>
 
+          <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-violet-950/40 border border-violet-500/30 text-[11px] font-mono text-violet-300">
+            <span>💡</span>
+            <span>
+              <strong>Pricelist Terkalibrasi Live:</strong> Kurs USD aktual (~Rp 16.200) + service fee checkout Eneba (~10-12%). Contoh: Minecraft Java &amp; Bedrock (~Rp 315.000), Project Zomboid (~Rp 118.000).
+            </span>
+          </div>
+
           {/* Supplier Gateway Quick Switcher */}
           <div className="flex flex-wrap items-center gap-2 mt-4 pt-1 text-[11px] font-mono">
             <span className="text-slate-500">Gateway Supplier:</span>
@@ -539,10 +546,10 @@ export default function EnebaTerminalPage() {
               className="bg-zinc-950/90 border border-zinc-800 text-zinc-200 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-violet-500 w-full sm:w-56"
             >
               <option value={0}>Semua Budget Modal</option>
-              <option value={50000}>Modal Ringan (&lt; Rp 50.000)</option>
-              <option value={100000}>Modal Menengah (&lt; Rp 100.000)</option>
-              <option value={200000}>Modal Menengah (&lt; Rp 200.000)</option>
-              <option value={350000}>Modal Premium (&lt; Rp 350.000)</option>
+              <option value={100000}>Budget Ringan (&lt; Rp 100.000)</option>
+              <option value={200000}>Budget Menengah (&lt; Rp 200.000)</option>
+              <option value={400000}>Budget Populer (&lt; Rp 400.000)</option>
+              <option value={800000}>Budget AAA / Flagship (&lt; Rp 800.000)</option>
             </select>
           </div>
         </div>

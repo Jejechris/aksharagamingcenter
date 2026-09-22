@@ -20,7 +20,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=terraria",
     searchSlug: "terraria",
-    estimatedPriceIdr: 42000,
+    estimatedPriceIdr: 49000,
   },
   stardew: {
     title: "Stardew Valley",
@@ -28,7 +28,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=stardew+valley",
     searchSlug: "stardew-valley",
-    estimatedPriceIdr: 58000,
+    estimatedPriceIdr: 395000,
   },
   "hollow knight": {
     title: "Hollow Knight",
@@ -36,7 +36,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=hollow+knight",
     searchSlug: "hollow-knight",
-    estimatedPriceIdr: 49000,
+    estimatedPriceIdr: 148000,
   },
   "dont starve": {
     title: "Don't Starve Together",
@@ -44,15 +44,15 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=don-t-starve-together",
     searchSlug: "dont-starve-together",
-    estimatedPriceIdr: 35000,
+    estimatedPriceIdr: 85000,
   },
   "project zomboid": {
     title: "Project Zomboid",
     platform: "Steam",
-    keyType: "Steam Key (Global)",
+    keyType: "Steam Key / Gift (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=project+zomboid",
     searchSlug: "project-zomboid",
-    estimatedPriceIdr: 72000,
+    estimatedPriceIdr: 118000,
   },
   "witcher 3": {
     title: "The Witcher 3: Wild Hunt Complete Edition",
@@ -60,7 +60,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "GOG Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=witcher+3",
     searchSlug: "witcher-3-wild-hunt",
-    estimatedPriceIdr: 68000,
+    estimatedPriceIdr: 365000,
   },
   cyberpunk: {
     title: "Cyberpunk 2077",
@@ -68,7 +68,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "GOG Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=cyberpunk+2077",
     searchSlug: "cyberpunk-2077",
-    estimatedPriceIdr: 245000,
+    estimatedPriceIdr: 325000,
   },
   minecraft: {
     title: "Minecraft: Java & Bedrock Edition",
@@ -76,7 +76,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Xbox Live / Microsoft Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=minecraft+java+bedrock",
     searchSlug: "minecraft-java-bedrock",
-    estimatedPriceIdr: 198000,
+    estimatedPriceIdr: 315000,
   },
   "gta v": {
     title: "Grand Theft Auto V: Premium Edition",
@@ -84,7 +84,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Rockstar Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=grand+theft+auto+v",
     searchSlug: "gta-v-premium",
-    estimatedPriceIdr: 155000,
+    estimatedPriceIdr: 235000,
   },
   rdr2: {
     title: "Red Dead Redemption 2",
@@ -92,7 +92,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Rockstar Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=red+dead+redemption+2",
     searchSlug: "red-dead-redemption-2",
-    estimatedPriceIdr: 185000,
+    estimatedPriceIdr: 255000,
   },
   "lethal company": {
     title: "Lethal Company",
@@ -100,7 +100,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=lethal+company",
     searchSlug: "lethal-company",
-    estimatedPriceIdr: 45000,
+    estimatedPriceIdr: 125000,
   },
   phasmophobia: {
     title: "Phasmophobia",
@@ -108,7 +108,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=phasmophobia",
     searchSlug: "phasmophobia",
-    estimatedPriceIdr: 55000,
+    estimatedPriceIdr: 215000,
   },
   palworld: {
     title: "Palworld",
@@ -116,7 +116,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=palworld",
     searchSlug: "palworld",
-    estimatedPriceIdr: 125000,
+    estimatedPriceIdr: 425000,
   },
   "elden ring": {
     title: "Elden Ring",
@@ -124,7 +124,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=elden+ring",
     searchSlug: "elden-ring",
-    estimatedPriceIdr: 385000,
+    estimatedPriceIdr: 785000,
   },
   "fc 25": {
     title: "EA SPORTS FC 25 Standard Edition",
@@ -132,7 +132,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "EA App Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=fc+25",
     searchSlug: "fc-25",
-    estimatedPriceIdr: 165000,
+    estimatedPriceIdr: 665000,
   },
   "euro truck": {
     title: "Euro Truck Simulator 2",
@@ -140,7 +140,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=euro+truck+simulator+2",
     searchSlug: "euro-truck-simulator-2",
-    estimatedPriceIdr: 39000,
+    estimatedPriceIdr: 195000,
   },
   "assetto corsa": {
     title: "Assetto Corsa",
@@ -148,15 +148,15 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=assetto+corsa",
     searchSlug: "assetto-corsa",
-    estimatedPriceIdr: 34000,
+    estimatedPriceIdr: 75000,
   },
   "left 4 dead 2": {
     title: "Left 4 Dead 2",
     platform: "Steam",
-    keyType: "Steam Key (Global)",
+    keyType: "Steam Key / Gift (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=left+4+dead+2",
     searchSlug: "left-4-dead-2",
-    estimatedPriceIdr: 29000,
+    estimatedPriceIdr: 125000,
   }
 };
 
