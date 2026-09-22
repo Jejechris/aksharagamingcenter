@@ -49,6 +49,11 @@ interface Seller {
   profile_url: string;
   net_profit_idr?: number;
   net_margin_pct?: number;
+  is_online?: boolean;
+  live_status?: string;
+  total_success_order?: number;
+  live_synced_at?: string;
+  offer_id?: string;
 }
 
 interface GameItem {
@@ -73,6 +78,14 @@ function formatRp(val: number): string {
   return "Rp " + Math.round(val || 0).toLocaleString("id-ID");
 }
 
+function extractOfferId(urlOrId?: string): string | null {
+  if (!urlOrId) return null;
+  const trimmed = urlOrId.trim();
+  if (/^G\d+[A-Z0-9]+$/i.test(trimmed)) return trimmed;
+  const match = trimmed.match(/offer\/(G\d+[A-Z0-9]+)/i);
+  return match ? match[1] : null;
+}
+
 export default function StockSentryPage() {
   const [catalog, setCatalog] = useState<GameItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,10 +97,12 @@ export default function StockSentryPage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "CRITICAL" | "WARNING" | "SAFE">("ALL");
   const [platformFilter, setPlatformFilter] = useState("ALL");
 
-  // Live Audit simulation
+  // Live Audit from G2G SLS API
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditProgress, setAuditProgress] = useState(0);
   const [lastAuditTime, setLastAuditTime] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [showAuditLogs, setShowAuditLogs] = useState(false);
 
   // Inline Stock Edit modal / state
   const [editingStockState, setEditingStockState] = useState<{
@@ -142,26 +157,40 @@ export default function StockSentryPage() {
     setLastAuditTime(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
   }, []);
 
-  // Run live simulation ping across all suppliers
+  // Run live real-time G2G SLS API audit
   const handleRunLiveAudit = async () => {
-    setIsAuditing(true);
-    setAuditProgress(10);
+    try {
+      setIsAuditing(true);
+      setAuditProgress(15);
 
-    const timer1 = setTimeout(() => setAuditProgress(40), 400);
-    const timer2 = setTimeout(() => setAuditProgress(75), 800);
-    const timer3 = setTimeout(async () => {
+      const interval = setInterval(() => {
+        setAuditProgress((prev) => (prev < 85 ? prev + 14 : prev));
+      }, 300);
+
+      const res = await fetch("/api/inventory/live-sync", {
+        method: "POST",
+      });
+      clearInterval(interval);
       setAuditProgress(100);
-      await fetchCatalog();
-      setIsAuditing(false);
-      setLastAuditTime(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
-      showToast("✅ Audit ketersediaan stok supplier selesai. Data tersinkronisasi!", "success");
-    }, 1200);
 
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-    };
+      const json = await res.json();
+      if (json.status === "success") {
+        setCatalog(json.data);
+        setAuditLogs(json.audit_logs || []);
+        setShowAuditLogs(true);
+        setLastAuditTime(json.audit_time || new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
+        showToast(
+          `✅ Audit live selesai! ${json.synced_count} seller G2G tersinkronisasi faktual langsung dari server SLS G2G.`,
+          "success"
+        );
+      } else {
+        showToast(json.message || "Gagal sinkronisasi live dari G2G.", "error");
+      }
+    } catch (err: any) {
+      showToast("Terjadi kesalahan saat menghubungi server G2G SLS API.", "error");
+    } finally {
+      setIsAuditing(false);
+    }
   };
 
   // Switch Supplier (Failover)
@@ -443,7 +472,7 @@ export default function StockSentryPage() {
         <div className="w-full bg-zinc-900 border border-amber-500/30 rounded-xl p-3 space-y-2">
           <div className="flex justify-between items-center text-xs font-mono">
             <span className="text-amber-400 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 animate-pulse" /> Ping ke server G2G & Eneba merchant...
+              <Zap className="w-3.5 h-3.5 animate-pulse" /> Ping real-time langsung ke server G2G SLS API (sls.g2g.com)...
             </span>
             <span className="text-zinc-400">{auditProgress}%</span>
           </div>
@@ -453,6 +482,92 @@ export default function StockSentryPage() {
               style={{ width: `${auditProgress}%` }}
             />
           </div>
+        </div>
+      )}
+
+      {/* LIVE AUDIT REPORT BANNER: If audit logs exist */}
+      {auditLogs.length > 0 && (
+        <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/10 p-4 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-xs font-mono text-cyan-300">
+              <Zap className="w-4 h-4 text-cyan-400" />
+              <span>
+                LAPORAN AUDIT LIVE G2G SLS ({auditLogs.length} SELLER TERSINKRONISASI) • {lastAuditTime} WIB
+              </span>
+            </div>
+            <button
+              onClick={() => setShowAuditLogs(!showAuditLogs)}
+              className="text-xs text-cyan-400 hover:text-cyan-200 font-mono underline"
+            >
+              {showAuditLogs ? "Tutup Laporan ▲" : "Buka Tabel Faktual Live ▼"}
+            </button>
+          </div>
+
+          {showAuditLogs && (
+            <div className="overflow-x-auto rounded-lg border border-zinc-800/80 mt-2">
+              <table className="w-full text-xs text-left text-zinc-300 font-mono">
+                <thead className="text-[10px] uppercase bg-zinc-900 text-zinc-400 border-b border-zinc-800">
+                  <tr>
+                    <th className="py-2.5 px-3">Game</th>
+                    <th className="py-2.5 px-3">Seller (Offer ID)</th>
+                    <th className="py-2.5 px-3">Status G2G</th>
+                    <th className="py-2.5 px-3">Stok Live Faktual</th>
+                    <th className="py-2.5 px-3">Status Online</th>
+                    <th className="py-2.5 px-3">Tingkat Risiko</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/60 bg-zinc-950/40">
+                  {auditLogs.map((log, idx) => (
+                    <tr key={idx} className="hover:bg-zinc-900/40">
+                      <td className="py-2 px-3 font-medium text-zinc-200">{log.game_title}</td>
+                      <td className="py-2 px-3">
+                        <span className="text-zinc-100 font-medium">{log.seller_name}</span>{" "}
+                        <span className="text-zinc-500 text-[11px]">({log.offer_id})</span>
+                      </td>
+                      <td className="py-2 px-3">
+                        <span className="text-emerald-400">🟢 {log.status}</span>
+                      </td>
+                      <td className="py-2 px-3">
+                        <strong
+                          className={
+                            log.live_stock === 0
+                              ? "text-rose-400 font-bold"
+                              : log.live_stock <= 4
+                              ? "text-amber-400 font-bold"
+                              : "text-emerald-400 font-bold"
+                          }
+                        >
+                          {log.live_stock.toLocaleString()} Unit
+                        </strong>
+                      </td>
+                      <td className="py-2 px-3">
+                        {log.is_online ? (
+                          <span className="text-emerald-400">🟢 Online</span>
+                        ) : (
+                          <span className="text-zinc-500">⚪ Offline</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3">
+                        {log.health === "CRITICAL" ? (
+                          <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px]">
+                            🔴 Kritis
+                          </span>
+                        ) : log.health === "WARNING" ? (
+                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">
+                            🟡 Menipis
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px]">
+                            🟢 Aman
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -859,14 +974,30 @@ export default function StockSentryPage() {
                         >
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-sm text-zinc-200">
+                              <span className="font-semibold text-sm text-zinc-200 flex items-center gap-1.5">
+                                {game.selectedSeller.is_online !== undefined && (
+                                  <span
+                                    className={`w-2 h-2 rounded-full shrink-0 ${
+                                      game.selectedSeller.is_online ? "bg-emerald-400 animate-pulse" : "bg-zinc-500"
+                                    }`}
+                                    title={game.selectedSeller.is_online ? "Seller Online di G2G" : "Seller Offline di G2G"}
+                                  />
+                                )}
                                 {game.selectedSeller.seller_name}
                               </span>
                               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700/50">
                                 {game.selectedSeller.tier_label || "⚖️ Mid-Level"}
                               </span>
+                              {extractOfferId(game.selectedSeller.profile_url) && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
+                                  ID: {extractOfferId(game.selectedSeller.profile_url)}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
+                                <Zap className="w-2.5 h-2.5" /> Faktual G2G SLS
+                              </span>
                             </div>
-                            <div className="flex items-center gap-3 text-xs text-zinc-400">
+                            <div className="flex items-center gap-3 text-xs text-zinc-400 flex-wrap">
                               <span>⭐ {game.selectedSeller.rating_pct}%</span>
                               <span>•</span>
                               <span>{game.selectedSeller.reviews_count.toLocaleString()} ulasan</span>
@@ -874,6 +1005,14 @@ export default function StockSentryPage() {
                               <span className="text-emerald-400">
                                 {game.selectedSeller.delivery_speed}
                               </span>
+                              {game.selectedSeller.is_online !== undefined && (
+                                <>
+                                  <span>•</span>
+                                  <span className={game.selectedSeller.is_online ? "text-emerald-300" : "text-zinc-500"}>
+                                    {game.selectedSeller.is_online ? "Online di G2G" : "Offline"}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
 
@@ -1046,14 +1185,22 @@ export default function StockSentryPage() {
                               >
                                 <div>
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium text-zinc-200 truncate">
+                                    <span className="font-medium text-zinc-200 truncate flex items-center gap-1.5">
+                                      {standby.is_online !== undefined && (
+                                        <span
+                                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                            standby.is_online ? "bg-emerald-400" : "bg-zinc-500"
+                                          }`}
+                                          title={standby.is_online ? "Online di G2G" : "Offline"}
+                                        />
+                                      )}
                                       {standby.seller_name}
                                     </span>
                                     <span
                                       className={`font-mono text-[11px] px-1.5 py-0.5 rounded ${
                                         isStandbyEmpty
                                           ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                          : standbyStock <= 3
+                                          : standbyStock <= 4
                                           ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
                                           : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                                       }`}
@@ -1061,12 +1208,20 @@ export default function StockSentryPage() {
                                       {standbyStock} Unit
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-2 text-[11px] text-zinc-400 mt-1">
+                                  <div className="flex items-center gap-2 text-[11px] text-zinc-400 mt-1 flex-wrap">
                                     <span>{standby.tier_label || "⚖️ Mid-Level"}</span>
                                     <span>•</span>
                                     <span className="text-zinc-300 font-mono">
                                       {formatRp(standby.price_g2g_idr)}
                                     </span>
+                                    {extractOfferId(standby.profile_url) && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-zinc-500 text-[10px] font-mono">
+                                          {extractOfferId(standby.profile_url)}
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
 

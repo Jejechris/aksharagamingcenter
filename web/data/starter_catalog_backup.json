@@ -19,14 +19,18 @@
         "reviews_count": 32450,
         "price_g2g_idr": 186000,
         "delivery_speed": "Instant Delivery",
-        "stock": 25,
+        "stock": 6604,
         "risk_score": 0,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/minecraft-account/offer/G1703129821471UK",
         "qris_fee_idr": 1302,
         "cogs_net_idr": 187302,
         "net_profit_idr": 39606,
-        "net_margin_pct": 15.8
+        "net_margin_pct": 15.8,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1703129821471UK"
       },
       {
         "seller_id": "g2g-mc-lowest",
@@ -38,14 +42,18 @@
         "reviews_count": 32450,
         "price_g2g_idr": 148100,
         "delivery_speed": "Instant Delivery",
-        "stock": 25,
+        "stock": 8796,
         "risk_score": 0,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/minecraft-account/offer/G1703129540216LH",
         "qris_fee_idr": 1037,
         "cogs_net_idr": 149137,
         "net_profit_idr": 77771,
-        "net_margin_pct": 31.1
+        "net_margin_pct": 31.1,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1703129540216LH"
       },
       {
         "seller_id": "g2g-mc-rising",
@@ -57,14 +65,18 @@
         "reviews_count": 32450,
         "price_g2g_idr": 18000,
         "delivery_speed": "Instant Delivery",
-        "stock": 25,
+        "stock": 9114,
         "risk_score": 0,
         "is_recommended": true,
         "profile_url": "https://www.g2g.com/id/categories/minecraft-account/offer/G1750132707906OD",
         "qris_fee_idr": 126,
         "cogs_net_idr": 18126,
         "net_profit_idr": 208782,
-        "net_margin_pct": 83.5
+        "net_margin_pct": 83.5,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1750132707906OD"
       },
       {
         "seller_id": "g2g-custom-1789646938863",
@@ -76,10 +88,14 @@
         "reviews_count": 1000,
         "price_g2g_idr": 125000,
         "delivery_speed": "Instant Delivery",
-        "stock": 25,
+        "stock": 6604,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/id/categories/minecraft-account/offer/G1703129821471UK"
+        "profile_url": "https://www.g2g.com/id/categories/minecraft-account/offer/G1703129821471UK",
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1703129821471UK"
       }
     ],
     "metrics": {
@@ -133,14 +149,18 @@
         "reviews_count": 32450,
         "price_g2g_idr": 18000,
         "delivery_speed": "Instant Delivery",
-        "stock": 40,
+        "stock": 98932,
         "risk_score": 0,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/terraria-account/offer/G1703314890265KW",
         "qris_fee_idr": 126,
         "cogs_net_idr": 18126,
         "net_profit_idr": 15582,
-        "net_margin_pct": 39.1
+        "net_margin_pct": 39.1,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1703314890265KW"
       },
       {
         "seller_id": "g2g-taceofspades-tr",
@@ -152,14 +172,18 @@
         "reviews_count": 18900,
         "price_g2g_idr": 16900,
         "delivery_speed": "Instant Delivery",
-        "stock": 50,
+        "stock": 4,
         "risk_score": 0,
         "is_recommended": true,
         "profile_url": "https://www.g2g.com/id/categories/terraria-account/offer/G1737050259610GZ",
         "qris_fee_idr": 118,
         "cogs_net_idr": 17018,
         "net_profit_idr": 16690,
-        "net_margin_pct": 41.8
+        "net_margin_pct": 41.8,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1737050259610GZ"
       },
       {
         "seller_id": "g2g-madangna-tr",
@@ -171,14 +195,18 @@
         "reviews_count": 14200,
         "price_g2g_idr": 18000,
         "delivery_speed": "Instant Delivery",
-        "stock": 28,
+        "stock": 919,
         "risk_score": 1,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/terraria-account/offer/G1752722558769EU",
         "qris_fee_idr": 126,
         "cogs_net_idr": 18126,
         "net_profit_idr": 15582,
-        "net_margin_pct": 39.1
+        "net_margin_pct": 39.1,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1752722558769EU"
       }
     ],
     "metrics": {
@@ -232,14 +260,18 @@
         "reviews_count": 32450,
         "price_g2g_idr": 664600,
         "delivery_speed": "Instant Delivery",
-        "stock": 10,
+        "stock": 550,
         "risk_score": 0,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/black-myth-wukong-accounts/offer/G1717828080220IT",
         "qris_fee_idr": 4652,
         "cogs_net_idr": 669252,
         "net_profit_idr": -314372,
-        "net_margin_pct": -80.8
+        "net_margin_pct": -80.8,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1717828080220IT"
       },
       {
         "seller_id": "g2g-financewz-wk",
@@ -251,14 +283,18 @@
         "reviews_count": 8700,
         "price_g2g_idr": 288800,
         "delivery_speed": "Instant Delivery",
-        "stock": 15,
+        "stock": 74,
         "risk_score": 1,
         "is_recommended": true,
         "profile_url": "https://www.g2g.com/id/categories/black-myth-wukong-accounts/offer/G1735807277413VH",
         "qris_fee_idr": 2022,
         "cogs_net_idr": 290822,
         "net_profit_idr": 64058,
-        "net_margin_pct": 16.5
+        "net_margin_pct": 16.5,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1735807277413VH"
       },
       {
         "seller_id": "g2g-wukong-rising",
@@ -270,14 +306,18 @@
         "reviews_count": 32450,
         "price_g2g_idr": 722200,
         "delivery_speed": "Instant Delivery",
-        "stock": 12,
+        "stock": 5197,
         "risk_score": 1,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/black-myth-wukong-accounts/offer/G1724212419124LE",
         "qris_fee_idr": 5055,
         "cogs_net_idr": 727255,
         "net_profit_idr": -372375,
-        "net_margin_pct": -95.7
+        "net_margin_pct": -95.7,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1724212419124LE"
       }
     ],
     "metrics": {
@@ -331,14 +371,18 @@
         "reviews_count": 32450,
         "price_g2g_idr": 198700,
         "delivery_speed": "Instant Delivery",
-        "stock": 42,
+        "stock": 169,
         "risk_score": 0,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/steam-global-account/offer/G1724725195838IV",
         "qris_fee_idr": 1391,
         "cogs_net_idr": 200091,
         "net_profit_idr": 44389,
-        "net_margin_pct": 16.5
+        "net_margin_pct": 16.5,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1724725195838IV"
       },
       {
         "seller_id": "g2g-madangna-gta",
@@ -350,14 +394,18 @@
         "reviews_count": 14200,
         "price_g2g_idr": 186000,
         "delivery_speed": "Instant Delivery",
-        "stock": 35,
+        "stock": 12287,
         "risk_score": 1,
         "is_recommended": true,
         "profile_url": "https://www.g2g.com/id/categories/steam-global-account/offer/G1752687998537NX",
         "qris_fee_idr": 1302,
         "cogs_net_idr": 187302,
         "net_profit_idr": 57178,
-        "net_margin_pct": 21.3
+        "net_margin_pct": 21.3,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1752687998537NX"
       },
       {
         "seller_id": "g2g-gta-rising",
@@ -369,14 +417,18 @@
         "reviews_count": 14200,
         "price_g2g_idr": 18000,
         "delivery_speed": "Instant Delivery",
-        "stock": 60,
+        "stock": 99179,
         "risk_score": 2,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/steam-global-account/offer/G1703491270148EB",
         "qris_fee_idr": 126,
         "cogs_net_idr": 18126,
         "net_profit_idr": 226354,
-        "net_margin_pct": 84.1
+        "net_margin_pct": 84.1,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1703491270148EB"
       }
     ],
     "metrics": {
@@ -430,14 +482,18 @@
         "reviews_count": 41200,
         "price_g2g_idr": 32900,
         "delivery_speed": "Instant Delivery",
-        "stock": 250,
+        "stock": 19939,
         "risk_score": 0,
         "is_recommended": true,
         "profile_url": "https://www.g2g.com/id/categories/tf2-item/offer/G1763801186859QT",
         "qris_fee_idr": 230,
         "cogs_net_idr": 33130,
         "net_profit_idr": 7018,
-        "net_margin_pct": 15
+        "net_margin_pct": 15,
+        "is_online": false,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1763801186859QT"
       },
       {
         "seller_id": "g2g-hellenwong-tf2",
@@ -449,14 +505,18 @@
         "reviews_count": 32450,
         "price_g2g_idr": 33000,
         "delivery_speed": "Instant Delivery",
-        "stock": 320,
+        "stock": 8767,
         "risk_score": 0,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/tf2-item/offer/G1729742255608SE",
         "qris_fee_idr": 231,
         "cogs_net_idr": 33231,
         "net_profit_idr": 6917,
-        "net_margin_pct": 14.7
+        "net_margin_pct": 14.7,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1729742255608SE"
       },
       {
         "seller_id": "g2g-player-tf2",
@@ -468,14 +528,18 @@
         "reviews_count": 5400,
         "price_g2g_idr": 33400,
         "delivery_speed": "Instant Delivery",
-        "stock": 95,
+        "stock": 200,
         "risk_score": 1,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/tf2-item/offer/G1703480907757CA",
         "qris_fee_idr": 234,
         "cogs_net_idr": 33634,
         "net_profit_idr": 6514,
-        "net_margin_pct": 13.9
+        "net_margin_pct": 13.9,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1703480907757CA"
       }
     ],
     "metrics": {
@@ -529,14 +593,18 @@
         "reviews_count": 32450,
         "price_g2g_idr": 361200,
         "delivery_speed": "Instant Delivery",
-        "stock": 18,
+        "stock": 9994,
         "risk_score": 0,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/fc-25-accounts/offer/G1758334661567LY",
         "qris_fee_idr": 2528,
         "cogs_net_idr": 363728,
         "net_profit_idr": -229648,
-        "net_margin_pct": -154.1
+        "net_margin_pct": -154.1,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1758334661567LY"
       },
       {
         "seller_id": "g2g-krovler-fc",
@@ -548,14 +616,18 @@
         "reviews_count": 11200,
         "price_g2g_idr": 87600,
         "delivery_speed": "Instant Delivery",
-        "stock": 20,
+        "stock": 1232,
         "risk_score": 1,
         "is_recommended": true,
         "profile_url": "https://www.g2g.com/id/categories/fc-25-accounts/offer/G1740289240129LL",
         "qris_fee_idr": 613,
         "cogs_net_idr": 88213,
         "net_profit_idr": 45867,
-        "net_margin_pct": 30.8
+        "net_margin_pct": 30.8,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1740289240129LL"
       },
       {
         "seller_id": "g2g-lootkings-fc",
@@ -567,14 +639,18 @@
         "reviews_count": 9400,
         "price_g2g_idr": 196900,
         "delivery_speed": "Instant Delivery",
-        "stock": 14,
+        "stock": 97,
         "risk_score": 2,
         "is_recommended": false,
         "profile_url": "https://www.g2g.com/id/categories/fc-25-accounts/offer/G1722612671951NJ",
         "qris_fee_idr": 1378,
         "cogs_net_idr": 198278,
         "net_profit_idr": -64198,
-        "net_margin_pct": -43.1
+        "net_margin_pct": -43.1,
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1722612671951NJ"
       },
       {
         "seller_id": "g2g-custom-1789648263404",
@@ -586,10 +662,14 @@
         "reviews_count": 8500,
         "price_g2g_idr": 15000,
         "delivery_speed": "Instant Delivery",
-        "stock": 20,
+        "stock": 1232,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/id/categories/fc-25-accounts/offer/G1740289240129LL"
+        "profile_url": "https://www.g2g.com/id/categories/fc-25-accounts/offer/G1740289240129LL",
+        "is_online": true,
+        "live_status": "live",
+        "live_synced_at": "2026-09-22T11:15:39.334Z",
+        "offer_id": "G1740289240129LL"
       }
     ],
     "metrics": {
