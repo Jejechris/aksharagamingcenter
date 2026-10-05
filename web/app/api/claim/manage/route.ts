@@ -27,7 +27,9 @@ function saveClaims(claims: any[]) {
   // Sinkronkan ke replika jika ada
   const replicaPaths = [
     "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\claimed_credentials.json",
-    path.resolve(process.cwd(), "..", "output", "claimed_credentials.json")
+    path.resolve(process.cwd(), "..", "output", "claimed_credentials.json"),
+    path.resolve(process.cwd(), "..", "claim-web", "data", "claimed_credentials.json"),
+    "C:\\Users\\jesen\\Desktop\\scrt\\claim-web\\data\\claimed_credentials.json",
   ];
   for (const rPath of replicaPaths) {
     try {
@@ -72,12 +74,14 @@ export async function POST(req: NextRequest) {
 
     const claims = readClaims();
     const rndCode = custom_code || `AKSH-${Math.floor(1000 + Math.random() * 9000)}-${product_title.slice(0, 2).toUpperCase()}`;
+    const generatedPasscode = body.passcode || String(Math.floor(100000 + Math.random() * 900000));
     const nowIso = new Date().toISOString();
     const cleanOrderId = order_id || `SHP-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}${Math.floor(1000 + Math.random() * 9000)}`;
     const warrantySerial = `AKSHARA-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     const newClaim = {
       claim_code: rndCode.toUpperCase(),
+      passcode: generatedPasscode,
       order_id: cleanOrderId,
       buyer_username: buyer_username.trim(),
       product_title: product_title.trim(),

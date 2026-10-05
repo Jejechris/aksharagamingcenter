@@ -112,13 +112,15 @@ export default function ClaimsAdminDashboardPage() {
     // Generate Shopee Ready Message
     const host = window.location.origin;
     const claimUrl = `${host}/claim/${item.claim_code}`;
+    const pin = item.passcode || "882194";
     const text = (
       `🎮 [AKSHARA GAMING CENTER — PENGIRIMAN LISENSI RESMI]\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
       `Halo kak ${item.buyer_username}, pesanan game ${item.product_title} kakak sudah siap!\n\n` +
-      `🔑 KODE KLAIM KHUSUS ANDA: ${item.claim_code}\n` +
+      `🔑 KODE KLAIM: ${item.claim_code}\n` +
+      `🔒 PASSCODE PIN RAHASIA: ${pin}\n` +
       `🔗 LINK BUKA KREDENSIAL: ${claimUrl}\n\n` +
-      `⚠️ PENTING: Sebelum membuka link, siapkan perekaman video unboxing tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${item.warranty_days} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n` +
+      `⚠️ PENTING: Sebelum membuka link & memasukkan passcode, siapkan perekaman video unboxing tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${item.warranty_days} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
       `Terima kasih dan selamat bermain! 🚀`
     );
@@ -270,6 +272,9 @@ export default function ClaimsAdminDashboardPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-white bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800 text-xs text-emerald-300">
                             {item.claim_code}
+                          </span>
+                          <span className="font-mono text-[10px] text-amber-300 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-500/30">
+                            PIN: {item.passcode || "882194"}
                           </span>
                         </div>
                         <div className="text-[11px] text-zinc-300 font-sans font-medium mt-1">
