@@ -279,17 +279,22 @@ class TelegramCommander:
 
         try:
             selling_price = float(parts[0].replace(".", "").replace(",", ""))
-            cogs_usd = float(parts[1].replace("$", "").replace(",", "."))
+            cogs_input = float(parts[1].replace("$", "").replace(".", "").replace(",", "."))
         except ValueError:
-            await self.send_message(chat_id, "❌ Format angka tidak valid. Contoh: `/quant 219000 8.20`")
+            await self.send_message(chat_id, "❌ Format angka tidak valid. Contoh: `/quant 219000 135000` atau `/quant 219000 8.20`")
             return
 
         usd_rate = 16350.0
-        cogs_raw_idr = cogs_usd * usd_rate
-        qris_fee_idr = cogs_raw_idr * 0.007
+        # Jika input di atas 1000 berarti sudah Rupiah, jika di bawah berarti USD
+        if cogs_input > 1000:
+            cogs_raw_idr = cogs_input
+        else:
+            cogs_raw_idr = cogs_input * usd_rate
+
+        qris_fee_idr = math.ceil(cogs_raw_idr * 0.007)
         cogs_net_idr = cogs_raw_idr + qris_fee_idr
 
-        shopee_admin_fee = selling_price * 0.08
+        shopee_admin_fee = math.ceil(selling_price * 0.08)
         shopee_service_fee = 1000.0
         packaging_cost = 2000.0
 
@@ -299,7 +304,7 @@ class TelegramCommander:
 
         # BEP
         fixed_costs = cogs_net_idr + shopee_service_fee + packaging_cost
-        bep = fixed_costs / 0.92
+        bep = math.ceil(fixed_costs / 0.92)
 
         health_emoji = "🟢 SEHAT" if net_margin >= 20 else ("🟡 TIPIS" if net_margin >= 10 else "🔴 RISIKO RUGI")
 
@@ -307,7 +312,7 @@ class TelegramCommander:
             f"🧮 *[HASIL SIMULASI PROFIT — THE QUANT]*\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"💰 *Harga Jual Shopee:* Rp {selling_price:,.0f}\n"
-            f"💵 *Modal Sourcing:* ${cogs_usd:.2f} (~Rp {cogs_raw_idr:,.0f})\n"
+            f"💵 *Modal Sourcing:* Rp {cogs_raw_idr:,.0f}\n"
             f"💳 *Fee QRIS (0.7%):* Rp {qris_fee_idr:,.0f}\n"
             f"📦 *Modal Bersih (COGS Net):* Rp {cogs_net_idr:,.0f}\n\n"
             f"📉 *POTONGAN & BIAYA TETAP:*\n"
@@ -339,20 +344,20 @@ class TelegramCommander:
                 lines.append(
                     f"🎮 *{item['title']}*\n"
                     f"• Platform: `{item['platform']}` ({item['key_type']})\n"
-                    f"• Modal Checkout Riil: *Rp {item['price_idr']:,}* (~${item['price_usd']:.2f})\n"
+                    f"• Modal Checkout Riil: *Rp {item['price_idr']:,}*\n"
                     f"• Rekomendasi Shopee: *Rp {item['recommended_shopee_idr']:,}*\n"
                     f"• Potensi Margin: *+{item['net_margin_pct']}%* (+Rp {item['net_profit_idr']:,})\n"
                     f"• Risiko: 🛡️ *{item['hackback_risk']}*\n"
                     f"• Link: {item['url']}\n"
                 )
             lines.append("━━━━━━━━━━━━━━━━━━━━━━")
-            lines.append("💡 _Pricelist terkalibrasi kurs USD + fee checkout Eneba 10% + QRIS 0.7%._")
+            lines.append("💡 _Pricelist terkalibrasi kurs Rupiah + fee checkout Eneba 10% + QRIS 0.7%._")
             await self.send_message(chat_id, "\n".join(lines))
         else:
             calc = calculate_custom_eneba(price_usd=15.0)
             msg = (
                 f"🔍 Tidak ada game dengan nama *'{q}'* pada 18 katalog utama Eneba.\n\n"
-                f"💡 *Kalkulator Formula Sourcing Eneba:* Jika Anda menemukan CDKey di Eneba seharga misal $15.00, maka landed cost adalah:\n"
+                f"💡 *Kalkulator Formula Sourcing Eneba:* Jika Anda menemukan CDKey di Eneba seharga misal Rp 245.000, maka landed cost adalah:\n"
                 f"• Modal Checkout (+10% fee): Rp {calc['landed_cost_idr']:,}\n"
                 f"• Rekomendasi Jual Shopee: Rp {calc['recommended_shopee_idr']:,}\n"
                 f"• Potensi Laba Bersih: Rp {calc['net_profit_idr']:,} ({calc['net_margin_pct']}%)"
@@ -376,6 +381,10 @@ class TelegramCommander:
         if res.get("ok"):
             online_str = "🟢 ONLINE" if res.get("is_online") else "⚪ OFFLINE"
             status_str = "🟢 LIVE AKTIF" if res.get("status") == "live" else f"🔴 {res.get('status').upper()}"
+            price_usd = float(res.get("price_usd", 0.0) or 0.0)
+            price_idr = int(math.ceil(price_usd * 16350 / 100) * 100) if price_usd > 0 else 0
+            price_str = f"Rp {price_idr:,}" if price_idr > 0 else "N/A"
+
             msg = (
                 f"🎮 *[HASIL INSPEKSI OFFER G2G SLS]*\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -385,9 +394,9 @@ class TelegramCommander:
                 f"⭐ *Rating:* {res.get('satisfaction_rate', 0)*100:.1f}%\n"
                 f"📊 *Status:* {status_str}\n"
                 f"📦 *Stok Faktual:* *{res.get('available_qty', 0):,} UNIT*\n"
-                f"💵 *Harga Modal:* *${res.get('price_usd', 0.0):.2f}*\n"
+                f"💵 *Harga Modal Kulakan:* *{price_str}*\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"⚡ _Data langsung ditarik detik ini dari sls.g2g.com._"
+                f"⚡ _Data langsung ditarik detik ini dari sls.g2g.com (dalam Rupiah)._"
             )
         else:
             msg = f"❌ Gagal memeriksa offer `{offer_id}`: {res.get('error')}"

@@ -7,6 +7,7 @@ import os
 import json
 import asyncio
 import re
+import math
 from typing import Dict, Any, List, Optional, Tuple
 import httpx
 
@@ -163,12 +164,14 @@ def build_stock_summary_report(audit_results: List[Dict[str, Any]]) -> str:
         seller = r.get("seller_name") or r.get("recorded_seller_name", "Seller")
         qty = r.get("available_qty", 0)
         usd = r.get("price_usd", 0.0)
+        price_idr = int(math.ceil(usd * 16350 / 100) * 100) if usd > 0 else 0
+        price_str = f"Rp {price_idr:,}" if price_idr > 0 else "-"
         oid = r.get("offer_id", "")
 
         lines.append(
             f"{emoji} *{game}*\n"
             f"   • Seller: `{seller}` ({online_badge})\n"
-            f"   • Stok Faktual: *{qty:,} Unit* | ${usd:.2f} (`{oid}`)"
+            f"   • Stok Faktual: *{qty:,} Unit* | Modal: *{price_str}* (`{oid}`)"
         )
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━")
