@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Compass,
   PackageSearch,
+  ShieldCheck,
 } from "lucide-react";
 
 interface NavItem {
@@ -120,11 +121,21 @@ const navSections: NavSection[] = [
         href: "/dashboard/support",
         icon: <Headphones className="w-4 h-4 shrink-0 text-sky-400" />,
       },
+      {
+        label: "Klaim Forensik",
+        href: "/dashboard/claims",
+        icon: <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />,
+      },
     ],
   },
   {
     title: "SYSTEM",
     items: [
+      {
+        label: "Bot Commander",
+        href: "/dashboard/bot",
+        icon: <Terminal className="w-4 h-4 shrink-0 text-cyan-400" />,
+      },
       {
         label: "Operations Health",
         href: "/dashboard/health",

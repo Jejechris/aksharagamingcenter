@@ -15,6 +15,33 @@ const replicaWebPath = "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\active_catal
 // In-memory cache fallback for serverless environments
 let inMemoryCatalogCache: any[] | null = null;
 
+async function notifyTelegramNewGame(newItem: any) {
+  const token = process.env.TELEGRAM_BOT_TOKEN || "8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI";
+  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID || "7025906160";
+  try {
+    const text =
+      `🆕 *[PRODUK BARU DITAMBAHKAN KE KATALOG]*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🎮 *Game:* \`${newItem.title}\`\n` +
+      `📦 *Platform:* \`${newItem.platform || "PC"}\`\n` +
+      `💰 *Harga Jual Shopee:* *Rp ${(newItem.selling_price_shopee_idr || 0).toLocaleString("id-ID")}*\n` +
+      `👤 *Jumlah Seller:* ${newItem.sellers?.length || 0} seller\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `⚡ _Bot Sentry otomatis memonitor stok produk ini pada audit berkala._`;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "Markdown",
+        disable_web_page_preview: true,
+      }),
+    });
+  } catch (err) {}
+}
+
 function getCatalogData(): any[] {
   // 1. If in-memory cache is populated (by previous writes in this lambda), prioritize it
   if (inMemoryCatalogCache !== null && inMemoryCatalogCache.length > 0) {
@@ -537,6 +564,7 @@ export async function POST(req: Request) {
         catalog.push(newItem);
         saveCatalogData(catalog);
         await saveDbGame(newItem);
+        notifyTelegramNewGame(newItem).catch(() => {});
         return NextResponse.json({
           status: "success",
           message: `Game "${newItem.title}" added to portfolio`,
