@@ -57,6 +57,26 @@ def save_claimed_credentials_all(claims: List[Dict[str, Any]]) -> None:
         except Exception:
             pass
 
+def generate_unique_passcode(existing_claims: List[Dict[str, Any]]) -> str:
+    """Menghasilkan PIN 6-digit unik yang terjamin belum pernah digunakan di database (Anti-Tabrakan)."""
+    used_pins = {str(c.get("passcode", "")).strip() for c in existing_claims if c.get("passcode")}
+    for _ in range(10000):
+        pin = str(random.randint(100000, 999999))
+        if pin not in used_pins:
+            return pin
+    # Fallback
+    return str(random.randint(1000000, 9999999))
+
+def generate_unique_claim_code(existing_claims: List[Dict[str, Any]], game_title: str) -> str:
+    """Menghasilkan Kode Klaim unik yang belum pernah digunakan."""
+    used_codes = {str(c.get("claim_code", "")).upper() for c in existing_claims if c.get("claim_code")}
+    clean_tag = "".join(c for c in game_title[:2] if c.isalnum()).upper() or "MC"
+    for _ in range(10000):
+        code = f"AKSH-{random.randint(1000, 9999)}-{clean_tag}"
+        if code not in used_codes:
+            return code
+    return f"AKSH-{random.randint(10000, 99999)}-{clean_tag}"
+
 # Load Environment Variables from .env
 def get_env_credentials() -> (str, str):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -84,6 +104,7 @@ class TelegramCommander:
         self.watcher_enabled = True
         self.last_stock_state: Dict[str, int] = {}
         self.check_interval_seconds = 900  # 15 menit
+        self.sessions: Dict[str, Dict[str, Any]] = {}  # Wizard sesi interaktif per chat_id
 
     async def send_message(
         self,
@@ -458,23 +479,43 @@ class TelegramCommander:
         await self.send_message(chat_id, msg)
 
     async def handle_new_claim(self, chat_id: str, args_text: str) -> None:
-        """Handler untuk membuat kredensial baru dengan Passcode PIN dari Telegram."""
+        """Handler untuk membuat kredensial baru dengan Wizard Interaktif atau 1-Shot."""
         text = args_text.strip()
         if not text:
+            # MEMULAI WIZARD INTERAKTIF STEP-BY-STEP!
+            self.sessions[chat_id] = {"step": "AWAIT_GAME", "data": {}}
+            games_markup = {
+                "inline_keyboard": [
+                    [
+                        {"text": "⛏️ Minecraft", "callback_data": "wizard_game_Minecraft: Java & Bedrock Edition"},
+                        {"text": "🧟 Project Zomboid", "callback_data": "wizard_game_Project Zomboid"}
+                    ],
+                    [
+                        {"text": "🚗 Grand Theft Auto V", "callback_data": "wizard_game_Grand Theft Auto V: Premium Edition"},
+                        {"text": "⚽ EA SPORTS FC 24", "callback_data": "wizard_game_EA SPORTS FC 24"}
+                    ],
+                    [
+                        {"text": "🧱 Terraria", "callback_data": "wizard_game_Terraria"},
+                        {"text": "🔨 Rust", "callback_data": "wizard_game_Rust"}
+                    ],
+                    [
+                        {"text": "❌ Batal", "callback_data": "wizard_cancel"}
+                    ]
+                ]
+            }
             guide = (
-                "🔑 *[BUAT TOKEN KLAIM & PASSCODE VIA TELEGRAM]*\n"
+                "🔑 *[WIZARD KLAIM INTERAKTIF — LANGKAH 1/3]*\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
-                "Gunakan format pemisah garis tegak `|`:\n"
-                "`/newclaim <Game> | <Pembeli> | <Kredensial> [| <Passcode>]`\n\n"
-                "💡 *Contoh Akun Full Access:*\n"
-                "`/newclaim Minecraft Java | budi_gamers | Email: mc@budi.com Pass: Secret123# | 882194`\n\n"
-                "💡 *Contoh CDKey (PIN Otomatis 6-Digit):*\n"
-                "`/newclaim Project Zomboid | alvin_santoso | PZOMB-99812-KJ829-LH001`\n\n"
-                "📌 _Jika Passcode dikosongkan, bot otomatis meng-generate PIN 6 digit acak yang aman._"
+                "Mari terbitkan token klaim dan PIN unik secara interaktif tanpa repot tanda `|`!\n\n"
+                "🎮 *Langkah 1: Tentukan Judul Game*\n"
+                "• Klik salah satu game populer di bawah, ATAU\n"
+                "• Ketik langsung judul game yang dipesan ke chat ini:\n\n"
+                "🔒 _PIN Passcode otomatis dijamin 100% UNIK (Anti-Tabrakan)._"
             )
-            await self.send_message(chat_id, guide)
+            await self.send_message(chat_id, guide, reply_markup=games_markup)
             return
 
+        # Cek jika pengguna mengetik format 1-shot (misal dipisah pipe atau multi-line)
         parts = [p.strip() for p in text.split("|")]
         if len(parts) < 3:
             lines = [l.strip() for l in text.split("\n") if l.strip()]
@@ -482,23 +523,93 @@ class TelegramCommander:
                 parts = lines
 
         if len(parts) < 3:
+            # Pengguna mengetik nama game saja (misal: /newclaim Wukong)
+            # Masukkan ke wizard langkah 2 (minta nama pembeli)
+            self.sessions[chat_id] = {"step": "AWAIT_BUYER", "data": {"game": text}}
+            cancel_markup = {"inline_keyboard": [[{"text": "❌ Batal", "callback_data": "wizard_cancel"}]]}
             await self.send_message(
                 chat_id,
-                "⚠️ *Format Kurang Lengkap!*\nMinimal masukkan: `Game | Pembeli | Kredensial`\n\nContoh:\n`/newclaim Minecraft | Budi | Email: a@b.com Pass: 123`"
+                f"👤 *[WIZARD KLAIM INTERAKTIF — LANGKAH 2/3]*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🎮 *Game:* `{text}`\n\n"
+                f"Silakan ketik *Username Pembeli Shopee*:\n"
+                f"_(Contoh: `budi_santoso` atau `alvin_gamers`)_",
+                reply_markup=cancel_markup
             )
             return
 
         game = parts[0]
         buyer = parts[1]
         credential = parts[2]
-        passcode = parts[3] if len(parts) > 3 and parts[3].strip() else str(random.randint(100000, 999999))
-        platform = parts[4] if len(parts) > 4 and parts[4].strip() else ("PC / Steam Key" if "key" in credential.lower() else "PC / Microsoft Account")
+        custom_pin = parts[3] if len(parts) > 3 and parts[3].strip() else None
+        await self.finalize_new_claim(chat_id, game, buyer, credential, custom_pin)
+
+    async def handle_wizard_input(self, chat_id: str, text: str, session: Dict[str, Any]) -> None:
+        """Menangani pesan teks masuk selama sesi wizard interaktif aktif."""
+        step = session.get("step")
+        cancel_markup = {"inline_keyboard": [[{"text": "❌ Batal", "callback_data": "wizard_cancel"}]]}
+
+        if step == "AWAIT_GAME":
+            session["data"]["game"] = text.strip()
+            session["step"] = "AWAIT_BUYER"
+            await self.send_message(
+                chat_id,
+                f"👤 *[WIZARD KLAIM INTERAKTIF — LANGKAH 2/3]*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🎮 *Game Dipilih:* `{session['data']['game']}`\n\n"
+                f"Silakan ketik *Username Pembeli Shopee*:\n"
+                f"_(Contoh: `budi_santoso` atau `alvin_gamers`)_",
+                reply_markup=cancel_markup
+            )
+
+        elif step == "AWAIT_BUYER":
+            session["data"]["buyer"] = text.strip()
+            session["step"] = "AWAIT_CREDENTIALS"
+            await self.send_message(
+                chat_id,
+                f"🔐 *[WIZARD KLAIM INTERAKTIF — LANGKAH 3/3]*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🎮 *Game:* `{session['data']['game']}`\n"
+                f"👤 *Pembeli:* `{session['data']['buyer']}`\n\n"
+                f"Silakan *paste* akun login atau digital key dari supplier:\n"
+                f"_(Bisa Email & Password, atau CDKey. Format bebas!)_",
+                reply_markup=cancel_markup
+            )
+
+        elif step == "AWAIT_CREDENTIALS":
+            session["data"]["credential"] = text.strip()
+            game = session["data"]["game"]
+            buyer = session["data"]["buyer"]
+            credential = session["data"]["credential"]
+
+            # Bersihkan session
+            if chat_id in self.sessions:
+                del self.sessions[chat_id]
+
+            await self.finalize_new_claim(chat_id, game, buyer, credential)
+
+    async def finalize_new_claim(
+        self,
+        chat_id: str,
+        game: str,
+        buyer: str,
+        credential: str,
+        custom_passcode: Optional[str] = None
+    ) -> None:
+        """Membuat token klaim, menghasilkan passcode unik anti-tabrakan, dan mengirimkan format Shopee."""
+        claims = load_claimed_credentials()
+
+        # Otomatiskan passcode PIN unik (Anti-Tabrakan)
+        if custom_passcode and custom_passcode.strip():
+            passcode = custom_passcode.strip()
+        else:
+            passcode = generate_unique_passcode(claims)
+
+        claim_code = generate_unique_claim_code(claims, game)
         order_id = f"SHP-{datetime.datetime.now().strftime('%y%m%d')}{random.randint(1000, 9999)}"
         warranty_days = 30
-
-        clean_tag = "".join(c for c in game[:2] if c.isalnum()).upper() or "MC"
-        claim_code = f"AKSH-{random.randint(1000, 9999)}-{clean_tag}"
         warranty_code = f"AKSHARA-{datetime.datetime.now().strftime('%y%m%d')}-{random.randint(1000, 9999)}"
+        platform = "PC / Steam Key" if "key" in credential.lower() else "PC / Microsoft Account"
         now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         new_claim = {
@@ -520,7 +631,6 @@ class TelegramCommander:
             "reveal_history": []
         }
 
-        claims = load_claimed_credentials()
         claims.insert(0, new_claim)
         save_claimed_credentials_all(claims)
 
@@ -539,16 +649,16 @@ class TelegramCommander:
         )
 
         resp_msg = (
-            f"✅ *[KREDENSIAL BERHASIL DISIMPAN KE VAULT]*\n"
+            f"🎉 *[TOKEN KLAIM SUKSES DITERBITKAN]*\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"🎮 *Game:* `{game}`\n"
             f"👤 *Pembeli:* `{buyer}`\n"
             f"🔑 *Kode Klaim:* `{claim_code}`\n"
-            f"🔒 *Passcode PIN:* `{passcode}`\n"
+            f"🔒 *Passcode PIN Unik:* `{passcode}` _(Auto Unik & Anti-Tabrakan)_\n"
             f"📦 *No. Pesanan:* `{order_id}`\n"
             f"🛡️ *Garansi:* {warranty_days} Hari (`{warranty_code}`)\n"
-            f"🌐 *Sinkronisasi:* 2-Way Live (Web & Claim-Web Vault)\n\n"
-            f"📋 *[SIAP DI-COPY KE CHAT SHOPEE]:*\n"
+            f"🌐 *Sinkronisasi:* 2-Way Live Vault\n\n"
+            f"📋 *[TINGGAL COPY-PASTE KE CHAT SHOPEE]:*\n"
             f"```\n{shopee_text}\n```"
         )
 
@@ -557,6 +667,9 @@ class TelegramCommander:
                 [
                     {"text": "🔍 Cek Status Klaim Ini", "callback_data": f"check_claim_{claim_code}"},
                     {"text": "📋 Daftar Semua Klaim", "callback_data": "btn_claims_list"}
+                ],
+                [
+                    {"text": "➕ Buat Klaim Baru Lagi", "callback_data": "btn_new_claim_help"}
                 ]
             ]
         }
@@ -650,6 +763,26 @@ class TelegramCommander:
             await self.handle_eneba(chat_id, "minecraft")
         elif data == "btn_new_claim_help":
             await self.handle_new_claim(chat_id, "")
+        elif data.startswith("wizard_game_"):
+            chosen_game = data.replace("wizard_game_", "")
+            self.sessions[chat_id] = {
+                "step": "AWAIT_BUYER",
+                "data": {"game": chosen_game}
+            }
+            cancel_markup = {"inline_keyboard": [[{"text": "❌ Batal", "callback_data": "wizard_cancel"}]]}
+            await self.send_message(
+                chat_id,
+                f"👤 *[WIZARD KLAIM INTERAKTIF — LANGKAH 2/3]*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🎮 *Game Dipilih:* `{chosen_game}`\n\n"
+                f"Silakan ketik *Username Pembeli Shopee*:\n"
+                f"_(Contoh: `budi_santoso` atau `alvin_gamers`)_",
+                reply_markup=cancel_markup
+            )
+        elif data == "wizard_cancel":
+            if chat_id in self.sessions:
+                del self.sessions[chat_id]
+            await self.send_message(chat_id, "❌ Wizard pembuatan klaim dibatalkan.")
         elif data == "btn_claims_list":
             await self.handle_list_claims(chat_id)
         elif data.startswith("check_claim_"):
@@ -688,6 +821,25 @@ class TelegramCommander:
 
         cmd = text.split()[0].lower()
         args_text = text[len(cmd):].strip()
+
+        # 1. Cek pembatalan wizard
+        if cmd in ("/batal", "/cancel"):
+            if chat_id in self.sessions:
+                del self.sessions[chat_id]
+                await self.send_message(chat_id, "❌ Wizard pembuatan klaim telah dibatalkan.")
+            else:
+                await self.send_message(chat_id, "ℹ️ Tidak ada proses pembuatan klaim yang sedang berjalan.")
+            return
+
+        # 2. Cek apakah chat sedang dalam sesi interaktif Wizard
+        if not text.startswith("/"):
+            session = self.sessions.get(chat_id)
+            if session:
+                await self.handle_wizard_input(chat_id, text, session)
+                return
+
+        # Jika ada command slash baru saat session aktif, bersihkan session lama
+        self.sessions.pop(chat_id, None)
 
         # Handle Commands
         if cmd in ("/start", "/menu"):

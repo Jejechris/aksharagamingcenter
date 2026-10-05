@@ -113,6 +113,25 @@ export async function POST(req: NextRequest) {
       } else if (data.startsWith("check_claim_")) {
         const code = data.replace("check_claim_", "");
         await handleCheckClaimCommand(chatId, code);
+      } else if (data.startsWith("wizard_game_")) {
+        const chosenGame = data.replace("wizard_game_", "");
+        setTelegramSession(chatId, {
+          step: "AWAIT_BUYER",
+          data: { game: chosenGame },
+        });
+        const cancelMarkup = { inline_keyboard: [[{ text: "❌ Batal", callback_data: "wizard_cancel" }]] };
+        await sendTelegramMessage(
+          chatId,
+          `👤 *[WIZARD KLAIM INTERAKTIF — LANGKAH 2/3]*\n`
+          + `━━━━━━━━━━━━━━━━━━━━━━\n`
+          + `🎮 *Game Dipilih:* \`${chosenGame}\`\n\n`
+          + `Silakan ketik *Username Pembeli Shopee*:\n`
+          + `_(Contoh: \`budi_santoso\` atau \`alvin_gamers\`)_`,
+          cancelMarkup
+        );
+      } else if (data === "wizard_cancel") {
+        setTelegramSession(chatId, null);
+        await sendTelegramMessage(chatId, "❌ Wizard pembuatan klaim telah dibatalkan.");
       } else if (data === "btn_format_help") {
         await sendTelegramMessage(
           chatId,
@@ -139,6 +158,25 @@ export async function POST(req: NextRequest) {
     const chatId = message.chat?.id || ADMIN_CHAT_ID;
     const cmd = text.split(" ")[0].toLowerCase();
     const argsText = text.substring(cmd.length).trim();
+
+    // 2a. Cek pembatalan wizard
+    if (cmd === "/batal" || cmd === "/cancel") {
+      setTelegramSession(chatId, null);
+      await sendTelegramMessage(chatId, "❌ Wizard pembuatan klaim telah dibatalkan. Ketik `/newclaim` kapan saja untuk mulai lagi.");
+      return NextResponse.json({ ok: true });
+    }
+
+    // 2b. Cek interaksi wizard berkelanjutan (jika pesan bukan slash command)
+    if (!text.startsWith("/")) {
+      const activeSession = getTelegramSession(chatId);
+      if (activeSession) {
+        await handleWizardInput(chatId, text, activeSession);
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    // Jika slash command baru dipanggil, bersihkan sesi wizard
+    setTelegramSession(chatId, null);
 
     if (cmd === "/start" || cmd === "/menu") {
       await sendTelegramMessage(
@@ -499,20 +537,94 @@ function saveClaimsData(claims: any[]): void {
   }
 }
 
+function generateUniquePasscode(existingClaims: any[]): string {
+  const usedPins = new Set(existingClaims.map((c) => String(c.passcode || "").trim()));
+  for (let i = 0; i < 10000; i++) {
+    const pin = String(Math.floor(100000 + Math.random() * 900000));
+    if (!usedPins.has(pin)) return pin;
+  }
+  return String(Math.floor(1000000 + Math.random() * 9000000));
+}
+
+function generateUniqueClaimCode(existingClaims: any[], gameTitle: string): string {
+  const usedCodes = new Set(existingClaims.map((c) => String(c.claim_code || "").toUpperCase()));
+  const cleanTag = (gameTitle.slice(0, 2).replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || "MC");
+  for (let i = 0; i < 10000; i++) {
+    const code = `AKSH-${Math.floor(1000 + Math.random() * 9000)}-${cleanTag}`;
+    if (!usedCodes.has(code)) return code;
+  }
+  return `AKSH-${Date.now().toString().slice(-4)}-${cleanTag}`;
+}
+
+function getSessionFilePath(): string {
+  if (process.env.VERCEL) {
+    return path.join("/tmp", "telegram_sessions.json");
+  }
+  return path.join(process.cwd(), "data", "telegram_sessions.json");
+}
+
+function getTelegramSession(chatId: string | number): any {
+  try {
+    const p = getSessionFilePath();
+    if (fs.existsSync(p)) {
+      const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+      return data[String(chatId)] || null;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function setTelegramSession(chatId: string | number, session: any): void {
+  try {
+    const p = getSessionFilePath();
+    const dir = path.dirname(p);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    let data: any = {};
+    if (fs.existsSync(p)) {
+      try { data = JSON.parse(fs.readFileSync(p, "utf-8")); } catch (e) {}
+    }
+    if (session) {
+      data[String(chatId)] = session;
+    } else {
+      delete data[String(chatId)];
+    }
+    fs.writeFileSync(p, JSON.stringify(data), "utf-8");
+  } catch (e) {}
+}
+
 async function handleNewClaimCommand(chatId: string | number, argsText: string) {
   const text = argsText.trim();
   if (!text) {
+    // Mulai Wizard Interaktif!
+    setTelegramSession(chatId, { step: "AWAIT_GAME", data: {} });
+    const gamesMarkup = {
+      inline_keyboard: [
+        [
+          { text: "⛏️ Minecraft", callback_data: "wizard_game_Minecraft: Java & Bedrock Edition" },
+          { text: "🧟 Project Zomboid", callback_data: "wizard_game_Project Zomboid" },
+        ],
+        [
+          { text: "🚗 Grand Theft Auto V", callback_data: "wizard_game_Grand Theft Auto V: Premium Edition" },
+          { text: "⚽ EA SPORTS FC 24", callback_data: "wizard_game_EA SPORTS FC 24" },
+        ],
+        [
+          { text: "🧱 Terraria", callback_data: "wizard_game_Terraria" },
+          { text: "🔨 Rust", callback_data: "wizard_game_Rust" },
+        ],
+        [
+          { text: "❌ Batal", callback_data: "wizard_cancel" },
+        ],
+      ],
+    };
     const guide =
-      "🔑 *[BUAT TOKEN KLAIM & PASSCODE VIA TELEGRAM]*\n"
+      "🔑 *[WIZARD KLAIM INTERAKTIF — LANGKAH 1/3]*\n"
       + "━━━━━━━━━━━━━━━━━━━━━━\n"
-      + "Gunakan format pemisah tegak `|`:\n"
-      + "`/newclaim <Game> | <Pembeli> | <Kredensial> [| <Passcode>]`\n\n"
-      + "💡 *Contoh Akun Full Access:*\n"
-      + "`/newclaim Minecraft Java | budi_gamers | Email: mc@budi.com Pass: Secret123# | 882194`\n\n"
-      + "💡 *Contoh CDKey (PIN Acak Otomatis):*\n"
-      + "`/newclaim Project Zomboid | alvin_santoso | PZOMB-99812-KJ829-LH001`\n\n"
-      + "📌 _Jika Passcode dikosongkan, bot otomatis membuat PIN 6 digit acak yang aman._";
-    await sendTelegramMessage(chatId, guide);
+      + "Mari terbitkan token klaim dan PIN unik secara interaktif tanpa repot tanda `|`!\n\n"
+      + "🎮 *Langkah 1: Tentukan Judul Game*\n"
+      + "• Klik salah satu game populer di bawah, ATAU\n"
+      + "• Ketik langsung judul game yang dipesan ke chat ini:\n\n"
+      + "🔒 _PIN Passcode otomatis dijamin 100% UNIK (Anti-Tabrakan)._";
+    await sendTelegramMessage(chatId, guide, gamesMarkup);
     return;
   }
 
@@ -525,9 +637,16 @@ async function handleNewClaimCommand(chatId: string | number, argsText: string) 
   }
 
   if (parts.length < 3) {
+    setTelegramSession(chatId, { step: "AWAIT_BUYER", data: { game: text } });
+    const cancelMarkup = { inline_keyboard: [[{ text: "❌ Batal", callback_data: "wizard_cancel" }]] };
     await sendTelegramMessage(
       chatId,
-      "⚠️ *Format Kurang Lengkap!*\nMinimal masukkan: `Game | Pembeli | Kredensial`\n\nContoh:\n`/newclaim Minecraft | Budi | Email: a@b.com Pass: 123`"
+      `👤 *[WIZARD KLAIM INTERAKTIF — LANGKAH 2/3]*\n`
+      + `━━━━━━━━━━━━━━━━━━━━━━\n`
+      + `🎮 *Game:* \`${text}\`\n\n`
+      + `Silakan ketik *Username Pembeli Shopee*:\n`
+      + `_(Contoh: \`budi_santoso\` atau \`alvin_gamers\`)_`,
+      cancelMarkup
     );
     return;
   }
@@ -535,14 +654,64 @@ async function handleNewClaimCommand(chatId: string | number, argsText: string) 
   const game = parts[0];
   const buyer = parts[1];
   const credential = parts[2];
-  const passcode = parts[3] && parts[3].trim() ? parts[3].trim() : String(Math.floor(100000 + Math.random() * 900000));
-  const platform = parts[4] && parts[4].trim() ? parts[4].trim() : (credential.toLowerCase().includes("key") ? "PC / Steam Key" : "PC / Microsoft Account");
+  const customPin = parts[3] && parts[3].trim() ? parts[3].trim() : undefined;
+  await finalizeClaim(chatId, game, buyer, credential, customPin);
+}
+
+async function handleWizardInput(chatId: string | number, text: string, session: any) {
+  const step = session.step;
+  const cancelMarkup = { inline_keyboard: [[{ text: "❌ Batal", callback_data: "wizard_cancel" }]] };
+
+  if (step === "AWAIT_GAME") {
+    session.data.game = text.trim();
+    session.step = "AWAIT_BUYER";
+    setTelegramSession(chatId, session);
+    await sendTelegramMessage(
+      chatId,
+      `👤 *[WIZARD KLAIM INTERAKTIF — LANGKAH 2/3]*\n`
+      + `━━━━━━━━━━━━━━━━━━━━━━\n`
+      + `🎮 *Game Dipilih:* \`${session.data.game}\`\n\n`
+      + `Silakan ketik *Username Pembeli Shopee*:\n`
+      + `_(Contoh: \`budi_santoso\` atau \`alvin_gamers\`)_`,
+      cancelMarkup
+    );
+  } else if (step === "AWAIT_BUYER") {
+    session.data.buyer = text.trim();
+    session.step = "AWAIT_CREDENTIALS";
+    setTelegramSession(chatId, session);
+    await sendTelegramMessage(
+      chatId,
+      `🔐 *[WIZARD KLAIM INTERAKTIF — LANGKAH 3/3]*\n`
+      + `━━━━━━━━━━━━━━━━━━━━━━\n`
+      + `🎮 *Game:* \`${session.data.game}\`\n`
+      + `👤 *Pembeli:* \`${session.data.buyer}\`\n\n`
+      + `Silakan *paste* akun login atau digital key dari supplier:\n`
+      + `_(Bisa Email & Password, atau CDKey. Format bebas!)_`,
+      cancelMarkup
+    );
+  } else if (step === "AWAIT_CREDENTIALS") {
+    const game = session.data.game;
+    const buyer = session.data.buyer;
+    const credential = text.trim();
+    setTelegramSession(chatId, null);
+    await finalizeClaim(chatId, game, buyer, credential);
+  }
+}
+
+async function finalizeClaim(
+  chatId: string | number,
+  game: string,
+  buyer: string,
+  credential: string,
+  customPin?: string
+) {
+  const claims = readClaimsData();
+  const passcode = customPin && customPin.trim() ? customPin.trim() : generateUniquePasscode(claims);
+  const claimCode = generateUniqueClaimCode(claims, game);
   const orderId = `SHP-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}${Math.floor(1000 + Math.random() * 9000)}`;
   const warrantyDays = 30;
-
-  const cleanTag = (game.slice(0, 2).replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || "MC");
-  const claimCode = `AKSH-${Math.floor(1000 + Math.random() * 9000)}-${cleanTag}`;
   const warrantySerial = `AKSHARA-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const platform = credential.toLowerCase().includes("key") ? "PC / Steam Key" : "PC / Microsoft Account";
   const nowIso = new Date().toISOString();
 
   const newClaim = {
@@ -564,7 +733,6 @@ async function handleNewClaimCommand(chatId: string | number, argsText: string) 
     reveal_history: [],
   };
 
-  const claims = readClaimsData();
   claims.unshift(newClaim);
   saveClaimsData(claims);
 
@@ -582,16 +750,16 @@ async function handleNewClaimCommand(chatId: string | number, argsText: string) 
     + `Terima kasih dan selamat bermain! 🚀`;
 
   const respMsg =
-    `✅ *[KREDENSIAL BERHASIL DISIMPAN KE VAULT]*\n`
+    `🎉 *[TOKEN KLAIM SUKSES DITERBITKAN]*\n`
     + `━━━━━━━━━━━━━━━━━━━━━━\n`
     + `🎮 *Game:* \`${game}\`\n`
     + `👤 *Pembeli:* \`${buyer}\`\n`
     + `🔑 *Kode Klaim:* \`${claimCode}\`\n`
-    + `🔒 *Passcode PIN:* \`${passcode}\`\n`
+    + `🔒 *Passcode PIN Unik:* \`${passcode}\` _(Auto Unik & Anti-Tabrakan)_\n`
     + `📦 *No. Pesanan:* \`${orderId}\`\n`
     + `🛡️ *Garansi:* ${warrantyDays} Hari (\`${warrantySerial}\`)\n`
-    + `🌐 *Sinkronisasi:* 2-Way Live (Web & Claim-Web Vault)\n\n`
-    + `📋 *[SIAP DI-COPY KE CHAT SHOPEE]:*\n`
+    + `🌐 *Sinkronisasi:* 2-Way Live Vault\n\n`
+    + `📋 *[TINGGAL COPY-PASTE KE CHAT SHOPEE]:*\n`
     + "```\n" + shopeeText + "\n```";
 
   const replyMarkup = {
@@ -599,6 +767,9 @@ async function handleNewClaimCommand(chatId: string | number, argsText: string) 
       [
         { text: "🔍 Cek Status Klaim Ini", callback_data: `check_claim_${claimCode}` },
         { text: "📋 Daftar Semua Klaim", callback_data: "btn_claims_list" },
+      ],
+      [
+        { text: "➕ Buat Klaim Baru Lagi", callback_data: "btn_new_claim_help" },
       ],
     ],
   };

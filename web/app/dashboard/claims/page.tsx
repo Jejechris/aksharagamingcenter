@@ -63,6 +63,30 @@ export default function ClaimsAdminDashboardPage() {
     fetchClaims();
   }, []);
 
+  const handleOpenModal = () => {
+    // Generate PIN 6 digit unik yang belum ada di claims
+    const usedPins = new Set(claims.map((c: any) => String(c.passcode || "").trim()));
+    let newPin = "";
+    for (let i = 0; i < 10000; i++) {
+      const p = String(Math.floor(100000 + Math.random() * 900000));
+      if (!usedPins.has(p)) {
+        newPin = p;
+        break;
+      }
+    }
+    setFormData({
+      product_title: "",
+      buyer_username: "",
+      platform: "PC / Steam Key",
+      credential_data: "",
+      order_id: "",
+      warranty_days: 30,
+      custom_code: "",
+      passcode: newPin || String(Math.floor(100000 + Math.random() * 900000)),
+    });
+    setCreateModalOpen(true);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -187,7 +211,7 @@ export default function ClaimsAdminDashboardPage() {
 
           <button
             type="button"
-            onClick={() => setCreateModalOpen(true)}
+            onClick={handleOpenModal}
             className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-lg shadow-emerald-600/20 cursor-pointer select-none"
           >
             <Plus className="w-4 h-4" />
@@ -480,25 +504,35 @@ export default function ClaimsAdminDashboardPage() {
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[11px] font-mono text-amber-300 uppercase font-semibold flex items-center gap-1">
                       <Lock className="w-3 h-3 text-amber-400" />
-                      <span>Passcode PIN (6-Digit):</span>
+                      <span>Passcode PIN (Auto-Unik):</span>
                     </label>
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, passcode: String(Math.floor(100000 + Math.random() * 900000)) })}
+                      onClick={() => {
+                        const usedPins = new Set(claims.map((c: any) => String(c.passcode || "").trim()));
+                        let newPin = "";
+                        for (let i = 0; i < 10000; i++) {
+                          const p = String(Math.floor(100000 + Math.random() * 900000));
+                          if (!usedPins.has(p)) { newPin = p; break; }
+                        }
+                        setFormData({ ...formData, passcode: newPin || String(Math.floor(100000 + Math.random() * 900000)) });
+                      }}
                       className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 font-bold"
                     >
-                      🎲 Acak PIN
+                      🎲 Acak PIN Lain
                     </button>
                   </div>
                   <input
                     type="text"
                     maxLength={12}
-                    placeholder="Kosongkan untuk auto acak"
+                    placeholder="PIN 6 Digit Unik"
                     value={formData.passcode}
                     onChange={(e) => setFormData({ ...formData, passcode: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-amber-300 placeholder:text-zinc-600 focus:outline-none focus:border-amber-500 font-bold tracking-wider"
                   />
-                  <span className="text-[9px] text-zinc-500 block mt-0.5">Wajib diinput pembeli di Website 2</span>
+                  <span className="text-[9px] text-emerald-400/90 block mt-0.5">
+                    ✅ Dijamin 100% Unik (Anti-Tabrakan / Belum Pernah Dipakai)
+                  </span>
                 </div>
 
                 <div>

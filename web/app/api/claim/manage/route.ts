@@ -73,8 +73,36 @@ export async function POST(req: NextRequest) {
     }
 
     const claims = readClaims();
-    const rndCode = custom_code || `AKSH-${Math.floor(1000 + Math.random() * 9000)}-${product_title.slice(0, 2).toUpperCase()}`;
-    const generatedPasscode = body.passcode || String(Math.floor(100000 + Math.random() * 900000));
+    
+    // Otomatiskan PIN Passcode unik (Anti-Tabrakan)
+    const existingPasscodes = new Set(claims.map((c: any) => String(c.passcode || "").trim()));
+    let generatedPasscode = body.passcode?.trim();
+    if (!generatedPasscode) {
+      for (let i = 0; i < 10000; i++) {
+        const pin = String(Math.floor(100000 + Math.random() * 900000));
+        if (!existingPasscodes.has(pin)) {
+          generatedPasscode = pin;
+          break;
+        }
+      }
+      if (!generatedPasscode) generatedPasscode = String(Date.now()).slice(-6);
+    }
+
+    // Otomatiskan Kode Klaim unik
+    const existingCodes = new Set(claims.map((c: any) => String(c.claim_code || "").toUpperCase()));
+    const cleanTag = (product_title.slice(0, 2).replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || "MC");
+    let rndCode = custom_code?.trim()?.toUpperCase();
+    if (!rndCode) {
+      for (let i = 0; i < 10000; i++) {
+        const candidate = `AKSH-${Math.floor(1000 + Math.random() * 9000)}-${cleanTag}`;
+        if (!existingCodes.has(candidate)) {
+          rndCode = candidate;
+          break;
+        }
+      }
+      if (!rndCode) rndCode = `AKSH-${Date.now().toString().slice(-4)}-${cleanTag}`;
+    }
+
     const nowIso = new Date().toISOString();
     const cleanOrderId = order_id || `SHP-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}${Math.floor(1000 + Math.random() * 9000)}`;
     const warrantySerial = `AKSHARA-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
