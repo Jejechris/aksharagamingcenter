@@ -10,6 +10,8 @@ import io
 import math
 import datetime
 import traceback
+import json
+import random
 from typing import Dict, Any, List, Optional
 import httpx
 
@@ -28,6 +30,32 @@ from bot.market_sentry import (
     fetch_g2g_offer_live,
     extract_offer_id
 )
+
+CLAIM_SYNC_PATHS = [
+    os.path.join(BASE_DIR, "web", "data", "claimed_credentials.json"),
+    os.path.join(BASE_DIR, "claim-web", "data", "claimed_credentials.json"),
+    r"C:\Users\jesen\Desktop\scrt\web\data\claimed_credentials.json",
+    r"C:\Users\jesen\Desktop\scrt\claim-web\data\claimed_credentials.json",
+]
+
+def load_claimed_credentials() -> List[Dict[str, Any]]:
+    for p in CLAIM_SYNC_PATHS:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                continue
+    return []
+
+def save_claimed_credentials_all(claims: List[Dict[str, Any]]) -> None:
+    for target in CLAIM_SYNC_PATHS:
+        try:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, "w", encoding="utf-8") as f:
+                json.dump(claims, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
 
 # Load Environment Variables from .env
 def get_env_credentials() -> (str, str):
@@ -132,6 +160,10 @@ class TelegramCommander:
                     {"text": "⚡ Radar Eneba CDKey", "callback_data": "btn_eneba"}
                 ],
                 [
+                    {"text": "🔑 Buat Token Klaim", "callback_data": "btn_new_claim_help"},
+                    {"text": "📋 Daftar Token Klaim", "callback_data": "btn_claims_list"}
+                ],
+                [
                     {"text": "🎨 Buat Banner Canvas", "callback_data": "btn_canvas_help"},
                     {"text": "📋 Format Pesanan Shopee", "callback_data": "btn_format_help"}
                 ],
@@ -149,14 +181,16 @@ class TelegramCommander:
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "Halo Senna! Sistem komando otonom Akshara siap melayani operasional Anda.\n\n"
             "⚡ *Fitur Komando Tersedia:*\n"
-            "• `/stock` — Audit live stok seller ribuan unit & status online\n"
+            "• `/newclaim <game> | <buyer> | <kredensial>` — Terbitkan token klaim + Passcode PIN\n"
+            "• `/claims` — Lihat 5 token klaim terbaru & status buka/IP\n"
+            "• `/cekclaim <kode>` — Audit forensik IP pembeli & waktu buka kredensial\n"
+            "• `/stock` — Audit live stok seller ribuan unit & status online (Rupiah)\n"
             "• `/canvas <game>` — Auto generate banner 1080x1080 Shopee\n"
-            "• `/format <game> | <pembeli> | <key>` — Format chat pengiriman 3-langkah\n"
+            "• `/format <game> | <buyer> | <key>` — Format chat pengiriman Shopee\n"
             "• `/quant <jual> <cogs_usd>` — Kalkulasi margin bersih, Shopee fee & BEP\n"
-            "• `/eneba <query>` — Cek harga checkout landed cost Eneba\n"
+            "• `/eneba <query>` — Cek harga checkout landed cost Eneba (Rupiah)\n"
             "• `/g2g <link_atau_id>` — Inspeksi offer & seller G2G langsung\n"
-            "• `/briefing` — Ringkasan metrik eksekutif toko\n"
-            "• `/help` — Panduan lengkap sintaks perintah\n\n"
+            "• `/briefing` — Ringkasan metrik eksekutif toko\n\n"
             "Silakan gunakan tombol menu di bawah untuk akses cepat:"
         )
         await self.send_message(chat_id, text, reply_markup=self.get_main_menu_markup())
@@ -166,23 +200,23 @@ class TelegramCommander:
         text = (
             "📖 *PANDUAN LENGKAP COMMAND AKSHARA BOT*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "1️⃣ *Live Stock & Sentry:*\n"
-            "• `/stock` — Menampilkan audit real-time seluruh supplier di katalog aktif.\n"
+            "🔑 *1. Brankas Klaim & Passcode PIN (Website Ke-2):*\n"
+            "• `/newclaim <game> | <buyer> | <kredensial> [| <passcode>]` — Terbitkan klaim baru.\n"
+            "  _Contoh:_ `/newclaim Minecraft | budi_gamers | Email: mc@budi.com Pass: Secret123 | 882194`\n"
+            "  _Contoh Auto PIN:_ `/newclaim Project Zomboid | alvin | STEAM-KEY-1234`\n"
+            "• `/claims` — Tampilkan daftar token klaim aktif dan statusnya.\n"
+            "• `/cekclaim <kode>` — Audit forensik IP & waktu saat pembeli membuka kredensial.\n\n"
+            "📦 *2. Live Stock & Sentry:*\n"
+            "• `/stock` — Audit real-time seluruh supplier di katalog aktif (dalam Rupiah).\n"
             "• `/g2g <link/offer_id>` — Cek offer tertentu (contoh: `/g2g G1703129821471UK`).\n\n"
-            "2️⃣ *Pemasaran & Konten Produk:*\n"
+            "🎨 *3. Pemasaran & Konten Produk:*\n"
             "• `/canvas <nama_game>` — Membuat gambar thumbnail 1080x1080.\n"
-            "  _Contoh:_ `/canvas Project Zomboid`\n"
-            "  _Contoh:_ `/canvas Minecraft | Rp 219.000`\n\n"
-            "3️⃣ *Pengiriman & Layanan Pembeli:*\n"
-            "• `/format <game> | <buyer> | <key>` — Format chat pengiriman 3-langkah.\n"
-            "  _Contoh:_ `/format Terraria | Budi Santoso | STEAM-XXXX-YYYY`\n\n"
-            "4️⃣ *Kalkulasi Finansial (The Quant):*\n"
-            "• `/quant <harga_jual> <cogs_usd>` — Hitung profit bersih setelah fee Shopee (8%+1k) & QRIS.\n"
-            "  _Contoh:_ `/quant 219000 8.20`\n\n"
-            "5️⃣ *Supplier Radar (Eneba):*\n"
-            "• `/eneba <nama_game>` — Cek modal landed cost Eneba (kurs + checkout fee 10% + QRIS).\n"
-            "  _Contoh:_ `/eneba minecraft` atau `/eneba zomboid`\n\n"
-            "6️⃣ *Sistem Watcher:*\n"
+            "  _Contoh:_ `/canvas Project Zomboid`\n\n"
+            "📋 *4. Pengiriman & Layanan Pembeli:*\n"
+            "• `/format <game> | <buyer> | <key>` — Format chat pengiriman 3-langkah.\n\n"
+            "🧮 *5. Finansial (The Quant) & Sourcing:*\n"
+            "• `/quant <harga_jual> <cogs_usd>` — Hitung profit bersih setelah fee Shopee & QRIS.\n"
+            "• `/eneba <game>` — Cek landed cost Eneba dalam Rupiah.\n"
             "• `/watcher` — Cek status background Sentry (pemantau stok berkala)."
         )
         await self.send_message(chat_id, text)
@@ -415,11 +449,191 @@ class TelegramCommander:
             f"💎 *Risiko Hackback:* 0% (Katalog Terverifikasi)\n"
             f"💳 *Metode Pembayaran:* QRIS Instant Pay (Fee 0.7%)\n\n"
             f"📦 *Pintasan Operasional:*\n"
+            f"• Ketik `/newclaim` untuk terbitkan lisensi + Passcode PIN\n"
+            f"• Ketik `/claims` untuk daftar klaim aktif\n"
             f"• Ketik `/stock` untuk audit live stok\n"
             f"• Ketik `/canvas <game>` untuk buat banner Shopee\n"
             f"• Ketik `/format <game> | <buyer> | <key>` untuk proses pesanan"
         )
         await self.send_message(chat_id, msg)
+
+    async def handle_new_claim(self, chat_id: str, args_text: str) -> None:
+        """Handler untuk membuat kredensial baru dengan Passcode PIN dari Telegram."""
+        text = args_text.strip()
+        if not text:
+            guide = (
+                "🔑 *[BUAT TOKEN KLAIM & PASSCODE VIA TELEGRAM]*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Gunakan format pemisah garis tegak `|`:\n"
+                "`/newclaim <Game> | <Pembeli> | <Kredensial> [| <Passcode>]`\n\n"
+                "💡 *Contoh Akun Full Access:*\n"
+                "`/newclaim Minecraft Java | budi_gamers | Email: mc@budi.com Pass: Secret123# | 882194`\n\n"
+                "💡 *Contoh CDKey (PIN Otomatis 6-Digit):*\n"
+                "`/newclaim Project Zomboid | alvin_santoso | PZOMB-99812-KJ829-LH001`\n\n"
+                "📌 _Jika Passcode dikosongkan, bot otomatis meng-generate PIN 6 digit acak yang aman._"
+            )
+            await self.send_message(chat_id, guide)
+            return
+
+        parts = [p.strip() for p in text.split("|")]
+        if len(parts) < 3:
+            lines = [l.strip() for l in text.split("\n") if l.strip()]
+            if len(lines) >= 3:
+                parts = lines
+
+        if len(parts) < 3:
+            await self.send_message(
+                chat_id,
+                "⚠️ *Format Kurang Lengkap!*\nMinimal masukkan: `Game | Pembeli | Kredensial`\n\nContoh:\n`/newclaim Minecraft | Budi | Email: a@b.com Pass: 123`"
+            )
+            return
+
+        game = parts[0]
+        buyer = parts[1]
+        credential = parts[2]
+        passcode = parts[3] if len(parts) > 3 and parts[3].strip() else str(random.randint(100000, 999999))
+        platform = parts[4] if len(parts) > 4 and parts[4].strip() else ("PC / Steam Key" if "key" in credential.lower() else "PC / Microsoft Account")
+        order_id = f"SHP-{datetime.datetime.now().strftime('%y%m%d')}{random.randint(1000, 9999)}"
+        warranty_days = 30
+
+        clean_tag = "".join(c for c in game[:2] if c.isalnum()).upper() or "MC"
+        claim_code = f"AKSH-{random.randint(1000, 9999)}-{clean_tag}"
+        warranty_code = f"AKSHARA-{datetime.datetime.now().strftime('%y%m%d')}-{random.randint(1000, 9999)}"
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        new_claim = {
+            "claim_code": claim_code,
+            "passcode": passcode,
+            "order_id": order_id,
+            "buyer_username": buyer,
+            "product_title": game,
+            "platform": platform,
+            "credential_data": credential,
+            "warranty_days": warranty_days,
+            "warranty_code": warranty_code,
+            "status": "UNCLAIMED",
+            "created_at": now_iso,
+            "revealed_at": None,
+            "revealed_ip": None,
+            "revealed_user_agent": None,
+            "reveal_count": 0,
+            "reveal_history": []
+        }
+
+        claims = load_claimed_credentials()
+        claims.insert(0, new_claim)
+        save_claimed_credentials_all(claims)
+
+        claim_url = f"https://claimakshara.vercel.app/claim/{claim_code}"
+
+        shopee_text = (
+            f"🎮 [AKSHARA GAMING CENTER — PENGIRIMAN LISENSI RESMI]\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Halo kak {buyer}, pesanan game {game} kakak sudah siap!\n\n"
+            f"🔑 KODE KLAIM: {claim_code}\n"
+            f"🔒 PASSCODE PIN RAHASIA: {passcode}\n"
+            f"🔗 LINK BUKA KREDENSIAL: {claim_url}\n\n"
+            f"⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan rekaman video unboxing tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama {warranty_days} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Terima kasih dan selamat bermain! 🚀"
+        )
+
+        resp_msg = (
+            f"✅ *[KREDENSIAL BERHASIL DISIMPAN KE VAULT]*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎮 *Game:* `{game}`\n"
+            f"👤 *Pembeli:* `{buyer}`\n"
+            f"🔑 *Kode Klaim:* `{claim_code}`\n"
+            f"🔒 *Passcode PIN:* `{passcode}`\n"
+            f"📦 *No. Pesanan:* `{order_id}`\n"
+            f"🛡️ *Garansi:* {warranty_days} Hari (`{warranty_code}`)\n"
+            f"🌐 *Sinkronisasi:* 2-Way Live (Web & Claim-Web Vault)\n\n"
+            f"📋 *[SIAP DI-COPY KE CHAT SHOPEE]:*\n"
+            f"```\n{shopee_text}\n```"
+        )
+
+        reply_markup = {
+            "inline_keyboard": [
+                [
+                    {"text": "🔍 Cek Status Klaim Ini", "callback_data": f"check_claim_{claim_code}"},
+                    {"text": "📋 Daftar Semua Klaim", "callback_data": "btn_claims_list"}
+                ]
+            ]
+        }
+        await self.send_message(chat_id, resp_msg, reply_markup=reply_markup)
+
+    async def handle_list_claims(self, chat_id: str) -> None:
+        """Handler untuk melihat daftar token kredensial."""
+        claims = load_claimed_credentials()
+        if not claims:
+            await self.send_message(chat_id, "ℹ️ Belum ada token klaim terdaftar di brankas.")
+            return
+
+        lines = [
+            "🔐 *[DAFTAR TOKEN KLAIM TERBARU — AKSHARA VAULT]*",
+            "━━━━━━━━━━━━━━━━━━━━━━"
+        ]
+
+        for c in claims[:6]:
+            status_emoji = "🟢" if c.get("status") != "REVEALED" else "🔓"
+            status_text = "BELUM DIBUKA" if c.get("status") != "REVEALED" else f"DIBUKA ({c.get('reveal_count', 1)}x)"
+            pin = c.get("passcode", "-")
+            ip_info = f" • IP: `{c.get('revealed_ip')}`" if c.get("revealed_ip") else ""
+
+            lines.append(
+                f"{status_emoji} *{c.get('product_title')}*\n"
+                f"   • Pembeli: `{c.get('buyer_username')}`\n"
+                f"   • Kode: `{c.get('claim_code')}` | PIN: `{pin}`\n"
+                f"   • Status: *{status_text}*{ip_info}"
+            )
+
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("💡 _Ketik `/cekclaim <kode>` untuk audit detail IP & waktu akses._")
+        await self.send_message(chat_id, "\n".join(lines))
+
+    async def handle_check_claim(self, chat_id: str, code_query: str) -> None:
+        """Handler untuk memeriksa audit forensik suatu kode klaim."""
+        q = code_query.strip().upper()
+        if not q:
+            await self.send_message(chat_id, "ℹ️ Ketik `/cekclaim <kode_klaim>`\nContoh: `/cekclaim AKSH-9921-MC`")
+            return
+
+        claims = load_claimed_credentials()
+        found = next((c for c in claims if c.get("claim_code", "").upper() == q), None)
+
+        if not found:
+            await self.send_message(chat_id, f"❌ Kode klaim `{q}` tidak ditemukan di brankas.")
+            return
+
+        is_rev = found.get("status") == "REVEALED"
+        status_badge = "🔓 SUDAH DIBUKA (TERCATAT IP)" if is_rev else "🟢 BELUM DIBUKA (MASIH AMAN)"
+
+        rev_time = "-"
+        if found.get("revealed_at"):
+            try:
+                dt = datetime.datetime.fromisoformat(found["revealed_at"].replace("Z", "+00:00"))
+                rev_time = (dt + datetime.timedelta(hours=7)).strftime("%d/%m/%Y %H:%M:%S WIB")
+            except Exception:
+                rev_time = found["revealed_at"]
+
+        detail = (
+            f"🛡️ *[AUDIT FORENSIK TOKEN — {found.get('claim_code')}]*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎮 *Game:* {found.get('product_title')}\n"
+            f"👤 *Pembeli:* `{found.get('buyer_username')}`\n"
+            f"📦 *No. Pesanan:* `{found.get('order_id')}`\n"
+            f"🔒 *Passcode PIN:* `{found.get('passcode')}`\n"
+            f"📊 *Status:* *{status_badge}*\n\n"
+            f"📍 *DATA FORENSIK DIGITAL:*\n"
+            f"• *Akses Pertama:* {rev_time}\n"
+            f"• *Alamat IP:* `{found.get('revealed_ip') or '-'}`\n"
+            f"• *Frekuensi Akses:* {found.get('reveal_count', 0)} kali\n"
+            f"• *Perangkat:* `{str(found.get('revealed_user_agent', '-'))[:70]}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔑 *Kredensial Tersimpan:*\n"
+            f"```\n{found.get('credential_data', '-')}\n```"
+        )
+        await self.send_message(chat_id, detail)
 
     async def handle_callback_query(self, query: Dict[str, Any]) -> None:
         """Handler untuk interaksi tombol inline keyboard."""
@@ -434,6 +648,13 @@ class TelegramCommander:
             await self.handle_stock(chat_id)
         elif data == "btn_eneba":
             await self.handle_eneba(chat_id, "minecraft")
+        elif data == "btn_new_claim_help":
+            await self.handle_new_claim(chat_id, "")
+        elif data == "btn_claims_list":
+            await self.handle_list_claims(chat_id)
+        elif data.startswith("check_claim_"):
+            code = data.replace("check_claim_", "")
+            await self.handle_check_claim(chat_id, code)
         elif data == "btn_canvas_help":
             await self.handle_canvas(chat_id, "")
         elif data == "btn_format_help":
@@ -473,6 +694,12 @@ class TelegramCommander:
             await self.handle_start(chat_id)
         elif cmd in ("/help", "/panduan"):
             await self.handle_help(chat_id)
+        elif cmd in ("/newclaim", "/buatklaim", "/tambahklaim", "/klaimbaru"):
+            await self.handle_new_claim(chat_id, args_text)
+        elif cmd in ("/claims", "/listklaim", "/daftarklaim", "/semuaklaim"):
+            await self.handle_list_claims(chat_id)
+        elif cmd in ("/cekclaim", "/cektoken", "/auditclaim"):
+            await self.handle_check_claim(chat_id, args_text)
         elif cmd in ("/stock", "/cekstok", "/stok"):
             await self.handle_stock(chat_id)
         elif cmd in ("/canvas", "/banner", "/thumbnail"):
