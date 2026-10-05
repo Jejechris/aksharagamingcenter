@@ -27,6 +27,7 @@ export default function ClaimsAdminDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [claimBaseUrl, setClaimBaseUrl] = useState<string>("https://claimakshara.vercel.app");
 
   // Modal Create
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -39,6 +40,7 @@ export default function ClaimsAdminDashboardPage() {
     order_id: "",
     warranty_days: 30,
     custom_code: "",
+    passcode: "",
   });
 
   const fetchClaims = async () => {
@@ -81,6 +83,7 @@ export default function ClaimsAdminDashboardPage() {
           order_id: "",
           warranty_days: 30,
           custom_code: "",
+          passcode: "",
         });
         fetchClaims();
       } else {
@@ -110,8 +113,10 @@ export default function ClaimsAdminDashboardPage() {
 
   const handleCopyShopeeChat = (item: any) => {
     // Generate Shopee Ready Message
-    const host = window.location.origin;
-    const claimUrl = `${host}/claim/${item.claim_code}`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const baseUrl = (claimBaseUrl && claimBaseUrl.trim()) ? claimBaseUrl.trim() : origin;
+    const cleanBaseUrl = baseUrl.replace(/\/$/, "");
+    const claimUrl = `${cleanBaseUrl}/claim/${item.claim_code}`;
     const pin = item.passcode || "882194";
     const text = (
       `🎮 [AKSHARA GAMING CENTER — PENGIRIMAN LISENSI RESMI]\n` +
@@ -120,7 +125,7 @@ export default function ClaimsAdminDashboardPage() {
       `🔑 KODE KLAIM: ${item.claim_code}\n` +
       `🔒 PASSCODE PIN RAHASIA: ${pin}\n` +
       `🔗 LINK BUKA KREDENSIAL: ${claimUrl}\n\n` +
-      `⚠️ PENTING: Sebelum membuka link & memasukkan passcode, siapkan perekaman video unboxing tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${item.warranty_days} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n` +
+      `⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan perekaman video unboxing tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${item.warranty_days} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
       `Terima kasih dan selamat bermain! 🚀`
     );
@@ -218,6 +223,41 @@ export default function ClaimsAdminDashboardPage() {
           </div>
           <div className="text-2xl font-bold font-mono text-amber-400">{revealedCount}</div>
           <div className="text-[10px] text-zinc-500 font-mono mt-1">Bukti Forensik Tersimpan</div>
+        </div>
+      </div>
+
+      {/* Website 2 Domain Configuration */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-2xl bg-zinc-950/80 border border-white/[0.08]">
+        <div className="flex items-center gap-2.5">
+          <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
+          <div>
+            <div className="text-xs font-bold text-white flex items-center gap-2">
+              <span>Domain Website Ke-2 (Customer Claim Vault):</span>
+              <span className="px-2 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-[10px] text-cyan-300 font-mono">
+                claimakshara
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-0.5">
+              URL target yang disisipkan ke pesan Shopee saat menekan tombol <strong>Chat Shopee</strong>.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <input
+            type="text"
+            value={claimBaseUrl}
+            onChange={(e) => setClaimBaseUrl(e.target.value)}
+            placeholder="https://claimakshara.vercel.app"
+            className="w-full sm:w-72 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+          />
+          <button
+            type="button"
+            onClick={() => setClaimBaseUrl("https://claimakshara.vercel.app")}
+            className="px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[11px] font-mono text-zinc-300 border border-zinc-800 shrink-0"
+            title="Reset ke domain default Vercel"
+          >
+            Vercel Default
+          </button>
         </div>
       </div>
 
@@ -433,6 +473,47 @@ export default function ClaimsAdminDashboardPage() {
                 <p className="text-[10px] text-zinc-500 mt-1">
                   🔒 Kredensial ini tersimpan terenkripsi di vault dan HANYA bisa dilihat pembeli setelah menekan tombol buka.
                 </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-zinc-900/60 border border-amber-500/20">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-mono text-amber-300 uppercase font-semibold flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      <span>Passcode PIN (6-Digit):</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, passcode: String(Math.floor(100000 + Math.random() * 900000)) })}
+                      className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 font-bold"
+                    >
+                      🎲 Acak PIN
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={12}
+                    placeholder="Kosongkan untuk auto acak"
+                    value={formData.passcode}
+                    onChange={(e) => setFormData({ ...formData, passcode: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-amber-300 placeholder:text-zinc-600 focus:outline-none focus:border-amber-500 font-bold tracking-wider"
+                  />
+                  <span className="text-[9px] text-zinc-500 block mt-0.5">Wajib diinput pembeli di Website 2</span>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-mono text-zinc-400 uppercase block mb-1">
+                    Custom Kode Klaim (Opsional):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: AKSH-9921-MC"
+                    value={formData.custom_code}
+                    onChange={(e) => setFormData({ ...formData, custom_code: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-emerald-300 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 font-bold uppercase"
+                  />
+                  <span className="text-[9px] text-zinc-500 block mt-0.5">Auto-generate jika dikosongkan</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
