@@ -1,27 +1,29 @@
 import { Pool } from "pg";
 
-// Default Supabase PostgreSQL connection string (Transaction Pooler - IPv4/IPv6 compatible)
-const DEFAULT_DATABASE_URL =
-  "postgresql://postgres.intwrunyezoikoanskdt:W8pX4Gczovlqpqw9@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres";
+const rawConnection = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  DEFAULT_DATABASE_URL;
+export function isDbConfigured(): boolean {
+  if (!rawConnection) return false;
+  if (rawConnection.includes("intwrunyezoikoanskdt")) return false; // obsolete dead placeholder
+  return rawConnection.startsWith("postgres://") || rawConnection.startsWith("postgresql://");
+}
+
+const connectionString = isDbConfigured() ? rawConnection : "";
 
 // Global singleton pool for Next.js / Serverless environments
 declare global {
   var __supabase_pg_pool__: Pool | undefined;
 }
 
-export function getDbPool(): Pool {
+export function getDbPool(): Pool | null {
+  if (!isDbConfigured()) return null;
   if (!global.__supabase_pg_pool__) {
     global.__supabase_pg_pool__ = new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false },
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      max: 5,
+      idleTimeoutMillis: 15000,
+      connectionTimeoutMillis: 2000,
     });
   }
   return global.__supabase_pg_pool__;
@@ -29,6 +31,7 @@ export function getDbPool(): Pool {
 
 export async function queryDb<T = any>(text: string, params?: any[]): Promise<T[]> {
   const pool = getDbPool();
+  if (!pool) return [] as T[];
   const res = await pool.query(text, params);
   return res.rows as T[];
 }
@@ -37,11 +40,12 @@ export async function queryDb<T = any>(text: string, params?: any[]): Promise<T[
 // Catalog Helpers
 // -------------------------------------------------------------
 export async function getDbCatalog(): Promise<any[] | null> {
+  if (!isDbConfigured()) return null;
   try {
     const rows = await queryDb(
       "SELECT id, title, platform, category, selling_price_shopee_idr, target_margin_pct, status, selected_seller_id, sellers FROM catalog_games ORDER BY updated_at DESC"
     );
-    if (rows) {
+    if (rows && rows.length > 0) {
       return rows.map((r: any) => ({
         ...r,
         selling_price_shopee_idr: Number(r.selling_price_shopee_idr),

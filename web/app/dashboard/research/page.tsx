@@ -138,11 +138,12 @@ export default function ResearchCenterPage() {
         enebaJson.data.forEach((item: any) => {
           combined.push({
             ...item,
-            price_g2g_idr: item.price_eneba_idr,
-            g2g_direct_url: item.eneba_direct_url,
+            price_g2g_idr: item.price_eneba_idr || item.price_g2g_idr,
+            g2g_direct_url: item.eneba_direct_url || item.g2g_direct_url,
             g2g_category_slug: "eneba-cdkey",
             source_marketplace: "ENEBA",
           });
+          if (item.is_already_in_catalog) inCatalog.add(item.id);
         });
       }
 
@@ -205,7 +206,7 @@ export default function ResearchCenterPage() {
       const endpoint = isEneba ? "/api/research/eneba-crawler" : "/api/research/g2g-crawler";
       const payload = isEneba
         ? { action: "single_import", game }
-        : { action: "bulk_import", games: [game] };
+        : { action: "single_import", game };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -216,8 +217,13 @@ export default function ResearchCenterPage() {
       const json = await res.json();
       if (res.ok && json.status === "success") {
         setAddedIds((prev) => new Set([...Array.from(prev), game.id]));
+        if (json.allGames && Array.isArray(json.allGames)) {
+          try {
+            localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(json.allGames));
+          } catch (e) {}
+        }
         showToast(
-          `✅ "${game.title}" (${isEneba ? "Eneba CDKey" : "G2G"}) berhasil dimasukkan ke Radar Katalog & Supabase!`
+          `✅ "${game.title}" (${isEneba ? "Eneba CDKey" : "G2G"}) berhasil tersimpan aman ke Radar Katalog!`
         );
       } else {
         showToast(json.message || "Gagal memasukkan game.", "error");
@@ -245,13 +251,19 @@ export default function ResearchCenterPage() {
       let successCount = 0;
 
       if (enebaGames.length > 0) {
-        for (const eg of enebaGames) {
-          const res = await fetch("/api/research/eneba-crawler", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "single_import", game: eg }),
-          });
-          if (res.ok) successCount++;
+        const res = await fetch("/api/research/eneba-crawler", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "bulk_import" }),
+        });
+        const eJson = await res.json();
+        if (res.ok && eJson.status === "success") {
+          successCount += eJson.importedCount || enebaGames.length;
+          if (eJson.allGames && Array.isArray(eJson.allGames)) {
+            try {
+              localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(eJson.allGames));
+            } catch (e) {}
+          }
         }
       }
 
@@ -264,7 +276,15 @@ export default function ResearchCenterPage() {
             games: g2gGames,
           }),
         });
-        if (res.ok) successCount += g2gGames.length;
+        const gJson = await res.json();
+        if (res.ok && gJson.status === "success") {
+          successCount += gJson.count || g2gGames.length;
+          if (gJson.allGames && Array.isArray(gJson.allGames)) {
+            try {
+              localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(gJson.allGames));
+            } catch (e) {}
+          }
+        }
       }
 
       setAddedIds((prev) => {
@@ -274,7 +294,7 @@ export default function ResearchCenterPage() {
       });
 
       showToast(
-        `⚡ ${successCount} game berhasil diimpor sekaligus ke Radar Portofolio & Supabase!`
+        `⚡ ${successCount} game berhasil diimpor dan tersimpan permanen di Radar Katalog!`
       );
     } catch (err) {
       showToast("Gagal melakukan bulk import karena masalah jaringan.", "error");

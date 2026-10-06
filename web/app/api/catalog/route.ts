@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-import os from "os";
-import { getDbCatalog, saveDbGame, deleteDbGame } from "@/lib/db";
-
-const catalogPath = path.resolve(process.cwd(), "..", "output", "active_catalog.json");
-const bundledCatalogPath = path.resolve(process.cwd(), "data", "active_catalog.json");
-const tmpCatalogPath = path.resolve(os.tmpdir(), "akshara_active_catalog.json");
-
-// Secondary replica paths if present on this machine
-const replicaOutputPath = "C:\\Users\\jesen\\Desktop\\scrt\\output\\active_catalog.json";
-const replicaWebPath = "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\active_catalog.json";
-
-// In-memory cache fallback for serverless environments
-let inMemoryCatalogCache: any[] | null = null;
+import {
+  readAuthoritativeCatalog,
+  writeAuthoritativeCatalog,
+  calculateItemMetrics,
+  findGameIndexInList,
+  addOrUpdateGame,
+  bulkAddOrUpdateGames,
+  deleteGameFromCatalog,
+} from "@/lib/catalog";
+import { saveDbGame, deleteDbGame } from "@/lib/db";
 
 async function notifyTelegramNewGame(newItem: any) {
   const token = process.env.TELEGRAM_BOT_TOKEN || "8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI";
@@ -42,128 +37,15 @@ async function notifyTelegramNewGame(newItem: any) {
   } catch (err) {}
 }
 
-function getCatalogData(): any[] {
-  // 1. If in-memory cache is populated (by previous writes in this lambda), prioritize it
-  if (inMemoryCatalogCache !== null && inMemoryCatalogCache.length > 0) {
-    return inMemoryCatalogCache;
-  }
-
-  // 2. Try reading from writable serverless /tmp directory
-  if (fs.existsSync(tmpCatalogPath)) {
-    try {
-      const raw = fs.readFileSync(tmpCatalogPath, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        inMemoryCatalogCache = parsed;
-        return parsed;
-      }
-    } catch (e) {
-      console.error("Error reading tmpCatalogPath:", e);
-    }
-  }
-
-  // 3. Try reading from local output path (local dev orchestrator)
-  if (fs.existsSync(catalogPath)) {
-    try {
-      const raw = fs.readFileSync(catalogPath, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        inMemoryCatalogCache = parsed;
-        return parsed;
-      }
-    } catch (e) {
-      console.error("Error reading catalogPath:", e);
-    }
-  }
-
-  // 4. Fallback to bundled seed catalog
-  if (fs.existsSync(bundledCatalogPath)) {
-    try {
-      const raw = fs.readFileSync(bundledCatalogPath, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        inMemoryCatalogCache = parsed;
-        return parsed;
-      }
-    } catch (e) {
-      console.error("Error reading bundledCatalogPath:", e);
-    }
-  }
-
-  // 5. Fallback to starter catalog backup
-  const starterBackupPath = path.resolve(process.cwd(), "data", "starter_catalog_backup.json");
-  if (fs.existsSync(starterBackupPath)) {
-    try {
-      const raw = fs.readFileSync(starterBackupPath, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        inMemoryCatalogCache = parsed;
-        return parsed;
-      }
-    } catch (e) {
-      console.error("Error reading starterBackupPath:", e);
-    }
-  }
-
-  if (inMemoryCatalogCache !== null) {
-    return inMemoryCatalogCache;
-  }
-
-  inMemoryCatalogCache = [];
-  return inMemoryCatalogCache;
+async function loadCatalog(): Promise<any[]> {
+  return readAuthoritativeCatalog();
 }
 
 function saveCatalogData(data: any[]) {
-  inMemoryCatalogCache = data;
-  const jsonStr = JSON.stringify(data, null, 2);
-
-  // 0. Save to writable /tmp directory (Vercel Serverless environment)
-  try {
-    fs.writeFileSync(tmpCatalogPath, jsonStr, "utf-8");
-  } catch (err) {
-    console.warn("Could not write to tmpCatalogPath:", err);
-  }
-
-  // 1. Save to primary output directory (orchestrator / daemon)
-  try {
-    const dir = path.dirname(catalogPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(catalogPath, jsonStr, "utf-8");
-  } catch (err) {
-    console.warn("Could not write to primary catalogPath:", err);
-  }
-
-  // 2. Save to bundled web data directory (Vercel / Next.js web bundle)
-  try {
-    const bundledDir = path.dirname(bundledCatalogPath);
-    if (!fs.existsSync(bundledDir)) {
-      fs.mkdirSync(bundledDir, { recursive: true });
-    }
-    fs.writeFileSync(bundledCatalogPath, jsonStr, "utf-8");
-  } catch (err) {
-    console.warn("Could not write to bundledCatalogPath:", err);
-  }
-
-  // 3. Save to replica output if accessible
-  try {
-    if (fs.existsSync(path.dirname(replicaOutputPath))) {
-      fs.writeFileSync(replicaOutputPath, jsonStr, "utf-8");
-    }
-  } catch (e) {
-    // Ignore replica if not available
-  }
-
-  // 4. Save to replica web data if accessible
-  try {
-    if (fs.existsSync(path.dirname(replicaWebPath))) {
-      fs.writeFileSync(replicaWebPath, jsonStr, "utf-8");
-    }
-  } catch (e) {
-    // Ignore replica if not available
-  }
+  writeAuthoritativeCatalog(data);
 }
+
+
 
 /**
  * Super-Intelligent Game Index Matcher.
@@ -265,69 +147,7 @@ function findGameIndex(catalog: any[], game_id?: string, title?: string): number
   return -1;
 }
 
-function calculateItemMetrics(item: any) {
-  const selectedSeller =
-    item.sellers?.find((s: any) => s.seller_id === item.selected_seller_id) ||
-    item.sellers?.[0] || { price_g2g_idr: 100000, seller_name: "Default Seller" };
 
-  const cogsG2g = selectedSeller.price_g2g_idr || 0;
-  const qrisFee = Math.round(cogsG2g * 0.007);
-  const cogsNet = cogsG2g + qrisFee;
-  const sellingPrice = item.selling_price_shopee_idr || 0;
-  const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
-  const packaging = 2000;
-  const totalCost = cogsNet + shopeeFee + packaging;
-  const netProfit = sellingPrice - totalCost;
-  const netMargin = sellingPrice > 0 ? (netProfit / sellingPrice) * 100 : 0;
-  const breakEven = Math.round((cogsNet + 1000 + packaging) / (1 - 0.08));
-
-  // Compute metrics for each seller individually
-  const enrichedSellers = (item.sellers || []).map((s: any) => {
-    const sCogsG2g = s.price_g2g_idr || 0;
-    const sQris = Math.round(sCogsG2g * 0.007);
-    const sCogsNet = sCogsG2g + sQris;
-    const sTotalCost = sCogsNet + shopeeFee + packaging;
-    const sProfit = sellingPrice - sTotalCost;
-    const sMargin = sellingPrice > 0 ? (sProfit / sellingPrice) * 100 : 0;
-    return {
-      ...s,
-      qris_fee_idr: sQris,
-      cogs_net_idr: sCogsNet,
-      net_profit_idr: sProfit,
-      net_margin_pct: Math.round(sMargin * 10) / 10,
-    };
-  });
-
-  return {
-    ...item,
-    sellers: enrichedSellers,
-    metrics: {
-      selected_seller: selectedSeller,
-      cogs_g2g_idr: cogsG2g,
-      qris_fee_idr: qrisFee,
-      cogs_net_idr: cogsNet,
-      shopee_fee_idr: shopeeFee,
-      packaging_cost_idr: packaging,
-      total_cost_idr: totalCost,
-      net_profit_idr: netProfit,
-      net_margin_pct: Math.round(netMargin * 10) / 10,
-      break_even_price_idr: breakEven,
-    },
-  };
-}
-
-async function loadCatalog(): Promise<any[]> {
-  try {
-    const dbCatalog = await getDbCatalog();
-    if (dbCatalog !== null) {
-      inMemoryCatalogCache = dbCatalog;
-      return dbCatalog;
-    }
-  } catch (err) {
-    console.warn("loadCatalog DB fallback notice:", err);
-  }
-  return getCatalogData();
-}
 
 export async function GET() {
   try {
@@ -530,6 +350,7 @@ export async function POST(req: Request) {
           status: "success",
           message: `Game "${existing.title}" updated successfully`,
           data: calculateItemMetrics(existing),
+          allGames: catalog.map(calculateItemMetrics),
         });
       } else {
         // INSERT NEW GAME
@@ -561,7 +382,7 @@ export async function POST(req: Request) {
           sellers: newSellers,
         };
 
-        catalog.push(newItem);
+        catalog.unshift(newItem);
         saveCatalogData(catalog);
         await saveDbGame(newItem);
         notifyTelegramNewGame(newItem).catch(() => {});
@@ -569,6 +390,7 @@ export async function POST(req: Request) {
           status: "success",
           message: `Game "${newItem.title}" added to portfolio`,
           data: calculateItemMetrics(newItem),
+          allGames: catalog.map(calculateItemMetrics),
         });
       }
     }

@@ -1,50 +1,7 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-import os from "os";
-import { getDbCatalog, saveDbGame } from "@/lib/db";
 import { getEnebaProductUrl, getEnebaSearchUrl } from "@/lib/eneba";
 import { callGemini } from "@/lib/gemini";
-
-const catalogPath = path.resolve(process.cwd(), "..", "output", "active_catalog.json");
-const bundledCatalogPath = path.resolve(process.cwd(), "data", "active_catalog.json");
-const tmpCatalogPath = path.resolve(os.tmpdir(), "akshara_active_catalog.json");
-const replicaOutputPath = "C:\\Users\\jesen\\Desktop\\scrt\\output\\active_catalog.json";
-const replicaWebPath = "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\active_catalog.json";
-
-function syncLocalCatalogFiles(newGame: any) {
-  const tryRead = (p: string) => {
-    try {
-      if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf-8"));
-    } catch (e) {}
-    return null;
-  };
-
-  let list = tryRead(catalogPath) || tryRead(bundledCatalogPath) || tryRead(tmpCatalogPath) || [];
-  if (!Array.isArray(list)) list = [];
-
-  const existingIdx = list.findIndex(
-    (g: any) =>
-      g.id === newGame.id ||
-      (g.title && g.title.toLowerCase().trim() === newGame.title.toLowerCase().trim())
-  );
-
-  if (existingIdx >= 0) {
-    list[existingIdx] = { ...list[existingIdx], ...newGame };
-  } else {
-    list.push(newGame);
-  }
-
-  const jsonStr = JSON.stringify(list, null, 2);
-  const targets = [catalogPath, bundledCatalogPath, tmpCatalogPath, replicaOutputPath, replicaWebPath];
-  for (const t of targets) {
-    try {
-      const d = path.dirname(t);
-      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-      fs.writeFileSync(t, jsonStr, "utf-8");
-    } catch (e) {}
-  }
-}
+import { readAuthoritativeCatalog, addOrUpdateGame, bulkAddOrUpdateGames } from "@/lib/catalog";
 
 export interface EnebaScannedGame {
   id: string;
@@ -585,12 +542,24 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
 
 export async function GET() {
   try {
+    const currentCatalog = await readAuthoritativeCatalog();
+    const existingTitles = new Set(
+      (currentCatalog || []).map((g: any) => (g.title || "").toLowerCase().trim())
+    );
+
+    const enriched = ENEBA_CRAWLER_DATABASE.map((item) => ({
+      ...item,
+      is_already_in_catalog: Array.from(existingTitles).some(
+        (t) => t.includes(item.title.toLowerCase().trim()) || item.title.toLowerCase().trim().includes(t)
+      ),
+    }));
+
     return NextResponse.json({
       status: "success",
       source: "ENEBA_DIGITAL_KEYS",
-      data: ENEBA_CRAWLER_DATABASE,
+      data: enriched,
       meta: {
-        total_items: ENEBA_CRAWLER_DATABASE.length,
+        total_items: enriched.length,
         supported_payment: "QRIS, DANA, OVO, ShopeePay, Bank Transfer",
         risk_level: "0% Hackback (Official Redeem Codes)",
         timestamp: new Date().toISOString(),
@@ -608,67 +577,12 @@ export async function POST(req: Request) {
 
     // ACTION: BULK IMPORT ALL ENEBA CDKEYS
     if (action === "bulk_import") {
-      const dbGames = await getDbCatalog();
-      let importedCount = 0;
-
-      for (const item of ENEBA_CRAWLER_DATABASE) {
-        const alreadyExists = dbGames.some(
-          (g: any) => g.title.toLowerCase().trim() === item.title.toLowerCase().trim()
-        );
-
-        if (!alreadyExists) {
-          const newGame = {
-            id: item.id,
-            title: item.title,
-            platform: item.platform,
-            category: "Digital Key / CDKey",
-            selling_price_shopee_idr: item.recommended_shopee_price_idr,
-            target_margin_pct: item.net_margin_pct,
-            selected_seller_id: `${item.id}-eneba-seller`,
-            sellers: [
-              {
-                seller_id: `${item.id}-eneba-seller`,
-                seller_name: `${item.seller_name} (Eneba)`,
-                rating_pct: item.seller_rating_pct,
-                reviews_count: item.seller_reviews_count,
-                price_g2g_idr: item.price_eneba_idr,
-                delivery_speed: "Instant 0-Detik (Redeem Code)",
-                stock: 999,
-                risk_score: 0,
-                is_recommended: true,
-                tier: "ultra_safe",
-                tier_label: "🛡️ ENEBA CDKEY (0% HACKBACK)",
-                tier_desc: "Kunci aktivasi digital resmi Eneba. Instant redeem ke akun Steam pribadi.",
-                profile_url: item.eneba_direct_url,
-              },
-            ],
-          };
-
-          await saveDbGame(newGame);
-          syncLocalCatalogFiles(newGame);
-          importedCount++;
-        }
-      }
-
-      return NextResponse.json({
-        status: "success",
-        message: `Berhasil mengimpor ${importedCount} game CDKey dari Eneba ke portofolio katalog!`,
-        importedCount,
-      });
-    }
-
-    // ACTION: SINGLE IMPORT
-    if (action === "single_import") {
-      const item: EnebaScannedGame = body.game;
-      if (!item || !item.title) {
-        return NextResponse.json({ status: "error", message: "Data game Eneba tidak valid." }, { status: 400 });
-      }
-
-      const newGame = {
+      const payloads = ENEBA_CRAWLER_DATABASE.map((item) => ({
         id: item.id || `eneba-${Date.now()}`,
         title: item.title,
         platform: item.platform || "Steam",
         category: "Digital Key / CDKey",
+        source_marketplace: "ENEBA",
         selling_price_shopee_idr: item.recommended_shopee_price_idr,
         target_margin_pct: item.net_margin_pct,
         selected_seller_id: `${item.id}-eneba-seller`,
@@ -689,15 +603,60 @@ export async function POST(req: Request) {
             profile_url: item.eneba_direct_url || getEnebaProductUrl(item.title),
           },
         ],
+      }));
+
+      const res = await bulkAddOrUpdateGames(payloads);
+
+      return NextResponse.json({
+        status: "success",
+        message: `Berhasil mengimpor ${res.importedCount} game CDKey dari Eneba ke portofolio katalog!`,
+        importedCount: res.importedCount,
+        allGames: res.allGames,
+      });
+    }
+
+    // ACTION: SINGLE IMPORT
+    if (action === "single_import") {
+      const item: any = body.game;
+      if (!item || !item.title) {
+        return NextResponse.json({ status: "error", message: "Data game Eneba tidak valid." }, { status: 400 });
+      }
+
+      const newGame = {
+        id: item.id || `eneba-${Date.now()}`,
+        title: item.title,
+        platform: item.platform || "Steam",
+        category: "Digital Key / CDKey",
+        source_marketplace: "ENEBA",
+        selling_price_shopee_idr: Number(item.recommended_shopee_price_idr || item.selling_price_shopee_idr) || 100000,
+        target_margin_pct: Math.round(Number(item.net_margin_pct || item.target_margin_pct)) || 25,
+        selected_seller_id: `${item.id}-eneba-seller`,
+        sellers: [
+          {
+            seller_id: `${item.id}-eneba-seller`,
+            seller_name: `${item.seller_name || "Eneba Verified Merchant"} (Eneba)`,
+            rating_pct: item.seller_rating_pct || 99.8,
+            reviews_count: item.seller_reviews_count || 25000,
+            price_g2g_idr: Number(item.price_eneba_idr || item.price_g2g_idr) || 50000,
+            delivery_speed: "Instant 0-Detik (Redeem Code)",
+            stock: 999,
+            risk_score: 0,
+            is_recommended: true,
+            tier: "ultra_safe",
+            tier_label: "🛡️ ENEBA CDKEY (0% HACKBACK)",
+            tier_desc: "Kunci aktivasi digital resmi Eneba. Instant redeem ke akun Steam pribadi.",
+            profile_url: item.eneba_direct_url || getEnebaProductUrl(item.title),
+          },
+        ],
       };
 
-      await saveDbGame(newGame);
-      syncLocalCatalogFiles(newGame);
+      const res = await addOrUpdateGame(newGame);
 
       return NextResponse.json({
         status: "success",
         message: `Game CDKey "${item.title}" dari Eneba berhasil ditambahkan ke portofolio katalog!`,
-        data: newGame,
+        data: res.item,
+        allGames: res.allGames,
       });
     }
 

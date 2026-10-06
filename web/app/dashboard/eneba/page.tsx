@@ -112,7 +112,12 @@ export default function EnebaTerminalPage() {
       const json = await res.json();
       if (res.ok && json.status === "success") {
         setAddedIds((prev) => new Set([...Array.from(prev), game.id]));
-        showToast(`✅ "${game.title}" (Eneba CDKey) berhasil disimpan ke Radar Katalog & Supabase!`);
+        if (json.allGames && Array.isArray(json.allGames)) {
+          try {
+            localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(json.allGames));
+          } catch (e) {}
+        }
+        showToast(`✅ "${game.title}" (Eneba CDKey) berhasil disimpan aman ke Radar Katalog!`);
       } else {
         showToast(json.message || "Gagal menyimpan game.", "error");
       }
@@ -133,23 +138,27 @@ export default function EnebaTerminalPage() {
 
     setIsBulkImporting(true);
     try {
-      let count = 0;
-      for (const game of unaddedFiltered) {
-        const res = await fetch("/api/research/eneba-crawler", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "single_import", game }),
-        });
-        if (res.ok) count++;
-      }
-
-      setAddedIds((prev) => {
-        const next = new Set(Array.from(prev));
-        unaddedFiltered.forEach((g) => next.add(g.id));
-        return next;
+      const res = await fetch("/api/research/eneba-crawler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "bulk_import" }),
       });
-
-      showToast(`⚡ ${count} Digital CDKey berhasil diimpor sekaligus ke Katalog Radar & Supabase!`);
+      const json = await res.json();
+      if (res.ok && json.status === "success") {
+        setAddedIds((prev) => {
+          const next = new Set(Array.from(prev));
+          unaddedFiltered.forEach((g) => next.add(g.id));
+          return next;
+        });
+        if (json.allGames && Array.isArray(json.allGames)) {
+          try {
+            localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(json.allGames));
+          } catch (e) {}
+        }
+        showToast(`⚡ ${json.importedCount || unaddedFiltered.length} Digital CDKey berhasil diimpor dan tersimpan permanen di Katalog Radar!`);
+      } else {
+        showToast(json.message || "Gagal bulk import.", "error");
+      }
     } catch (err) {
       showToast("Gagal melakukan bulk import karena masalah jaringan.", "error");
     } finally {

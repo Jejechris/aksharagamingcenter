@@ -1,49 +1,6 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-import os from "os";
-import { getDbCatalog, saveDbGame } from "@/lib/db";
-import { getG2GSellerUrl, getG2GGameCategoryUrl } from "@/lib/g2g";
-
-const catalogPath = path.resolve(process.cwd(), "..", "output", "active_catalog.json");
-const bundledCatalogPath = path.resolve(process.cwd(), "data", "active_catalog.json");
-const tmpCatalogPath = path.resolve(os.tmpdir(), "akshara_active_catalog.json");
-const replicaOutputPath = "C:\\Users\\jesen\\Desktop\\scrt\\output\\active_catalog.json";
-const replicaWebPath = "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\active_catalog.json";
-
-function syncLocalCatalogFiles(newGame: any) {
-  const tryRead = (p: string) => {
-    try {
-      if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf-8"));
-    } catch (e) {}
-    return null;
-  };
-
-  let list = tryRead(catalogPath) || tryRead(bundledCatalogPath) || tryRead(tmpCatalogPath) || [];
-  if (!Array.isArray(list)) list = [];
-
-  const existingIdx = list.findIndex(
-    (g: any) =>
-      g.id === newGame.id ||
-      (g.title && g.title.toLowerCase().trim() === newGame.title.toLowerCase().trim())
-  );
-
-  if (existingIdx >= 0) {
-    list[existingIdx] = { ...list[existingIdx], ...newGame };
-  } else {
-    list.push(newGame);
-  }
-
-  const jsonStr = JSON.stringify(list, null, 2);
-  const targets = [catalogPath, bundledCatalogPath, tmpCatalogPath, replicaOutputPath, replicaWebPath];
-  for (const t of targets) {
-    try {
-      const d = path.dirname(t);
-      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-      fs.writeFileSync(t, jsonStr, "utf-8");
-    } catch (e) {}
-  }
-}
+import { getG2GSellerUrl } from "@/lib/g2g";
+import { readAuthoritativeCatalog, addOrUpdateGame, bulkAddOrUpdateGames } from "@/lib/catalog";
 
 export interface G2GScannedGame {
   id: string;
@@ -708,9 +665,9 @@ export async function GET(req: Request) {
     const platform = searchParams.get("platform") || "ALL";
 
     // 1. Fetch current database catalog to annotate `is_already_in_catalog`
-    const dbCatalog = await getDbCatalog();
+    const currentCatalog = await readAuthoritativeCatalog();
     const existingTitles = new Set(
-      (dbCatalog || []).map((g: any) => g.title.toLowerCase().trim())
+      (currentCatalog || []).map((g: any) => (g.title || "").toLowerCase().trim())
     );
 
     // 2. Filter scanned G2G database
@@ -739,11 +696,54 @@ export async function GET(req: Request) {
   }
 }
 
-// POST: Handles bulk import to Supabase or live crawl trigger
+// POST: Handles single or bulk import to authoritative catalog or live crawl trigger
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const action = body.action || "crawl";
+
+    if (action === "single_import") {
+      const item = body.game;
+      if (!item || !item.title) {
+        return NextResponse.json({ status: "error", message: "Data game tidak valid." }, { status: 400 });
+      }
+
+      const payload = {
+        id: item.id || `game-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        title: item.title,
+        platform: item.platform || "Steam",
+        category: item.category || "Account (Full Access)",
+        selling_price_shopee_idr: Number(item.recommended_shopee_price_idr || item.selling_price_shopee_idr) || 50000,
+        target_margin_pct: Math.round(Number(item.net_margin_pct || item.target_margin_pct)) || 25,
+        status: "active",
+        selected_seller_id: `g2g-${(item.seller_name || "seller").toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+        sellers: [
+          {
+            seller_id: `g2g-${(item.seller_name || "seller").toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+            seller_name: item.seller_name || "G2G Verified Seller",
+            rating_pct: Number(item.seller_rating_pct) || 99.5,
+            reviews_count: Number(item.seller_reviews_count) || 10000,
+            price_g2g_idr: Number(item.price_g2g_idr) || 20000,
+            delivery_speed: "Instant Delivery",
+            stock: 30,
+            risk_score: 0,
+            tier: item.supplier_tier || "ultra_safe",
+            tier_label: item.supplier_tier === "ultra_safe" ? "🛡️ TOP VERIFIED" : "⚡ LOWEST PRICE",
+            tier_desc: "Diimpor langsung oleh Autonomous G2G Arbitrage Crawler.",
+            is_recommended: true,
+            profile_url: item.g2g_direct_url || getG2GSellerUrl(item.seller_name, item.title),
+          },
+        ],
+      };
+
+      const result = await addOrUpdateGame(payload);
+      return NextResponse.json({
+        status: "success",
+        message: `Game "${payload.title}" berhasil disimpan ke Radar Portofolio & Katalog!`,
+        data: result.item,
+        allGames: result.allGames,
+      });
+    }
 
     if (action === "bulk_import") {
       const { games } = body;
@@ -751,45 +751,40 @@ export async function POST(req: Request) {
         return NextResponse.json({ status: "error", message: "Tidak ada game yang dipilih." }, { status: 400 });
       }
 
-      let importedCount = 0;
-      for (const item of games) {
-        const payload = {
-          id: `game-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          title: item.title,
-          platform: item.platform,
-          category: item.category,
-          selling_price_shopee_idr: Number(item.recommended_shopee_price_idr),
-          target_margin_pct: Math.round(item.net_margin_pct),
-          status: "active",
-          selected_seller_id: `g2g-${item.seller_name.toLowerCase()}`,
-          sellers: [
-            {
-              seller_id: `g2g-${item.seller_name.toLowerCase()}`,
-              seller_name: item.seller_name,
-              rating_pct: item.seller_rating_pct,
-              reviews_count: item.seller_reviews_count,
-              price_g2g_idr: item.price_g2g_idr,
-              delivery_speed: "Instant Delivery",
-              stock: 30,
-              risk_score: 0,
-              tier: item.supplier_tier,
-              tier_label: item.supplier_tier === "ultra_safe" ? "🛡️ TOP VERIFIED" : "⚡ LOWEST PRICE",
-              tier_desc: "Diimpor langsung oleh Autonomous G2G Arbitrage Crawler.",
-              is_recommended: true,
-              profile_url: item.g2g_direct_url || getG2GSellerUrl(item.seller_name, item.title),
-            },
-          ],
-        };
+      const payloads = games.map((item: any) => ({
+        id: item.id || `game-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        title: item.title,
+        platform: item.platform || "Steam",
+        category: item.category || "Account (Full Access)",
+        selling_price_shopee_idr: Number(item.recommended_shopee_price_idr || item.selling_price_shopee_idr) || 50000,
+        target_margin_pct: Math.round(Number(item.net_margin_pct || item.target_margin_pct)) || 25,
+        status: "active",
+        selected_seller_id: `g2g-${(item.seller_name || "seller").toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+        sellers: [
+          {
+            seller_id: `g2g-${(item.seller_name || "seller").toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+            seller_name: item.seller_name || "G2G Verified Seller",
+            rating_pct: Number(item.seller_rating_pct) || 99.5,
+            reviews_count: Number(item.seller_reviews_count) || 10000,
+            price_g2g_idr: Number(item.price_g2g_idr) || 20000,
+            delivery_speed: "Instant Delivery",
+            stock: 30,
+            risk_score: 0,
+            tier: item.supplier_tier || "ultra_safe",
+            tier_label: item.supplier_tier === "ultra_safe" ? "🛡️ TOP VERIFIED" : "⚡ LOWEST PRICE",
+            tier_desc: "Diimpor langsung oleh Autonomous G2G Arbitrage Crawler.",
+            is_recommended: true,
+            profile_url: item.g2g_direct_url || getG2GSellerUrl(item.seller_name, item.title),
+          },
+        ],
+      }));
 
-        await saveDbGame(payload);
-        syncLocalCatalogFiles(payload);
-        importedCount++;
-      }
-
+      const result = await bulkAddOrUpdateGames(payloads);
       return NextResponse.json({
         status: "success",
-        message: `Berhasil mengimpor ${importedCount} game berprofit tinggi ke Radar Katalog & Supabase!`,
-        count: importedCount,
+        message: `Berhasil mengimpor ${result.importedCount} game berprofit tinggi ke Radar Katalog!`,
+        count: result.importedCount,
+        allGames: result.allGames,
       });
     }
 
