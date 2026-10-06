@@ -599,7 +599,7 @@ class TelegramCommander:
             price_idr = int(math.ceil(price_usd * 16350 / 100) * 100) if price_usd > 0 else 0
             price_str = f"Rp {price_idr:,}" if price_idr > 0 else "N/A"
 
-            offer_url = f"https://www.g2g.com/offer/{res['offer_id']}"
+            offer_url = resolve_g2g_product_url(res['offer_id'], res.get('title') or '')
             msg = (
                 f"🎮 *[HASIL INSPEKSI OFFER G2G SLS]*\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -1070,7 +1070,8 @@ class TelegramCommander:
                                 self.last_stock_state[oid] = qty
                                 game = r.get("game_title", "Unknown")
                                 seller = r.get("seller_name") or r.get("recorded_seller_name", "Seller")
-                                url = f"https://www.g2g.com/offer/{oid}" if oid else "https://www.g2g.com"
+                                url = resolve_g2g_product_url(oid, game)
+                                category_url = resolve_g2g_product_url("", game)
 
                                 if health == "CRITICAL":
                                     alerts.append(
@@ -1079,7 +1080,8 @@ class TelegramCommander:
                                         f"🎮 *Game:* `{game}`\n"
                                         f"👤 *Seller:* `{seller}` (`{oid}`)\n"
                                         f"🔴 *Sisa Stok:* *0 UNIT (KOSONG)*\n"
-                                        f"🔗 *Cek Live Offer:* {url}\n"
+                                        f"🔗 *Cek Listing:* {url}\n"
+                                        f"🌐 *Etalase Alternatif:* {category_url}\n"
                                         f"⚠️ *TINDAKAN CEPAT:* Segera matikan etalase Shopee atau switch supplier di web!"
                                     )
                                 elif health == "WARNING":
@@ -1089,7 +1091,8 @@ class TelegramCommander:
                                         f"🎮 *Game:* `{game}`\n"
                                         f"👤 *Seller:* `{seller}` (`{oid}`)\n"
                                         f"⚠️ *Sisa Stok:* *HANYA {qty} UNIT TERSISA!*\n"
-                                        f"🔗 *Cek Live Offer:* {url}\n"
+                                        f"🔗 *Cek Listing:* {url}\n"
+                                        f"🌐 *Etalase Alternatif:* {category_url}\n"
                                         f"💡 *Saran:* Pantau order Shopee atau siapkan supplier cadangan."
                                     )
                         else:

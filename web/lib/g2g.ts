@@ -277,9 +277,13 @@ export function resolveG2GProductUrl(
     return `https://www.g2g.com/offer/${oid}`;
   }
 
-  // 3. Eneba URL
+  // 3. Eneba URL or Eneba Seller
   if (trimmed.includes("eneba.com")) {
     return trimmed;
+  }
+  if (trimmed.toLowerCase().includes("eneba") || (sellerName && sellerName.toLowerCase().includes("eneba"))) {
+    const clean = (gameTitle || "").replace(/[:&\[\]\(\)\-]/g, " ").replace(/\s+/g, " ").trim();
+    return `https://www.eneba.com/store/all?text=${encodeURIComponent(clean)}`;
   }
 
   // 4. URL HTTP valid selain generic search

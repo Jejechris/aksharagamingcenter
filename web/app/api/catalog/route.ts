@@ -9,20 +9,49 @@ import {
   deleteGameFromCatalog,
 } from "@/lib/catalog";
 import { saveDbGame, deleteDbGame } from "@/lib/db";
+import { resolveG2GProductUrl } from "@/lib/g2g";
+import { getEnebaProductUrl } from "@/lib/eneba";
 
 async function notifyTelegramNewGame(newItem: any) {
   const token = process.env.TELEGRAM_BOT_TOKEN || "8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI";
   const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID || "7025906160";
   try {
+    const isEneba = newItem.category?.toLowerCase().includes("key") ||
+                    newItem.category?.toLowerCase().includes("cdkey") ||
+                    newItem.id?.startsWith("eneba-") ||
+                    newItem.source_marketplace === "ENEBA" ||
+                    newItem.sellers?.some((s: any) => s.seller_name?.toLowerCase().includes("eneba") || s.profile_url?.includes("eneba.com"));
+
+    let productUrl = "";
+    if (isEneba) {
+      const sellerUrl = newItem.sellers?.[0]?.profile_url;
+      productUrl = (sellerUrl && sellerUrl.includes("eneba.com"))
+        ? sellerUrl
+        : getEnebaProductUrl(newItem.title);
+    } else {
+      const firstSeller = newItem.sellers?.[0];
+      productUrl = resolveG2GProductUrl(
+        firstSeller?.profile_url || firstSeller?.offer_id,
+        firstSeller?.seller_name,
+        newItem.title
+      );
+    }
+
+    const marketLabel = isEneba ? "⚡ Eneba Verified CDKey (0% Hackback)" : "🛒 G2G Verified Marketplace";
+    const securityBadge = isEneba ? "🛡️ 0% Hackback (Redeem Kode Resmi)" : "🛡️ Garansi Toko & Anti-Hackback";
+
     const text =
       `🆕 *[PRODUK BARU DITAMBAHKAN KE KATALOG]*\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🎮 *Game:* \`${newItem.title}\`\n` +
       `📦 *Platform:* \`${newItem.platform || "PC"}\`\n` +
+      `🏷️ *Kategori:* \`${newItem.category || "Digital Product"}\`\n` +
       `💰 *Harga Jual Shopee:* *Rp ${(newItem.selling_price_shopee_idr || 0).toLocaleString("id-ID")}*\n` +
-      `👤 *Jumlah Seller:* ${newItem.sellers?.length || 0} seller\n` +
+      `👤 *Seller Utama:* \`${newItem.sellers?.[0]?.seller_name || marketLabel}\`\n` +
+      `🛡️ *Keamanan:* ${securityBadge}\n` +
+      `🔗 *Tautan Listing Faktual:*\n${productUrl}\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `⚡ _Bot Sentry otomatis memonitor stok produk ini pada audit berkala._`;
+      `⚡ _Bot Sentry otomatis memonitor stok & harga produk ini pada audit berkala._`;
 
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",

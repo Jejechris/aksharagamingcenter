@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
-import { VERIFIED_ENEBA_CATALOG } from "@/lib/eneba";
+import { VERIFIED_ENEBA_CATALOG, getEnebaProductUrl } from "@/lib/eneba";
 import { resolveG2GProductUrl, KNOWN_DEAD_OFFERS, getG2GGameCategoryUrl } from "@/lib/g2g";
+import { readAuthoritativeCatalog } from "@/lib/catalog";
 import fs from "fs";
 import path from "path";
 
@@ -247,32 +248,50 @@ export async function POST(req: NextRequest) {
 
 async function handleStockCommand(chatId: string | number) {
   try {
-    const catalogPath = path.join(process.cwd(), "data", "active_catalog.json");
-    if (!fs.existsSync(catalogPath)) {
-      await sendTelegramMessage(chatId, "⚠️ File katalog tidak ditemukan di server.");
+    const catalog = await readAuthoritativeCatalog();
+    if (!catalog || catalog.length === 0) {
+      await sendTelegramMessage(chatId, "⚠️ Katalog produk tidak ditemukan atau masih kosong.");
       return;
     }
 
-    const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf-8"));
     const sellersToCheck: Array<{ gameTitle: string; sellerName: string; offerId: string }> = [];
+    const enebaGames: Array<{ title: string; sellerName: string; priceIdr: number; stock: number; productUrl: string }> = [];
 
     for (const game of catalog) {
-      for (const s of game.sellers || []) {
-        const rawId = s.offer_id || extractG2GOfferId(s.profile_url);
-        if (rawId) {
-          const offerId = extractG2GOfferId(rawId);
-          if (offerId && sellersToCheck.length < 8) {
-            sellersToCheck.push({
-              gameTitle: game.title,
-              sellerName: s.seller_name,
-              offerId,
-            });
+      const isEneba = game.category?.toLowerCase().includes("key") ||
+                      game.category?.toLowerCase().includes("cdkey") ||
+                      game.id?.startsWith("eneba-") ||
+                      game.source_marketplace === "ENEBA";
+
+      if (isEneba) {
+        const topSeller = game.sellers?.[0];
+        const price = topSeller?.price_g2g_idr || 0;
+        const sUrl = topSeller?.profile_url?.includes("eneba.com") ? topSeller.profile_url : getEnebaProductUrl(game.title);
+        enebaGames.push({
+          title: game.title,
+          sellerName: topSeller?.seller_name || "Eneba Verified Merchant",
+          priceIdr: price,
+          stock: topSeller?.stock || 999,
+          productUrl: sUrl,
+        });
+      } else {
+        for (const s of game.sellers || []) {
+          const rawId = s.offer_id || extractG2GOfferId(s.profile_url);
+          if (rawId) {
+            const offerId = extractG2GOfferId(rawId);
+            if (offerId && sellersToCheck.length < 8) {
+              sellersToCheck.push({
+                gameTitle: game.title,
+                sellerName: s.seller_name,
+                offerId,
+              });
+            }
           }
         }
       }
     }
 
-    await sendTelegramMessage(chatId, "🔍 _Menghubungi server G2G SLS API... Mohon tunggu._");
+    await sendTelegramMessage(chatId, "🔍 _Memeriksa live stock G2G SLS API & Eneba CDKeys... Mohon tunggu._");
 
     const results = await Promise.all(
       sellersToCheck.map(async (item) => {
@@ -282,23 +301,40 @@ async function handleStockCommand(chatId: string | number) {
     );
 
     const lines = [
-      "📦 *[LAPORAN LIVE STOK G2G SLS — RUPIAH]*",
+      "📦 *[LAPORAN LIVE STOK KATALOG — RUPIAH]*",
       "━━━━━━━━━━━━━━━━━━━━━━",
     ];
 
-    for (const r of results) {
-      const priceUsd = r.price_usd || 0;
-      const priceIdr = Math.ceil((priceUsd * 16350) / 100) * 100;
-      const priceStr = priceIdr > 0 ? `Rp ${priceIdr.toLocaleString("id-ID")}` : "-";
-      const onlineBadge = r.is_online ? "🟢 On" : "⚪ Off";
-      const healthEmoji = (r.available_qty || 0) <= 4 ? "🟡" : "🟢";
+    if (results.length > 0) {
+      lines.push("🎮 *ETALASE AKUN G2G (LIVE SLS):*");
+      for (const r of results) {
+        const priceUsd = r.price_usd || 0;
+        const priceIdr = Math.ceil((priceUsd * 16350) / 100) * 100;
+        const priceStr = priceIdr > 0 ? `Rp ${priceIdr.toLocaleString("id-ID")}` : "-";
+        const onlineBadge = r.is_online ? "🟢 On" : "⚪ Off";
+        const healthEmoji = (r.available_qty || 0) <= 4 ? "🟡" : "🟢";
 
-      lines.push(
-        `${healthEmoji} *${r.gameTitle}*\n`
-        + `   • Seller: \`${r.seller_name}\` (${onlineBadge})\n`
-        + `   • Stok Faktual: *${(r.available_qty || 0).toLocaleString("id-ID")} Unit* | Modal: *${priceStr}*\n`
-        + `   • 🔗 Link G2G: ${resolveG2GProductUrl(r.offerId, r.seller_name, r.gameTitle)}`
-      );
+        lines.push(
+          `${healthEmoji} *${r.gameTitle}*\n`
+          + `   • Seller: \`${r.seller_name}\` (${onlineBadge})\n`
+          + `   • Stok Faktual: *${(r.available_qty || 0).toLocaleString("id-ID")} Unit* | Modal: *${priceStr}*\n`
+          + `   • 🔗 Link G2G: ${resolveG2GProductUrl(r.offerId, r.seller_name, r.gameTitle)}`
+        );
+      }
+    }
+
+    if (enebaGames.length > 0) {
+      if (results.length > 0) lines.push("");
+      lines.push("⚡ *ETALASE ENEBA CDKEY (0% HACKBACK):*");
+      for (const e of enebaGames.slice(0, 7)) {
+        const priceStr = e.priceIdr > 0 ? `Rp ${e.priceIdr.toLocaleString("id-ID")}` : "-";
+        lines.push(
+          `🛡️ *${e.title}*\n`
+          + `   • Merchant: \`${e.sellerName}\` (Kode Global)\n`
+          + `   • Stok: *${e.stock.toLocaleString("id-ID")} Unit* | Modal: *${priceStr}*\n`
+          + `   • 🔗 Link Eneba: ${e.productUrl}`
+        );
+      }
     }
 
     lines.push("━━━━━━━━━━━━━━━━━━━━━━");
@@ -486,7 +522,7 @@ async function handleG2GCommand(chatId: string | number, query: string) {
       + `📊 *Status:* ${statusStr}\n`
       + `📦 *Stok Faktual:* *${(res.available_qty || 0).toLocaleString("id-ID")} UNIT*\n`
       + `💵 *Harga Modal Kulakan:* *${priceStr}*\n`
-      + `🔗 *URL Produk Faktual:* https://www.g2g.com/offer/${res.offer_id}\n`
+      + `🔗 *URL Produk Faktual:* ${resolveG2GProductUrl(res.offer_id, res.seller_name)}\n`
       + "━━━━━━━━━━━━━━━━━━━━━━\n"
       + "⚡ _Data langsung ditarik detik ini dari sls.g2g.com (dalam Rupiah)._";
 

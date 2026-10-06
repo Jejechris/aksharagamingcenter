@@ -4,6 +4,8 @@
  * 100% Real, Faktual, dan Live Time tanpa data fiktif atau perkiraan.
  */
 
+import { resolveG2GProductUrl } from "@/lib/g2g";
+
 export interface G2GLiveOfferResult {
   offer_id: string;
   product_url: string;
@@ -55,7 +57,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
   const offerId = extractG2GOfferId(offerIdOrUrl);
   const now = new Date().toISOString();
 
-  const productUrl = offerId ? `https://www.g2g.com/offer/${offerId}` : (offerIdOrUrl || "");
+  const productUrl = offerId ? resolveG2GProductUrl(offerId) : (offerIdOrUrl || "");
 
   if (!offerId) {
     return {
@@ -142,7 +144,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
 
     return {
       offer_id: payload.offer_id || offerId,
-      product_url: `https://www.g2g.com/offer/${payload.offer_id || offerId}`,
+      product_url: resolveG2GProductUrl(payload.offer_id || offerId, payload.username),
       seller_name: payload.username || "G2G Seller",
       status,
       is_sold_out: isSoldOut,
@@ -258,7 +260,7 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
           game_title: task.gameTitle,
           seller_name: task.sellerName,
           offer_id: task.offerId,
-          product_url: `https://www.g2g.com/offer/${task.offerId}`,
+          product_url: resolveG2GProductUrl(task.offerId, task.sellerName, task.gameTitle),
           previous_stock: task.previousStock,
           live_stock: liveData.available_qty,
           is_online: liveData.is_online,

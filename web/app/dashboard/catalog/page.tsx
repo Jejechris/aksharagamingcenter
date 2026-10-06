@@ -67,7 +67,17 @@ export default function CatalogDashboardPage() {
   const [drawerTierFilter, setDrawerTierFilter] = useState<Record<string, string>>({});
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const getValidSellerUrl = (seller?: Seller, gameTitle?: string) => {
+  const getValidSellerUrl = (seller?: Seller, gameTitle?: string, category?: string) => {
+    const isEneba = seller?.profile_url?.includes('eneba.com') ||
+                    seller?.seller_name?.toLowerCase().includes('eneba') ||
+                    category?.toLowerCase().includes('key') ||
+                    category?.toLowerCase().includes('cdkey');
+    if (isEneba) {
+      if (seller?.profile_url && seller.profile_url.includes('eneba.com')) {
+        return seller.profile_url;
+      }
+      return getEnebaSearchUrl(gameTitle || '');
+    }
     return resolveG2GProductUrl(
       seller?.profile_url || (seller as any)?.offer_id,
       seller?.seller_name,
@@ -450,11 +460,13 @@ export default function CatalogDashboardPage() {
     setLoading(true);
     try {
       // 1. Instant hydration from localStorage for fast initial paint
+      let localGames: CatalogGame[] = [];
       try {
         const stored = localStorage.getItem('akshara_custom_catalog_v2');
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) {
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localGames = parsed;
             setGames(parsed);
           }
         }
@@ -464,7 +476,34 @@ export default function CatalogDashboardPage() {
       const res = await fetch('/api/catalog');
       const json = await res.json();
       if (json.status === 'success' && Array.isArray(json.data)) {
-        updateCatalogState(json.data);
+        const serverGames: CatalogGame[] = json.data;
+
+        // Smart merge: Start with server games, but NEVER erase custom/Eneba games from localStorage
+        const mergedMap = new Map<string, CatalogGame>();
+        for (const g of serverGames) {
+          mergedMap.set(g.id, g);
+        }
+
+        for (const lg of localGames) {
+          if (!mergedMap.has(lg.id)) {
+            // Locally added game (e.g. imported from Eneba or custom creation)
+            mergedMap.set(lg.id, lg);
+          } else {
+            // Merge custom sellers if any
+            const existing = mergedMap.get(lg.id)!;
+            const existingSellerIds = new Set(existing.sellers?.map(s => s.seller_id) || []);
+            const additionalSellers = (lg.sellers || []).filter(s => !existingSellerIds.has(s.seller_id));
+            if (additionalSellers.length > 0) {
+              mergedMap.set(lg.id, {
+                ...existing,
+                sellers: [...existing.sellers, ...additionalSellers]
+              });
+            }
+          }
+        }
+
+        const mergedList = Array.from(mergedMap.values());
+        updateCatalogState(mergedList);
       }
     } catch (err) {
       console.error('Failed to fetch catalog:', err);
@@ -1024,7 +1063,7 @@ export default function CatalogDashboardPage() {
                           <span className="flex items-center gap-1.5">
                             <span className="text-violet-300 font-semibold">Supplier Eneba:</span>
                             <a
-                              href={getValidSellerUrl(selectedSeller, game.title)}
+                              href={getValidSellerUrl(selectedSeller, game.title, game.category)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-violet-400 hover:text-violet-300 font-bold inline-flex items-center gap-1 transition-colors"
@@ -1044,7 +1083,7 @@ export default function CatalogDashboardPage() {
                           <span className="flex items-center gap-1.5">
                             Supplier:{" "}
                             <a
-                              href={getValidSellerUrl(selectedSeller, game.title)}
+                              href={getValidSellerUrl(selectedSeller, game.title, game.category)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-amber-400 hover:text-amber-300 font-bold inline-flex items-center gap-1 transition-colors"
@@ -1453,7 +1492,7 @@ export default function CatalogDashboardPage() {
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
                                       <a
-                                        href={getValidSellerUrl(s, game.title)}
+                                        href={getValidSellerUrl(s, game.title, game.category)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className={`${isEneba ? 'text-violet-300 hover:text-violet-200' : 'text-slate-200 hover:text-amber-400'} font-semibold inline-flex items-center gap-1 transition-colors`}

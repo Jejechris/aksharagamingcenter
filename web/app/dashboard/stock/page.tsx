@@ -1157,7 +1157,7 @@ export default function StockSentryPage() {
                                 if (!oid) return null;
                                 return (
                                   <a
-                                    href={`https://www.g2g.com/offer/${oid}`}
+                                    href={resolveG2GProductUrl(oid, game.selectedSeller.seller_name, game.title)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-cyan-500/40 text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 group/link"
@@ -1410,7 +1410,7 @@ export default function StockSentryPage() {
                                         <>
                                           <span>•</span>
                                           <a
-                                            href={`https://www.g2g.com/offer/${oid}`}
+                                            href={resolveG2GProductUrl(oid, standby.seller_name, game.title)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-cyan-400 hover:text-cyan-300 text-[10px] font-mono hover:underline flex items-center gap-0.5"

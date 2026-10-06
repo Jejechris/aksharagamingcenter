@@ -38,14 +38,25 @@ GAME_CATEGORIES = {
 }
 
 def resolve_g2g_product_url(oid: str, game_title: str = "") -> str:
+    import urllib.parse
     if oid in KNOWN_DEAD_OFFERS:
         return KNOWN_DEAD_OFFERS[oid]
     if oid and oid.startswith("G"):
         return f"https://www.g2g.com/offer/{oid}"
-    lower = game_title.lower()
+
+    lower = game_title.lower() if game_title else ""
+    if "eneba" in lower or (oid and "eneba" in oid.lower()):
+        clean = game_title.replace(":", " ").replace("&", " ").replace("-", " ").strip()
+        return f"https://www.eneba.com/store/all?text={urllib.parse.quote_plus(clean)}"
+
     for k, v in GAME_CATEGORIES.items():
         if k in lower:
             return v
+
+    if game_title and len(game_title.strip()) > 1:
+        clean = game_title.replace(":", " ").replace("&", " ").replace("-", " ").strip()
+        return f"https://www.g2g.com/search?q={urllib.parse.quote_plus(clean)}"
+
     return "https://www.g2g.com/id/categories/steam-global-account"
 
 
