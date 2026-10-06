@@ -46,14 +46,15 @@ function getMainMenuMarkup() {
         { text: "⚡ Radar Eneba CDKey", callback_data: "btn_eneba" },
       ],
       [
+        { text: "🛍️ Shopee Listing & Cover", callback_data: "btn_shopee_help" },
+        { text: "📋 Format Pesanan Shopee", callback_data: "btn_format_help" },
+      ],
+      [
         { text: "🔑 Buat Token Klaim", callback_data: "btn_new_claim_help" },
         { text: "📋 Daftar Token Klaim", callback_data: "btn_claims_list" },
       ],
       [
-        { text: "📋 Format Pesanan Shopee", callback_data: "btn_format_help" },
         { text: "🧮 Hitung Quant & BEP", callback_data: "btn_quant_help" },
-      ],
-      [
         { text: "📊 Briefing Harian", callback_data: "btn_briefing" },
       ],
     ],
@@ -142,6 +143,8 @@ export async function POST(req: NextRequest) {
           chatId,
           "ℹ️ *The Quant:* Ketik `/quant <harga_jual> <modal_idr_atau_usd>`\nContoh: `/quant 219000 135000`"
         );
+      } else if (data === "btn_shopee_help") {
+        await handleShopeeCommand(chatId, "");
       } else if (data === "btn_briefing") {
         await handleBriefingCommand(chatId);
       }
@@ -213,6 +216,8 @@ export async function POST(req: NextRequest) {
       await handleFormatCommand(chatId, argsText);
     } else if (cmd === "/g2g" || cmd === "/offer") {
       await handleG2GCommand(chatId, argsText);
+    } else if (cmd === "/shopee" || cmd === "/listing" || cmd === "/deskripsi" || cmd === "/cover") {
+      await handleShopeeCommand(chatId, argsText);
     } else if (cmd === "/briefing" || cmd === "/daily") {
       await handleBriefingCommand(chatId);
     } else if (cmd === "/help") {
@@ -220,10 +225,11 @@ export async function POST(req: NextRequest) {
         chatId,
         "📖 *PANDUAN LENGKAP AKSHARA BOT (VERCEL CLOUD)*\n"
         + "━━━━━━━━━━━━━━━━━━━━━━\n"
+        + "• `/shopee <game>` — Judul SEO, Deskripsi Lengkap & Rekomendasi Cover\n"
         + "• `/newclaim <game> | <buyer> | <kredensial>` — Buat token + Passcode PIN\n"
         + "• `/claims` — Tampilkan daftar token brankas\n"
         + "• `/cekclaim <kode>` — Audit forensik IP & waktu akses\n"
-        + "• `/stock` — Laporan stok faktual & harga modal Rupiah\n"
+        + "• `/stock` — Laporan stok faktual & link produk asli\n"
         + "• `/eneba <game>` — Modal Eneba dalam Rupiah\n"
         + "• `/quant <jual> <modal>` — Hitung untung bersih dalam Rupiah\n"
         + "• `/format <game> | <buyer> | <key>` — Susun chat pengiriman Shopee\n"
@@ -289,7 +295,8 @@ async function handleStockCommand(chatId: string | number) {
       lines.push(
         `${healthEmoji} *${r.gameTitle}*\n`
         + `   • Seller: \`${r.seller_name}\` (${onlineBadge})\n`
-        + `   • Stok Faktual: *${(r.available_qty || 0).toLocaleString("id-ID")} Unit* | Modal: *${priceStr}* (\`${r.offerId}\`)`
+        + `   • Stok Faktual: *${(r.available_qty || 0).toLocaleString("id-ID")} Unit* | Modal: *${priceStr}*\n`
+        + `   • 🔗 Link G2G: https://www.g2g.com/offer/${r.offerId}`
       );
     }
 
@@ -466,6 +473,7 @@ async function handleG2GCommand(chatId: string | number, query: string) {
       + `📊 *Status:* ${statusStr}\n`
       + `📦 *Stok Faktual:* *${(res.available_qty || 0).toLocaleString("id-ID")} UNIT*\n`
       + `💵 *Harga Modal Kulakan:* *${priceStr}*\n`
+      + `🔗 *URL Produk Faktual:* https://www.g2g.com/offer/${res.offer_id}\n`
       + "━━━━━━━━━━━━━━━━━━━━━━\n"
       + "⚡ _Data langsung ditarik detik ini dari sls.g2g.com (dalam Rupiah)._";
 
@@ -473,6 +481,109 @@ async function handleG2GCommand(chatId: string | number, query: string) {
   } else {
     await sendTelegramMessage(chatId, `❌ Gagal memeriksa offer \`${offerId}\`.`);
   }
+}
+
+async function handleShopeeCommand(chatId: string | number, argsText: string) {
+  if (!argsText.trim()) {
+    await sendTelegramMessage(
+      chatId,
+      "ℹ️ *CARA PAKAI SHOPEE LISTING:*\n"
+      + "Ketik `/shopee <nama_game> [| <harga>]`\n\n"
+      + "Contoh:\n"
+      + "• `/shopee Minecraft: Java & Bedrock Edition`\n"
+      + "• `/shopee Project Zomboid | Rp 149.000`\n\n"
+      + "Sistem akan otomatis menghasilkan Judul SEO (maks 120 char), Rekomendasi Cover 1080x1080, dan Deskripsi Shopee lengkap siap copas!"
+    );
+    return;
+  }
+
+  const parts = argsText.split("|").map(p => p.trim());
+  const gameTitle = parts[0];
+  const priceStr = parts[1] || "Rp 199.000";
+  const cleanName = gameTitle.toUpperCase();
+
+  let seoTitle = `${cleanName} [PC / DIGITAL] ORIGINAL FULL ACCESS GARANSI RESMI + KARTU A6`;
+  if (seoTitle.length > 120) {
+    seoTitle = `${cleanName} ORIGINAL FULL ACCESS GARANSI RESMI + KARTU A6`;
+  }
+  if (seoTitle.length > 120) {
+    seoTitle = seoTitle.substring(0, 117) + "...";
+  }
+
+  const coverMsg = (
+    `🖼️ *[REKOMENDASI COVER SHOPEE 1080x1080 — ${cleanName}]*\n`
+    + "━━━━━━━━━━━━━━━━━━━━━━\n"
+    + "📐 *Dimensi:* 1080x1080 px (Rasio 1:1 Feed Utama Shopee)\n"
+    + "🎨 *Rekomendasi Desain:* Dark Tech Theme dengan Kontras Tinggi\n"
+    + "🏷️ *4 Badge Wajib di Gambar:*\n"
+    + "• [100% ORIGINAL & LEGAL]\n"
+    + "• [GARANSI RESMI 30 HARI]\n"
+    + "• [FULL ACCESS GANTI EMAIL]\n"
+    + "• [INSTANT DELIVERY 5 MENIT]\n"
+    + "💡 *Tips:* Tempatkan judul di area tengah (80% safe zone) agar tidak tertutup badge Star+/Mall Shopee!"
+  );
+
+  await sendTelegramMessage(chatId, coverMsg);
+
+  const titleMsg = (
+    "📌 *[JUDUL PRODUK SHOPEE — TINGGAL SALIN]*\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━\n"
+    + `\`${seoTitle}\`\n\n`
+    + `📏 *Panjang:* ${seoTitle.length} / 120 Karakter (Lolos Algoritma SEO)`
+  );
+
+  await sendTelegramMessage(chatId, titleMsg);
+
+  const descText = (
+    `🎮 AKSHARA GAMING CENTER — OFFICIAL DIGITAL LICENSE\n`
+    + `⚡ PRODUK 100% ORIGINAL & LEGAL | PERMANENT OWNERSHIP\n`
+    + `🛡️ FULL ACCESS | BISA GANTI SEMUA DATA | GARANSI RESMI\n\n`
+    + `==================================================\n`
+    + `🌟 DETAIL PRODUK:\n`
+    + `• Game: ${gameTitle}\n`
+    + `• Platform: PC / Official Launcher\n`
+    + `• Status: 100% Fresh & Original (Bukan Shared/Bajakan)\n`
+    + `• Wilayah: GLOBAL (Bisa dimainkan di seluruh Indonesia tanpa VPN)\n`
+    + `• Bahasa: Multi-language (Termasuk English)\n`
+    + `==================================================\n\n`
+    + `💎 KEUNGGULAN BELI DI AKSHARA GAMING:\n`
+    + `✅ FULL ACCESS 100%: Bebas ganti Email, Password, & Nickname.\n`
+    + `✅ ONLINE MULTIPLAYER RESMI: Bebas main online di semua server resmi.\n`
+    + `✅ PERMANEN MILIK ANDA: Akun/Lisensi aktif selamanya, bukan sewa.\n`
+    + `✅ PENGIRIMAN KILAT: Detail dikirimkan via chat segera setelah order.\n`
+    + `✅ BONUS KARTU GARANSI FISIK: Dilengkapi Kartu Garansi Resmi A6 (Art Carton 260gsm) berpita hologram & QR Code!\n\n`
+    + `==================================================\n`
+    + `🚀 3 LANGKAH MUDAH AKTIVASI:\n`
+    + `1. Selesaikan pembayaran di Shopee dan cek chat Shopee Anda.\n`
+    + `2. Tim Akshara akan mengirimkan data lisensi beserta panduan setup instan.\n`
+    + `3. Login ke launcher resmi, ubah data sesuai keinginan, dan game siap dimainkan!\n\n`
+    + `==================================================\n`
+    + `⚠️ SYARAT & KETENTUAN KLAIM GARANSI (SOP ANTI-FRAUD):\n`
+    + `1. Wajib membuat VIDEO UNBOXING amplop kartu garansi fisik tanpa jeda (no-cut) dari awal paket masih tersegel rapi.\n`
+    + `2. Segera lakukan pengecekan dan pergantian data setelah detail diterima.\n`
+    + `3. Garansi tidak berlaku jika akun terindikasi menggunakan cheat/mod ilegal.\n`
+    + `4. Tim Support Akshara siap membantu 24/7 jika ada kendala login awal.\n\n`
+    + `==================================================\n`
+    + `❓ PERTANYAAN UMUM (FAQ):\n`
+    + `Q: Apakah produk selalu ready stok?\n`
+    + `A: Selalu READY STOK kak! Sistem kami autonomous, silakan langsung di-checkout saja.\n\n`
+    + `Q: Apakah butuh VPN untuk login atau main?\n`
+    + `A: Sama sekali TIDAK. 100% region Global dan aman koneksi internet Indonesia.\n\n`
+    + `Q: Apakah dikirim paket fisik ke alamat rumah?\n`
+    + `A: Ya kak, amplop resmi berisi Kartu Garansi Akshara A6 dikirim via kurir Shopee agar order Anda resmi dan aman regulasi.\n\n`
+    + `Terima kasih telah berbelanja di Akshara Gaming Center!\n`
+    + `Happy Gaming! 🎮🔥\n\n`
+    + `#JualGameOriginal #AksharaGaming #GamePC #GaransiResmi #ShopeeGamingID`
+  );
+
+  const descMsg = (
+    "📝 *[DESKRIPSI LENGKAP SHOPEE — SIAP SALIN]*\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━\n"
+    + `\`\`\`text\n${descText}\n\`\`\`\n`
+    + "💡 _Sentuh/tekan blok teks di atas untuk menyalin langsung ke Seller Centre Shopee!_"
+  );
+
+  await sendTelegramMessage(chatId, descMsg);
 }
 
 async function handleBriefingCommand(chatId: string | number) {

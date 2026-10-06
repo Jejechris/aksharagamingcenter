@@ -181,15 +181,18 @@ class TelegramCommander:
                     {"text": "⚡ Radar Eneba CDKey", "callback_data": "btn_eneba"}
                 ],
                 [
+                    {"text": "🛍️ Shopee Listing & Cover", "callback_data": "btn_shopee_help"},
+                    {"text": "🎨 Buat Banner Canvas", "callback_data": "btn_canvas_help"}
+                ],
+                [
                     {"text": "🔑 Buat Token Klaim", "callback_data": "btn_new_claim_help"},
                     {"text": "📋 Daftar Token Klaim", "callback_data": "btn_claims_list"}
                 ],
                 [
-                    {"text": "🎨 Buat Banner Canvas", "callback_data": "btn_canvas_help"},
-                    {"text": "📋 Format Pesanan Shopee", "callback_data": "btn_format_help"}
+                    {"text": "📋 Format Pesanan Shopee", "callback_data": "btn_format_help"},
+                    {"text": "🧮 Hitung Quant & BEP", "callback_data": "btn_quant_help"}
                 ],
                 [
-                    {"text": "🧮 Hitung Quant & BEP", "callback_data": "btn_quant_help"},
                     {"text": "📊 Briefing Harian", "callback_data": "btn_briefing"}
                 ]
             ]
@@ -202,15 +205,16 @@ class TelegramCommander:
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "Halo Senna! Sistem komando otonom Akshara siap melayani operasional Anda.\n\n"
             "⚡ *Fitur Komando Tersedia:*\n"
+            "• `/shopee <game>` — Judul SEO, Deskripsi Lengkap & Render Cover Shopee 1080x1080\n"
             "• `/newclaim <game> | <buyer> | <kredensial>` — Terbitkan token klaim + Passcode PIN\n"
             "• `/claims` — Lihat 5 token klaim terbaru & status buka/IP\n"
             "• `/cekclaim <kode>` — Audit forensik IP pembeli & waktu buka kredensial\n"
-            "• `/stock` — Audit live stok seller ribuan unit & status online (Rupiah)\n"
+            "• `/stock` — Audit live stok seller ribuan unit & link langsung (Rupiah)\n"
             "• `/canvas <game>` — Auto generate banner 1080x1080 Shopee\n"
             "• `/format <game> | <buyer> | <key>` — Format chat pengiriman Shopee\n"
             "• `/quant <jual> <cogs_usd>` — Kalkulasi margin bersih, Shopee fee & BEP\n"
             "• `/eneba <query>` — Cek harga checkout landed cost Eneba (Rupiah)\n"
-            "• `/g2g <link_atau_id>` — Inspeksi offer & seller G2G langsung\n"
+            "• `/g2g <link_atau_id>` — Inspeksi offer & seller G2G langsung + link\n"
             "• `/briefing` — Ringkasan metrik eksekutif toko\n\n"
             "Silakan gunakan tombol menu di bawah untuk akses cepat:"
         )
@@ -221,21 +225,25 @@ class TelegramCommander:
         text = (
             "📖 *PANDUAN LENGKAP COMMAND AKSHARA BOT*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🔑 *1. Brankas Klaim & Passcode PIN (Website Ke-2):*\n"
+            "🛍️ *1. Listing Shopee & Cover Generator:*\n"
+            "• `/shopee <nama_game> [| <harga>]` — Generate Judul SEO, Deskripsi lengkap siap salin, & Render Cover Banner 1080x1080.\n"
+            "  _Contoh:_ `/shopee Minecraft: Java & Bedrock`\n"
+            "  _Contoh:_ `/shopee Project Zomboid | Rp 149.000`\n\n"
+            "🔑 *2. Brankas Klaim & Passcode PIN (Website Ke-2):*\n"
             "• `/newclaim <game> | <buyer> | <kredensial> [| <passcode>]` — Terbitkan klaim baru.\n"
             "  _Contoh:_ `/newclaim Minecraft | budi_gamers | Email: mc@budi.com Pass: Secret123 | 882194`\n"
             "  _Contoh Auto PIN:_ `/newclaim Project Zomboid | alvin | STEAM-KEY-1234`\n"
             "• `/claims` — Tampilkan daftar token klaim aktif dan statusnya.\n"
             "• `/cekclaim <kode>` — Audit forensik IP & waktu saat pembeli membuka kredensial.\n\n"
-            "📦 *2. Live Stock & Sentry:*\n"
-            "• `/stock` — Audit real-time seluruh supplier di katalog aktif (dalam Rupiah).\n"
+            "📦 *3. Live Stock & Sentry:*\n"
+            "• `/stock` — Audit real-time seluruh supplier di katalog aktif lengkap dengan URL produk asli.\n"
             "• `/g2g <link/offer_id>` — Cek offer tertentu (contoh: `/g2g G1703129821471UK`).\n\n"
-            "🎨 *3. Pemasaran & Konten Produk:*\n"
+            "🎨 *4. Pemasaran & Konten Produk:*\n"
             "• `/canvas <nama_game>` — Membuat gambar thumbnail 1080x1080.\n"
             "  _Contoh:_ `/canvas Project Zomboid`\n\n"
-            "📋 *4. Pengiriman & Layanan Pembeli:*\n"
+            "📋 *5. Pengiriman & Layanan Pembeli:*\n"
             "• `/format <game> | <buyer> | <key>` — Format chat pengiriman 3-langkah.\n\n"
-            "🧮 *5. Finansial (The Quant) & Sourcing:*\n"
+            "🧮 *6. Finansial (The Quant) & Sourcing:*\n"
             "• `/quant <harga_jual> <cogs_usd>` — Hitung profit bersih setelah fee Shopee & QRIS.\n"
             "• `/eneba <game>` — Cek landed cost Eneba dalam Rupiah.\n"
             "• `/watcher` — Cek status background Sentry (pemantau stok berkala)."
@@ -292,6 +300,146 @@ class TelegramCommander:
             f"💡 _Siap diunduh dan dipasang di etalase Shopee Anda!_"
         )
         await self.send_photo(chat_id, img_bytes, caption=caption)
+
+    async def handle_shopee(self, chat_id: str, args_text: str) -> None:
+        """Handler untuk command /shopee atau /listing: Buat Judul, Deskripsi & Render Cover Shopee."""
+        if not args_text.strip():
+            msg = (
+                "ℹ️ *CARA PAKAI COMMAND SHOPEE LISTING:*\n"
+                "Ketik `/shopee <nama_game> [| <harga_jual>]`\n\n"
+                "Contoh:\n"
+                "• `/shopee Minecraft: Java & Bedrock Edition`\n"
+                "• `/shopee Project Zomboid | Rp 149.000`\n"
+                "• `/shopee Terraria | 99000`\n\n"
+                "💡 *Output Otomatis:*\n"
+                "1. Judul SEO Shopee (Maksimal 120 Karakter)\n"
+                "2. Deskripsi Lengkap Siap Copy-Paste (Spek, Fitur, Garansi 30 Hari, SOP Video Unboxing, FAQ)\n"
+                "3. Gambar Cover Banner HD 1080x1080 Ter-Render & Terkirim Langsung!"
+            )
+            await self.send_message(chat_id, msg)
+            return
+
+        parts = [p.strip() for p in args_text.split("|")]
+        game_title = parts[0]
+        price_val = 199000
+        price_str = "Rp 199.000"
+
+        if len(parts) > 1:
+            raw_p = parts[1].replace("Rp", "").replace(".", "").replace(",", "").strip()
+            if raw_p.isdigit():
+                price_val = int(raw_p)
+                price_str = f"Rp {price_val:,}".replace(",", ".")
+            else:
+                price_str = parts[1]
+
+        await self.send_message(chat_id, f"⚡ _Menyusun Judul SEO, Deskripsi Lengkap, dan Rendering Cover 1080x1080 untuk *{game_title}*..._")
+
+        # 1. Judul SEO (Max 120 chars)
+        clean_name = game_title.upper()
+        seo_title = f"{clean_name} [PC / DIGITAL] ORIGINAL FULL ACCESS GARANSI RESMI + KARTU A6"
+        if len(seo_title) > 120:
+            seo_title = f"{clean_name} ORIGINAL FULL ACCESS GARANSI RESMI + KARTU A6"
+        if len(seo_title) > 120:
+            seo_title = seo_title[:117] + "..."
+
+        # 2. Render Cover Banner 1080x1080
+        theme = "violet"
+        if "minecraft" in game_title.lower() or "terraria" in game_title.lower():
+            theme = "emerald"
+        elif "gta" in game_title.lower() or "zomboid" in game_title.lower():
+            theme = "amber"
+        elif "cyberpunk" in game_title.lower() or "company" in game_title.lower():
+            theme = "cyan"
+
+        img_bytes = generate_game_canvas(
+            game_title=game_title,
+            price_str=price_str,
+            theme_color=theme
+        )
+
+        caption_cover = (
+            f"🖼️ *[REKOMENDASI COVER SHOPEE 1080x1080]*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎮 *Game:* `{game_title}`\n"
+            f"📐 *Dimensi:* 1080x1080 px (1:1 Standar Utama Feed Shopee)\n"
+            f"🏷️ *Badge Disertakan:* 100% Original, Garansi Resmi 30 Hari, Full Access, Instant Delivery\n"
+            f"💡 _Unduh gambar ini dan pasang langsung sebagai Foto Utama produk di Shopee!_"
+        )
+        await self.send_photo(chat_id, img_bytes, caption=caption_cover)
+
+        # 3. Judul SEO
+        msg_title = (
+            f"📌 *[JUDUL PRODUK SHOPEE — TINGGAL SALIN]*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"`{seo_title}`\n\n"
+            f"📏 *Panjang:* {len(seo_title)} / 120 Karakter (Optimal Algoritma Pencarian)"
+        )
+        await self.send_message(chat_id, msg_title)
+
+        # 4. Deskripsi Lengkap Siap Salin
+        clean_tags = "#JualGameOriginal #AksharaGaming #GamePC #GaransiResmi #ShopeeGamingID"
+        desc_text = (
+            f"🎮 AKSHARA GAMING CENTER — OFFICIAL DIGITAL LICENSE\n"
+            f"⚡ PRODUK 100% ORIGINAL & LEGAL | PERMANENT OWNERSHIP\n"
+            f"🛡️ FULL ACCESS | BISA GANTI SEMUA DATA | GARANSI RESMI\n\n"
+            f"==================================================\n"
+            f"🌟 DETAIL PRODUK:\n"
+            f"• Game: {game_title}\n"
+            f"• Platform: PC / Official Launcher\n"
+            f"• Status: 100% Fresh & Original (Bukan Shared/Bajakan)\n"
+            f"• Wilayah: GLOBAL (Bisa dimainkan di seluruh Indonesia tanpa VPN)\n"
+            f"• Bahasa: Multi-language (Termasuk English)\n"
+            f"==================================================\n\n"
+            f"💎 KEUNGGULAN BELI DI AKSHARA GAMING:\n"
+            f"✅ FULL ACCESS 100%: Pembeli bebas ganti Email, Password, & Pertanyaan Keamanan.\n"
+            f"✅ ONLINE MULTIPLAYER RESMI: Bebas main online di seluruh server resmi.\n"
+            f"✅ PERMANEN MILIK ANDA: Akun/Lisensi aktif selamanya, bukan sewa.\n"
+            f"✅ PENGIRIMAN KILAT: Detail akun dikirim via chat segera setelah order terkonfirmasi.\n"
+            f"✅ BONUS KARTU GARANSI FISIK: Dilengkapi Kartu Garansi Resmi A6 (Art Carton 260gsm) berpita hologram & QR Code serial terdaftar!\n\n"
+            f"==================================================\n"
+            f"🚀 3 LANGKAH MUDAH AKTIVASI:\n"
+            f"1. Selesaikan pembayaran di Shopee dan cek chat Shopee Anda.\n"
+            f"2. Tim Akshara akan mengirimkan data lisensi beserta panduan setup instan.\n"
+            f"3. Login ke launcher resmi, ubah data sesuai keinginan, dan game siap dimainkan!\n\n"
+            f"==================================================\n"
+            f"⚠️ SYARAT & KETENTUAN KLAIM GARANSI (SOP ANTI-FRAUD):\n"
+            f"1. Wajib membuat VIDEO UNBOXING amplop kartu garansi fisik tanpa jeda (no-cut & unedited) dari awal paket masih tersegel rapi.\n"
+            f"2. Segera lakukan pengecekan dan pergantian data setelah detail diterima.\n"
+            f"3. Garansi tidak berlaku jika akun terindikasi menggunakan cheat/third-party mod ilegal.\n"
+            f"4. Tim Support Akshara siap membantu 24/7 jika ada kendala login awal.\n\n"
+            f"==================================================\n"
+            f"❓ PERTANYAAN UMUM (FAQ):\n"
+            f"Q: Apakah produk selalu ready stok?\n"
+            f"A: Selalu READY STOK kak! Sistem kami autonomous, silakan langsung di-checkout saja.\n\n"
+            f"Q: Apakah butuh VPN untuk login atau main?\n"
+            f"A: Sama sekali TIDAK. 100% region Global dan aman koneksi internet Indonesia.\n\n"
+            f"Q: Apakah dikirim paket fisik ke alamat rumah?\n"
+            f"A: Ya kak, amplop resmi berisi Kartu Garansi Akshara A6 dikirim via kurir Shopee agar order Anda resmi dan aman regulasi.\n\n"
+            f"Terima kasih telah berbelanja di Akshara Gaming Center!\n"
+            f"Happy Gaming! 🎮🔥\n\n"
+            f"{clean_tags}"
+        )
+
+        msg_desc = (
+            f"📝 *[DESKRIPSI LENGKAP SHOPEE — SIAP SALIN]*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"```text\n{desc_text}\n```\n"
+            f"💡 _Sentuh/tekan blok teks di atas untuk menyalin langsung ke Seller Centre Shopee!_"
+        )
+
+        markup = {
+            "inline_keyboard": [
+                [
+                    {"text": "📦 Cek Stok Live", "callback_data": "btn_stock"},
+                    {"text": "⚡ Radar Eneba", "callback_data": "btn_eneba"}
+                ],
+                [
+                    {"text": "📋 Format Pesanan", "callback_data": "btn_format_help"},
+                    {"text": "🧮 Hitung Quant", "callback_data": "btn_quant_help"}
+                ]
+            ]
+        }
+        await self.send_message(chat_id, msg_desc, reply_markup=markup)
 
     async def handle_format(self, chat_id: str, args_text: str) -> None:
         """Handler untuk command /format."""
@@ -440,6 +588,7 @@ class TelegramCommander:
             price_idr = int(math.ceil(price_usd * 16350 / 100) * 100) if price_usd > 0 else 0
             price_str = f"Rp {price_idr:,}" if price_idr > 0 else "N/A"
 
+            offer_url = f"https://www.g2g.com/offer/{res['offer_id']}"
             msg = (
                 f"🎮 *[HASIL INSPEKSI OFFER G2G SLS]*\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -450,6 +599,7 @@ class TelegramCommander:
                 f"📊 *Status:* {status_str}\n"
                 f"📦 *Stok Faktual:* *{res.get('available_qty', 0):,} UNIT*\n"
                 f"💵 *Harga Modal Kulakan:* *{price_str}*\n"
+                f"🔗 *URL Produk Faktual:* {offer_url}\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"⚡ _Data langsung ditarik detik ini dari sls.g2g.com (dalam Rupiah)._"
             )
@@ -788,6 +938,8 @@ class TelegramCommander:
         elif data.startswith("check_claim_"):
             code = data.replace("check_claim_", "")
             await self.handle_check_claim(chat_id, code)
+        elif data == "btn_shopee_help":
+            await self.handle_shopee(chat_id, "")
         elif data == "btn_canvas_help":
             await self.handle_canvas(chat_id, "")
         elif data == "btn_format_help":
@@ -866,6 +1018,8 @@ class TelegramCommander:
             await self.handle_g2g(chat_id, args_text)
         elif cmd in ("/briefing", "/daily"):
             await self.handle_briefing(chat_id)
+        elif cmd in ("/shopee", "/listing", "/deskripsi", "/cover"):
+            await self.handle_shopee(chat_id, args_text)
         elif cmd in ("/watcher", "/sentry"):
             status = "🟢 AKTIF" if self.watcher_enabled else "🔴 NONAKTIF"
             await self.send_message(chat_id, f"🛡️ *Status Market Watcher Sentry:* {status}\nInterval Pemeriksaan: {self.check_interval_seconds // 60} menit sekali.")

@@ -188,7 +188,24 @@ ${seoHashtags}`;
       "Full Access (Bisa Ganti Email & Password)",
       "Garansi Resmi & Video Unboxing SOP",
       includePhysicalCard ? "Termasuk Kartu Garansi Fisik A6" : "Pengiriman Cepat"
-    ]
+    ],
+    cover_recommendation: {
+      suggested_ratio: "1:1 (1080 x 1080 px)",
+      headline_badges: [
+        "100% ORIGINAL & LEGAL",
+        "GARANSI RESMI 30 HARI",
+        category.includes("Key") ? "REDEEM CODE RESMI" : "FULL ACCESS GANTI EMAIL",
+        "PENGIRIMAN CEPAT 5 MENIT"
+      ],
+      theme_color: gameTitle.toLowerCase().includes("minecraft") || gameTitle.toLowerCase().includes("terraria") ? "emerald" : (gameTitle.toLowerCase().includes("gta") || gameTitle.toLowerCase().includes("zomboid") ? "amber" : "violet"),
+      ai_image_prompt: `High-converting Shopee product cover for "${gameTitle}" (${platform}), centered official artwork, 1:1 square ratio 1080x1080, dark modern tech aesthetic, vibrant glowing badges: "100% ORIGINAL", "GARANSI RESMI 30 HARI", "FULL ACCESS", clean typography, commercial ecommerce product photography, sharp focus.`,
+      design_tips: [
+        "Gunakan rasio 1:1 (1080x1080 px) resolusi tinggi agar tajam di semua jenis layar HP pembeli.",
+        "Tempatkan judul & badge utama di safe area tengah (80%) agar tidak tertutup badge Shopee Star+ di pojok kiri atas.",
+        "Batas teks maksimal 20% dari total luas gambar agar lolos rekomendasi algoritma feed Shopee.",
+        "Sertakan badge 'GARANSI RESMI' dan 'FULL ACCESS' untuk membedakan toko dari penjual bajakan/ilegal."
+      ]
+    }
   };
 }
 
@@ -210,7 +227,7 @@ export async function POST(req: Request) {
     } = body;
 
     const systemPrompt = `Kamu adalah Senior E-Commerce Copywriter & Shopee SEO Specialist spesialis produk game digital dan lisensi software di Indonesia untuk toko "Akshara Gaming Center".
-Tugasmu adalah membuat deskripsi produk Shopee Indonesia yang SANGAT MENARIK, PROFESIONAL, PERSUASIF, BERSIH, RAMAH ALGORITMA SHOPEE, dan MEMILIKI KONVERSI PENJUALAN TINGGI.
+Tugasmu adalah membuat deskripsi produk Shopee Indonesia yang SANGAT MENARIK, PROFESIONAL, PERSUASIF, BERSIH, RAMAH ALGORITMA SHOPEE, dan MEMILIKI KONVERSI PENJUALAN TINGGI, LENGKAP DENGAN REKOMENDASI COVER 1080x1080.
 
 Aturan Penting Format Shopee:
 1. Karakteristik pembeli Shopee Indonesia menyukai teks terstruktur rapi dengan pembatas garis (=== atau ---), bullet points yang jelas, dan emoji relevan (🎮, ⚡, 🛡️, ✅, 📦, ❓).
@@ -228,7 +245,13 @@ Aturan Penting Format Shopee:
   "seo_title": "string (maks 120 char)",
   "full_description": "string (deskripsi lengkap siap copy-paste)",
   "seo_hashtags": "string (daftar hashtag #Game #Steam dll)",
-  "quick_specs": ["bullet point 1", "bullet point 2", ...]
+  "quick_specs": ["bullet point 1", "bullet point 2", ...],
+  "cover_recommendation": {
+    "headline_badges": ["badge 1", "badge 2", "badge 3", "badge 4"],
+    "ai_image_prompt": "string prompt image generator 1080x1080",
+    "theme_color": "violet | emerald | amber | cyan",
+    "design_tips": ["tip 1", "tip 2", ...]
+  }
 }`;
 
     const userPrompt = `Buatkan deskripsi Shopee terbaik untuk:
@@ -260,6 +283,22 @@ Pastikan formatnya sangat rapi dan siap langsung di-paste ke Seller Centre Shope
             seo_hashtags: parsed.seo_hashtags || "",
             quick_specs: parsed.quick_specs || [],
             character_count: parsed.full_description.length,
+            cover_recommendation: parsed.cover_recommendation || {
+              suggested_ratio: "1:1 (1080 x 1080 px)",
+              headline_badges: [
+                "100% ORIGINAL & LEGAL",
+                "GARANSI RESMI 30 HARI",
+                category.includes("Key") ? "REDEEM CODE RESMI" : "FULL ACCESS GANTI EMAIL",
+                "PENGIRIMAN CEPAT 5 MENIT"
+              ],
+              theme_color: "violet",
+              ai_image_prompt: `High-converting Shopee product cover for "${gameTitle}" (${platform}), 1:1 ratio 1080x1080, dark modern tech aesthetic, key art, badges: "100% ORIGINAL", "GARANSI RESMI".`,
+              design_tips: [
+                "Gunakan rasio 1:1 (1080x1080 px) resolusi tinggi.",
+                "Area tengah 80% untuk teks utama agar tidak tertutup badge Shopee.",
+                "Maksimal 20% area tertutup teks agar performa feed optimal."
+              ]
+            }
           }
         });
       }

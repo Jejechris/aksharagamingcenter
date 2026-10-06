@@ -171,7 +171,8 @@ def build_stock_summary_report(audit_results: List[Dict[str, Any]]) -> str:
         lines.append(
             f"{emoji} *{game}*\n"
             f"   • Seller: `{seller}` ({online_badge})\n"
-            f"   • Stok Faktual: *{qty:,} Unit* | Modal: *{price_str}* (`{oid}`)"
+            f"   • Stok Faktual: *{qty:,} Unit* | Modal: *{price_str}*\n"
+            f"   • 🔗 URL Produk: https://www.g2g.com/offer/{oid}"
         )
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━")
@@ -189,6 +190,7 @@ def get_critical_stock_alerts(audit_results: List[Dict[str, Any]]) -> List[str]:
             game = r.get("game_title", "Unknown")
             seller = r.get("seller_name") or r.get("recorded_seller_name", "Seller")
             oid = r.get("offer_id", "")
+            url = f"https://www.g2g.com/offer/{oid}" if oid else "https://www.g2g.com"
             
             if health == "CRITICAL":
                 alerts.append(
@@ -197,6 +199,7 @@ def get_critical_stock_alerts(audit_results: List[Dict[str, Any]]) -> List[str]:
                     f"🎮 *Game:* `{game}`\n"
                     f"👤 *Seller:* `{seller}` (`{oid}`)\n"
                     f"🔴 *Sisa Stok:* *0 UNIT (KOSONG)*\n"
+                    f"🔗 *Cek Live Offer:* {url}\n"
                     f"⚠️ *TINDAKAN DIPERLUKAN:* Segera non-aktifkan listing di Shopee atau beralih ke seller cadangan!"
                 )
             elif health == "WARNING":
@@ -206,6 +209,7 @@ def get_critical_stock_alerts(audit_results: List[Dict[str, Any]]) -> List[str]:
                     f"🎮 *Game:* `{game}`\n"
                     f"👤 *Seller:* `{seller}` (`{oid}`)\n"
                     f"⚠️ *Sisa Stok:* *HANYA {qty} UNIT TERSISA!*\n"
+                    f"🔗 *Cek Live Offer:* {url}\n"
                     f"💡 *Saran:* Pantau pesanan masuk atau persiapkan supplier alternatif."
                 )
     return alerts

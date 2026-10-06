@@ -6,6 +6,7 @@
 
 export interface G2GLiveOfferResult {
   offer_id: string;
+  product_url: string;
   seller_name: string;
   status: "live" | "delisted" | "sold_out" | "unknown";
   is_sold_out: boolean;
@@ -24,6 +25,7 @@ export interface G2GAuditLogItem {
   game_title: string;
   seller_name: string;
   offer_id: string;
+  product_url: string;
   previous_stock: number;
   live_stock: number;
   is_online: boolean;
@@ -53,9 +55,12 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
   const offerId = extractG2GOfferId(offerIdOrUrl);
   const now = new Date().toISOString();
 
+  const productUrl = offerId ? `https://www.g2g.com/offer/${offerId}` : (offerIdOrUrl || "");
+
   if (!offerId) {
     return {
       offer_id: offerIdOrUrl,
+      product_url: productUrl,
       seller_name: "Unknown",
       status: "unknown",
       is_sold_out: true,
@@ -92,6 +97,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
     if (!res.ok) {
       return {
         offer_id: offerId,
+        product_url: productUrl,
         seller_name: "Unknown",
         status: "unknown",
         is_sold_out: true,
@@ -113,6 +119,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
     if (!payload) {
       return {
         offer_id: offerId,
+        product_url: productUrl,
         seller_name: "Unknown",
         status: "unknown",
         is_sold_out: true,
@@ -135,6 +142,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
 
     return {
       offer_id: payload.offer_id || offerId,
+      product_url: `https://www.g2g.com/offer/${payload.offer_id || offerId}`,
       seller_name: payload.username || "G2G Seller",
       status,
       is_sold_out: isSoldOut,
@@ -150,6 +158,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
   } catch (err: any) {
     return {
       offer_id: offerId,
+      product_url: productUrl,
       seller_name: "Unknown",
       status: "unknown",
       is_sold_out: true,
@@ -249,6 +258,7 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
           game_title: task.gameTitle,
           seller_name: task.sellerName,
           offer_id: task.offerId,
+          product_url: `https://www.g2g.com/offer/${task.offerId}`,
           previous_stock: task.previousStock,
           live_stock: liveData.available_qty,
           is_online: liveData.is_online,

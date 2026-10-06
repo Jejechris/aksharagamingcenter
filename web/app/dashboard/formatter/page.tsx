@@ -192,6 +192,16 @@ export default function FormatterPage() {
             Ubah data mentah akun game dari supplier G2G menjadi pesan serah terima yang rapi, profesional, dan siap kirim ke {channel}.
           </p>
         </div>
+
+        <div className="flex sm:self-center shrink-0">
+          <Link
+            href={`/dashboard/description?game=${encodeURIComponent(gameTitle)}`}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-300 text-xs font-medium transition-all shadow-sm group"
+          >
+            <span>📝 Buat Judul, Deskripsi &amp; Cover Shopee</span>
+            <span className="group-hover:translate-x-0.5 transition-transform text-orange-400">↗</span>
+          </Link>
+        </div>
       </div>
 
       {/* Quick Presets & Portfolio Games */}
@@ -657,6 +667,26 @@ export default function FormatterPage() {
                   </ul>
                 </div>
               )}
+
+              {/* Cross-Link to Shopee Listing & Cover */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent border border-orange-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold text-orange-300 flex items-center gap-1.5">
+                    <ShoppingBag className="w-3.5 h-3.5 text-orange-400" />
+                    Siapkan Listing &amp; Cover di Shopee?
+                  </span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Buat judul 120-karakter, deskripsi terstruktur, dan download cover HD 1080x1080 untuk game {gameTitle}.
+                  </p>
+                </div>
+                <Link
+                  href={`/dashboard/description?game=${encodeURIComponent(gameTitle)}`}
+                  className="px-3.5 py-2 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 text-orange-300 text-xs font-semibold shrink-0 flex items-center justify-center gap-1.5 transition-all shadow-sm group"
+                >
+                  <span>Buka Generator Shopee</span>
+                  <span className="group-hover:translate-x-0.5 transition-transform text-orange-400">→</span>
+                </Link>
+              </div>
 
             </div>
           ) : (

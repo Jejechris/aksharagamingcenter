@@ -24,6 +24,7 @@ import {
   Compass,
   PackageSearch,
   ShieldCheck,
+  ShoppingBag,
 } from "lucide-react";
 
 interface NavItem {
@@ -77,9 +78,9 @@ const navSections: NavSection[] = [
         icon: <Calculator className="w-4 h-4 shrink-0 text-emerald-400" />,
       },
       {
-        label: "Deskripsi Maker",
+        label: "Shopee Listing & Cover",
         href: "/dashboard/description",
-        icon: <FileText className="w-4 h-4 shrink-0 text-fuchsia-400" />,
+        icon: <ShoppingBag className="w-4 h-4 shrink-0 text-orange-400" />,
       },
       {
         label: "AI Formatter",

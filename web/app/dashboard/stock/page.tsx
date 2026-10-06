@@ -1147,11 +1147,22 @@ export default function StockSentryPage() {
                               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700/50">
                                 {game.selectedSeller.tier_label || "⚖️ Mid-Level"}
                               </span>
-                              {extractOfferId(game.selectedSeller.profile_url) && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
-                                  ID: {extractOfferId(game.selectedSeller.profile_url)}
-                                </span>
-                              )}
+                              {(() => {
+                                const oid = extractOfferId(game.selectedSeller.profile_url);
+                                if (!oid) return null;
+                                return (
+                                  <a
+                                    href={`https://www.g2g.com/offer/${oid}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-cyan-500/40 text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 group/link"
+                                    title={`Buka live offer ${oid} di G2G`}
+                                  >
+                                    <span>ID: {oid}</span>
+                                    <ExternalLink className="w-2.5 h-2.5 opacity-70 group-hover/link:opacity-100" />
+                                  </a>
+                                );
+                              })()}
                               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
                                 <Zap className="w-2.5 h-2.5" /> Faktual G2G SLS
                               </span>
@@ -1387,14 +1398,25 @@ export default function StockSentryPage() {
                                     <span className="text-zinc-300 font-mono">
                                       {formatRp(standby.price_g2g_idr)}
                                     </span>
-                                    {extractOfferId(standby.profile_url) && (
-                                      <>
-                                        <span>•</span>
-                                        <span className="text-zinc-500 text-[10px] font-mono">
-                                          {extractOfferId(standby.profile_url)}
-                                        </span>
-                                      </>
-                                    )}
+                                    {(() => {
+                                      const oid = extractOfferId(standby.profile_url);
+                                      if (!oid) return null;
+                                      return (
+                                        <>
+                                          <span>•</span>
+                                          <a
+                                            href={`https://www.g2g.com/offer/${oid}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-cyan-400 hover:text-cyan-300 text-[10px] font-mono hover:underline flex items-center gap-0.5"
+                                            title={`Buka live offer ${oid} di G2G`}
+                                          >
+                                            <span>{oid}</span>
+                                            <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                                          </a>
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
 
