@@ -29,6 +29,26 @@ export default function BotHealthMonitoringPage() {
   const [testMessage, setTestMessage] = useState("Halo Senna! Tes koneksi bot dari dashboard monitoring Akshara.");
   const [sendingTest, setSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [triggeringSentry, setTriggeringSentry] = useState(false);
+  const [sentryResult, setSentryResult] = useState<string | null>(null);
+
+  const handleTriggerSentry = async () => {
+    setTriggeringSentry(true);
+    setSentryResult(null);
+    try {
+      const res = await fetch("/api/cron/sentry?heartbeat=true");
+      const json = await res.json();
+      if (json.status === "success") {
+        setSentryResult(`✅ Audit sukses! Diaudit: ${json.auditedCount} seller, ${json.alertsDispatched} alert stok dikirim ke Telegram.`);
+      } else {
+        setSentryResult(`Gagal: ${json.message || "Unknown error"}`);
+      }
+    } catch (e: any) {
+      setSentryResult(`Error: ${e.message}`);
+    } finally {
+      setTriggeringSentry(false);
+    }
+  };
 
   const fetchWebhookStatus = async () => {
     try {
@@ -304,6 +324,42 @@ export default function BotHealthMonitoringPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* 24/7 Cloud Market Sentry Card */}
+      <div className="v0-card p-5 rounded-2xl border-cyan-500/20 bg-gradient-to-r from-cyan-950/20 via-zinc-950 to-zinc-950 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <h2 className="text-sm font-bold font-mono text-white uppercase tracking-wider flex items-center gap-2">
+                <span>24/7 Cloud Market Sentry &amp; Auto-Alerts</span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono">Real-time Cloud</span>
+              </h2>
+            </div>
+            <p className="text-xs text-zinc-400 max-w-2xl leading-relaxed">
+              Bot kini berjalan otonom di cloud via GitHub Actions &amp; Vercel Serverless. Pemeriksaan stok dan harga G2G SLS dilakukan otomatis setiap 15 menit tanpa perlu membuka halaman web atau menghidupkan laptop.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleTriggerSentry}
+              disabled={triggeringSentry}
+              className="px-3.5 py-2 rounded-xl bg-cyan-600/80 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-cyan-600/20 disabled:opacity-50 cursor-pointer"
+            >
+              <Zap className={`w-3.5 h-3.5 ${triggeringSentry ? "animate-spin text-amber-300" : ""}`} />
+              <span>{triggeringSentry ? "Memeriksa SLS..." : "Trigger Audit &amp; Kirim Laporan ke HP"}</span>
+            </button>
+          </div>
+        </div>
+
+        {sentryResult && (
+          <div className="p-2.5 rounded-lg bg-zinc-900 border border-cyan-500/30 text-xs font-mono text-cyan-300">
+            {sentryResult}
+          </div>
+        )}
       </div>
 
       {/* Directory of Commands */}

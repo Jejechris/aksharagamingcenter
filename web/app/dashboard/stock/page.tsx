@@ -32,6 +32,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { VERIFIED_ENEBA_CATALOG, getEnebaSearchUrl } from "@/lib/eneba";
+import { getG2GSellerUrl } from "@/lib/g2g";
 import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
 
 interface Seller {
@@ -85,6 +86,16 @@ function extractOfferId(urlOrId?: string): string | null {
   if (/^G\d+[A-Z0-9]+$/i.test(trimmed)) return trimmed;
   const match = trimmed.match(/offer\/(G\d+[A-Z0-9]+)/i);
   return match ? match[1] : null;
+}
+
+function resolveDirectListingUrl(seller?: { profile_url?: string; offer_id?: string; seller_name?: string }, gameTitle?: string): string {
+  const raw = seller?.profile_url || seller?.offer_id || "";
+  const oid = extractOfferId(raw);
+  if (oid) return `https://www.g2g.com/offer/${oid}`;
+  if (seller?.profile_url && seller.profile_url.startsWith("http") && !seller.profile_url.includes("/search")) {
+    return seller.profile_url;
+  }
+  return getG2GSellerUrl(seller?.seller_name || "", gameTitle);
 }
 
 export default function StockSentryPage() {
@@ -1228,7 +1239,7 @@ export default function StockSentryPage() {
                         {/* Supplier Direct Link */}
                         <div className="flex items-center justify-between text-xs text-zinc-400 pt-1 flex-wrap gap-2">
                           <a
-                            href={game.selectedSeller.profile_url}
+                            href={resolveDirectListingUrl(game.selectedSeller, game.title)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 underline underline-offset-4"
@@ -1449,7 +1460,7 @@ export default function StockSentryPage() {
                                   </button>
 
                                   <a
-                                    href={standby.profile_url}
+                                    href={resolveDirectListingUrl(standby, game.title)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200"

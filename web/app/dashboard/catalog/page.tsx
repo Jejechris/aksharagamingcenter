@@ -68,14 +68,19 @@ export default function CatalogDashboardPage() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const getValidSellerUrl = (seller?: Seller, gameTitle?: string) => {
-    if (seller?.profile_url && !seller.profile_url.includes("search?q=") && !seller.profile_url.includes("/search")) {
-      return seller.profile_url;
+    const raw = seller?.profile_url || (seller as any)?.offer_id || "";
+    const offerMatch = raw.match(/offer\/(G\d+[A-Z0-9]+)/i) || raw.match(/^(G\d+[A-Z0-9]+)$/i);
+    if (offerMatch) {
+      return `https://www.g2g.com/offer/${offerMatch[1]}`;
     }
     if (seller?.profile_url?.includes("eneba.com")) {
       return seller.profile_url;
     }
     if (seller?.seller_name?.toLowerCase().includes("eneba") || seller?.tier_label?.includes("ENEBA")) {
       return getEnebaSearchUrl(gameTitle || "");
+    }
+    if (seller?.profile_url && seller.profile_url.startsWith("http") && !seller.profile_url.includes("/search")) {
+      return seller.profile_url;
     }
     return getG2GSellerUrl(seller?.seller_name || "", gameTitle);
   };

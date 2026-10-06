@@ -103,7 +103,7 @@ class TelegramCommander:
         self.is_running = False
         self.watcher_enabled = True
         self.last_stock_state: Dict[str, int] = {}
-        self.check_interval_seconds = 900  # 15 menit
+        self.check_interval_seconds = 120  # 2 menit (Real-time Sentry)
         self.sessions: Dict[str, Dict[str, Any]] = {}  # Wizard sesi interaktif per chat_id
 
     async def send_message(
@@ -1033,14 +1033,52 @@ class TelegramCommander:
     async def run_market_watcher(self) -> None:
         """Background loop yang memeriksa stok & harga secara berkala."""
         print(f"[Market Sentry] Watcher started. Checking every {self.check_interval_seconds}s...")
-        await asyncio.sleep(10)  # Tunggu 10s setelah bot start sebelum cek pertama
+        await asyncio.sleep(5)  # Tunggu 5s setelah bot start sebelum cek pertama
         
         while self.is_running:
             if self.watcher_enabled:
                 try:
-                    print("[Market Sentry] Running scheduled stock audit...")
+                    now_str = datetime.datetime.now().strftime('%H:%M:%S')
+                    print(f"[{now_str}] [Market Sentry] Running scheduled stock audit...")
                     audit_res = await audit_all_catalog_sellers()
-                    alerts = get_critical_stock_alerts(audit_res)
+                    
+                    alerts = []
+                    for r in audit_res:
+                        oid = r.get("offer_id", "")
+                        qty = r.get("available_qty", 0)
+                        health = r.get("health", "SAFE")
+                        last_qty = self.last_stock_state.get(oid)
+
+                        if health in ("CRITICAL", "WARNING"):
+                            if last_qty is None or last_qty != qty:
+                                self.last_stock_state[oid] = qty
+                                game = r.get("game_title", "Unknown")
+                                seller = r.get("seller_name") or r.get("recorded_seller_name", "Seller")
+                                url = f"https://www.g2g.com/offer/{oid}" if oid else "https://www.g2g.com"
+
+                                if health == "CRITICAL":
+                                    alerts.append(
+                                        f"🚨 *[ALERT STOK KRITIS / HABIS]*\n"
+                                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        f"🎮 *Game:* `{game}`\n"
+                                        f"👤 *Seller:* `{seller}` (`{oid}`)\n"
+                                        f"🔴 *Sisa Stok:* *0 UNIT (KOSONG)*\n"
+                                        f"🔗 *Cek Live Offer:* {url}\n"
+                                        f"⚠️ *TINDAKAN CEPAT:* Segera matikan etalase Shopee atau switch supplier di web!"
+                                    )
+                                elif health == "WARNING":
+                                    alerts.append(
+                                        f"🟡 *[ALERT STOK MENIPIS]*\n"
+                                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        f"🎮 *Game:* `{game}`\n"
+                                        f"👤 *Seller:* `{seller}` (`{oid}`)\n"
+                                        f"⚠️ *Sisa Stok:* *HANYA {qty} UNIT TERSISA!*\n"
+                                        f"🔗 *Cek Live Offer:* {url}\n"
+                                        f"💡 *Saran:* Pantau order Shopee atau siapkan supplier cadangan."
+                                    )
+                        else:
+                            self.last_stock_state[oid] = qty
+
                     if alerts and self.admin_chat_id:
                         for alert_msg in alerts:
                             await self.send_message(self.admin_chat_id, alert_msg)
@@ -1051,15 +1089,46 @@ class TelegramCommander:
             await asyncio.sleep(self.check_interval_seconds)
 
     async def start_polling(self) -> None:
-        """Memulai loop async long-polling Telegram bot."""
+        """Memulai loop async long-polling Telegram bot atau background sentry watcher."""
         if not self.token or "mock" in self.token:
             print("[Error] TELEGRAM_BOT_TOKEN belum disetel di .env!")
             return
 
         self.is_running = True
-        print(f"🚀 [Telegram Commander] Bot polling started! Admin Chat ID: {self.admin_chat_id}")
         
-        # Kirim notifikasi bot aktif ke admin
+        # Cek apakah ada webhook Vercel yang sedang aktif
+        webhook_active = False
+        webhook_url = ""
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                w_resp = await client.get(f"{self.api_url}/getWebhookInfo")
+                if w_resp.status_code == 200:
+                    webhook_url = w_resp.json().get("result", {}).get("url", "")
+                    if webhook_url:
+                        webhook_active = True
+        except Exception:
+            pass
+
+        if webhook_active:
+            print(f"⚡ [Market Sentry Daemon] Webhook Cloud Vercel terdeteksi aktif: {webhook_url}")
+            print(f"🛡️ Berjalan dalam MODE SENTRY WATCHER REAL-TIME (Audit stok G2G setiap {self.check_interval_seconds}s).")
+            print("💡 Webhook Vercel melayani command Telegram, daemon lokal bertugas memantau pergerakan pasar realtime tanpa konflik!")
+            
+            if self.admin_chat_id:
+                await self.send_message(
+                    self.admin_chat_id,
+                    "🛡️ *[MARKET SENTRY REALTIME DAEMON DIAKTIFKAN]*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• Status: 🟢 AKTIF & MEMANTAU\n"
+                    f"• Interval: Setiap {self.check_interval_seconds} detik\n"
+                    f"• Cloud Webhook: {webhook_url}\n"
+                    "Alert otomatis akan dikirim ke sini seketika stok supplier habis atau menipis!"
+                )
+            await self.run_market_watcher()
+            return
+
+        # Jika webhook tidak aktif, jalankan mode polling penuh
+        print(f"🚀 [Telegram Commander] Bot polling started! Admin Chat ID: {self.admin_chat_id}")
         if self.admin_chat_id:
             await self.send_message(
                 self.admin_chat_id,
@@ -1070,7 +1139,6 @@ class TelegramCommander:
                 reply_markup=self.get_main_menu_markup()
             )
 
-        # Jalankan background watcher task
         watcher_task = asyncio.create_task(self.run_market_watcher())
 
         offset = 0
@@ -1089,10 +1157,9 @@ class TelegramCommander:
                             offset = update_id + 1
                             asyncio.create_task(self.process_update(update))
                     elif resp.status_code == 409:
-                        print("[Telegram Warning] Conflict 409: Ada instance bot lain yang aktif. Menunggu 5s...")
-                        await asyncio.sleep(5)
+                        print("[Telegram Warning] Conflict 409: Webhook terdeteksi. Beralih ke Watcher mode...")
+                        break
                     else:
-                        print(f"[Telegram Polling Warning] HTTP {resp.status_code}: {resp.text}")
                         await asyncio.sleep(3)
                 except (httpx.ReadTimeout, httpx.ConnectTimeout):
                     continue
@@ -1100,7 +1167,8 @@ class TelegramCommander:
                     print(f"[Telegram Polling Error] {e}")
                     await asyncio.sleep(5)
 
-        watcher_task.cancel()
+        if not watcher_task.done():
+            await watcher_task
 
 
 if __name__ == "__main__":

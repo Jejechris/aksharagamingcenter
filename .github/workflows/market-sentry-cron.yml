@@ -1,0 +1,17 @@
+name: Akshara 24/7 Market Sentry Cloud Watcher
+
+on:
+  schedule:
+    # Trigger audit every 15 minutes, 24/7
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sentry-audit:
+    name: Audit Live Stock & Push Telegram Alerts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Market Sentry Cloud Endpoint
+        run: |
+          echo "Executing scheduled Market Sentry audit against Vercel..."
+          curl -s -S --max-time 30 "https://asksharagaming.vercel.app/api/cron/sentry" || echo "Sentry check completed."
