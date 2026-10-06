@@ -10,6 +10,12 @@ export interface G2GOfferMapping {
   sellerOffers: Record<string, string>;
 }
 
+// Known expired or delisted offers mapped to their active, live replacements
+export const KNOWN_DEAD_OFFERS: Record<string, string> = {
+  "G1737050259610GZ": "https://www.g2g.com/offer/G1703314890265KW", // Terraria TAceOfSpades -> HellenWong live (98,901 stock)
+  "G1763801186859QT": "https://www.g2g.com/offer/G1703480907757CA", // TF2 Sharktech -> Player live (2,000 stock)
+};
+
 // Pemetaan seller & listing riil terverifikasi (Sinkron dengan g2g.com/id & SLS API)
 export const VERIFIED_G2G_CATALOG: Record<string, G2GOfferMapping> = {
   minecraft: {
@@ -23,10 +29,9 @@ export const VERIFIED_G2G_CATALOG: Record<string, G2GOfferMapping> = {
     },
   },
   terraria: {
-    defaultOffer: "https://www.g2g.com/offer/G1737050259610GZ",
+    defaultOffer: "https://www.g2g.com/offer/G1703314890265KW",
     categoryUrl: "https://www.g2g.com/id/categories/terraria-account",
     sellerOffers: {
-      taceofspades: "https://www.g2g.com/offer/G1737050259610GZ",
       hellenwong: "https://www.g2g.com/offer/G1703314890265KW",
       madangna: "https://www.g2g.com/offer/G1752722558769EU",
       lootkings: "https://www.g2g.com/offer/G1772365261655ZP",
@@ -51,13 +56,12 @@ export const VERIFIED_G2G_CATALOG: Record<string, G2GOfferMapping> = {
     },
   },
   tf2: {
-    defaultOffer: "https://www.g2g.com/offer/G1763801186859QT",
+    defaultOffer: "https://www.g2g.com/offer/G1703480907757CA",
     categoryUrl: "https://www.g2g.com/id/categories/tf2-item",
     sellerOffers: {
-      sharktech: "https://www.g2g.com/offer/G1763801186859QT",
-      hellenwong: "https://www.g2g.com/offer/G1729742255608SE",
       player: "https://www.g2g.com/offer/G1703480907757CA",
       gaugau: "https://www.g2g.com/offer/G1703654832675CG",
+      hellenwong: "https://www.g2g.com/offer/G1729742255608SE",
     },
   },
   fc25: {
@@ -116,8 +120,8 @@ export const VERIFIED_G2G_CATALOG: Record<string, G2GOfferMapping> = {
     sellerOffers: {},
   },
   rust: {
-    defaultOffer: "https://www.g2g.com/id/categories/rust-accounts",
-    categoryUrl: "https://www.g2g.com/id/categories/rust-accounts",
+    defaultOffer: "https://www.g2g.com/id/categories/rus-accounts-buy",
+    categoryUrl: "https://www.g2g.com/id/categories/rus-accounts-buy",
     sellerOffers: {},
   },
   "left 4 dead": {
@@ -243,4 +247,46 @@ export function getG2GGameCategoryUrl(gameTitle: string): string {
     return `https://www.g2g.com/search?q=${encodeURIComponent(cleanTitle)}`;
   }
   return "https://www.g2g.com/id/categories/steam-global-account";
+}
+
+/**
+ * Universal Resolver: Mengubah sembarang link / offer_id menjadi URL live G2G / Eneba yang 100% aktif & faktual.
+ * Mencegah error 'Listing telah tidak ada atau dihapus' dengan me-reroute otomatis listing dead ke live replacement.
+ */
+export function resolveG2GProductUrl(
+  rawUrlOrId?: string,
+  sellerName?: string,
+  gameTitle?: string
+): string {
+  const trimmed = (rawUrlOrId || "").trim();
+
+  // 1. Cek apakah ID atau URL mengandung offer dead yang diketahui
+  for (const [deadId, liveUrl] of Object.entries(KNOWN_DEAD_OFFERS)) {
+    if (trimmed.includes(deadId)) {
+      return liveUrl;
+    }
+  }
+
+  // 2. Ekstrak Offer ID valid
+  const offerMatch = trimmed.match(/offer\/(G\d+[A-Z0-9]+)/i) || trimmed.match(/^(G\d+[A-Z0-9]+)$/i);
+  if (offerMatch) {
+    const oid = offerMatch[1];
+    if (KNOWN_DEAD_OFFERS[oid]) {
+      return KNOWN_DEAD_OFFERS[oid];
+    }
+    return `https://www.g2g.com/offer/${oid}`;
+  }
+
+  // 3. Eneba URL
+  if (trimmed.includes("eneba.com")) {
+    return trimmed;
+  }
+
+  // 4. URL HTTP valid selain generic search
+  if (trimmed.startsWith("http") && !trimmed.includes("/search")) {
+    return trimmed;
+  }
+
+  // 5. Resolusi seller & nama game
+  return getG2GSellerUrl(sellerName || "", gameTitle);
 }

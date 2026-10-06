@@ -32,7 +32,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { VERIFIED_ENEBA_CATALOG, getEnebaSearchUrl } from "@/lib/eneba";
-import { getG2GSellerUrl } from "@/lib/g2g";
+import { getG2GSellerUrl, resolveG2GProductUrl } from "@/lib/g2g";
 import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
 
 interface Seller {
@@ -89,13 +89,7 @@ function extractOfferId(urlOrId?: string): string | null {
 }
 
 function resolveDirectListingUrl(seller?: { profile_url?: string; offer_id?: string; seller_name?: string }, gameTitle?: string): string {
-  const raw = seller?.profile_url || seller?.offer_id || "";
-  const oid = extractOfferId(raw);
-  if (oid) return `https://www.g2g.com/offer/${oid}`;
-  if (seller?.profile_url && seller.profile_url.startsWith("http") && !seller.profile_url.includes("/search")) {
-    return seller.profile_url;
-  }
-  return getG2GSellerUrl(seller?.seller_name || "", gameTitle);
+  return resolveG2GProductUrl(seller?.profile_url || seller?.offer_id, seller?.seller_name, gameTitle);
 }
 
 export default function StockSentryPage() {
@@ -620,7 +614,7 @@ export default function StockSentryPage() {
         <div className="flex-1 flex items-center gap-2">
           <input
             type="text"
-            placeholder="Paste link listing G2G atau Eneba (contoh: https://www.g2g.com/.../offer/G1703129821471UK atau ID: G1737050259610GZ)..."
+            placeholder="Paste link listing G2G atau Eneba (contoh: https://www.g2g.com/.../offer/G1703129821471UK atau ID: G1703314890265KW)..."
             value={detectorUrl}
             onChange={(e) => setDetectorUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleDetectLink()}

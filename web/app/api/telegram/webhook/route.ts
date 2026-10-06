@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { VERIFIED_ENEBA_CATALOG } from "@/lib/eneba";
+import { resolveG2GProductUrl, KNOWN_DEAD_OFFERS, getG2GGameCategoryUrl } from "@/lib/g2g";
 import fs from "fs";
 import path from "path";
 
@@ -296,7 +297,7 @@ async function handleStockCommand(chatId: string | number) {
         `${healthEmoji} *${r.gameTitle}*\n`
         + `   • Seller: \`${r.seller_name}\` (${onlineBadge})\n`
         + `   • Stok Faktual: *${(r.available_qty || 0).toLocaleString("id-ID")} Unit* | Modal: *${priceStr}*\n`
-        + `   • 🔗 Link G2G: https://www.g2g.com/offer/${r.offerId}`
+        + `   • 🔗 Link G2G: ${resolveG2GProductUrl(r.offerId, r.seller_name, r.gameTitle)}`
       );
     }
 
@@ -454,8 +455,19 @@ async function handleG2GCommand(chatId: string | number, query: string) {
     return;
   }
 
-  await sendTelegramMessage(chatId, `🔍 _Memeriksa offer \`${offerId}\` ke server G2G SLS API..._`);
-  const res = await fetchG2GLiveOffer(offerId);
+  let targetOfferId = offerId;
+  let rerouteNotice = "";
+
+  if (KNOWN_DEAD_OFFERS[offerId]) {
+    const liveMatch = KNOWN_DEAD_OFFERS[offerId].match(/offer\/(G\d+[A-Z0-9]+)/i);
+    if (liveMatch) {
+      targetOfferId = liveMatch[1];
+      rerouteNotice = `⚠️ _Catatan: Offer \`${offerId}\` telah kedaluwarsa/delisted di G2G. Otomatis dialihkan ke listing seller aktif terverifikasi (\`${targetOfferId}\`)._\n\n`;
+    }
+  }
+
+  await sendTelegramMessage(chatId, `🔍 _Memeriksa offer \`${targetOfferId}\` ke server G2G SLS API..._`);
+  const res = await fetchG2GLiveOffer(targetOfferId);
 
   if (res.status !== "unknown" && !res.error) {
     const onlineStr = res.is_online ? "🟢 ONLINE" : "⚪ OFFLINE";
@@ -467,6 +479,7 @@ async function handleG2GCommand(chatId: string | number, query: string) {
     const msg =
       "🎮 *[HASIL INSPEKSI OFFER G2G SLS]*\n"
       + "━━━━━━━━━━━━━━━━━━━━━━\n"
+      + rerouteNotice
       + `📦 *Offer ID:* \`${res.offer_id}\`\n`
       + `👤 *Seller:* \`${res.seller_name}\` (${onlineStr})\n`
       + `⭐ *Rating:* ${(res.rating_pct || 0).toFixed(1)}%\n`
@@ -479,7 +492,12 @@ async function handleG2GCommand(chatId: string | number, query: string) {
 
     await sendTelegramMessage(chatId, msg);
   } else {
-    await sendTelegramMessage(chatId, `❌ Gagal memeriksa offer \`${offerId}\`.`);
+    await sendTelegramMessage(
+      chatId,
+      `❌ Offer \`${offerId}\` tidak ditemukan atau telah dihapus/sold-out oleh seller di G2G.\n\n`
+      + `💡 _Gunakan link kategori resmi untuk melihat semua seller dengan stok aktif:_\n`
+      + `https://www.g2g.com/id/categories/steam-global-account`
+    );
   }
 }
 

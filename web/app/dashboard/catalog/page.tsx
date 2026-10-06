@@ -10,7 +10,7 @@ import {
   Award, QrCode, Zap, Layers, BarChart3, CheckCircle2, Clock, Save,
   Pencil, FileText, Download, Upload, Database, ShoppingBag
 } from 'lucide-react';
-import { getG2GSellerUrl, getG2GGameCategoryUrl } from '@/lib/g2g';
+import { getG2GSellerUrl, getG2GGameCategoryUrl, resolveG2GProductUrl } from '@/lib/g2g';
 import { getEnebaSearchUrl } from '@/lib/eneba';
 import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
 
@@ -68,21 +68,11 @@ export default function CatalogDashboardPage() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const getValidSellerUrl = (seller?: Seller, gameTitle?: string) => {
-    const raw = seller?.profile_url || (seller as any)?.offer_id || "";
-    const offerMatch = raw.match(/offer\/(G\d+[A-Z0-9]+)/i) || raw.match(/^(G\d+[A-Z0-9]+)$/i);
-    if (offerMatch) {
-      return `https://www.g2g.com/offer/${offerMatch[1]}`;
-    }
-    if (seller?.profile_url?.includes("eneba.com")) {
-      return seller.profile_url;
-    }
-    if (seller?.seller_name?.toLowerCase().includes("eneba") || seller?.tier_label?.includes("ENEBA")) {
-      return getEnebaSearchUrl(gameTitle || "");
-    }
-    if (seller?.profile_url && seller.profile_url.startsWith("http") && !seller.profile_url.includes("/search")) {
-      return seller.profile_url;
-    }
-    return getG2GSellerUrl(seller?.seller_name || "", gameTitle);
+    return resolveG2GProductUrl(
+      seller?.profile_url || (seller as any)?.offer_id,
+      seller?.seller_name,
+      gameTitle
+    );
   };
 
   const [daemonInfo, setDaemonInfo] = useState<{
@@ -905,7 +895,7 @@ export default function CatalogDashboardPage() {
         <div className="flex-1 flex items-center gap-2">
           <input
             type="text"
-            placeholder="Paste link listing G2G atau Eneba (contoh: https://www.g2g.com/.../offer/G1703129821471UK atau ID: G1737050259610GZ)..."
+            placeholder="Paste link listing G2G atau Eneba (contoh: https://www.g2g.com/.../offer/G1703129821471UK atau ID: G1703314890265KW)..."
             value={detectorUrl}
             onChange={(e) => setDetectorUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleDetectLink()}
@@ -1294,7 +1284,7 @@ export default function CatalogDashboardPage() {
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              placeholder="https://www.g2g.com/.../offer/G1703129821471UK atau ID: G1737050259610GZ"
+                              placeholder="https://www.g2g.com/.../offer/G1703129821471UK atau ID: G1703314890265KW"
                               value={drawerListingUrl}
                               onChange={(e) => setDrawerListingUrl(e.target.value)}
                               onKeyDown={(e) => e.key === "Enter" && handleDetectInDrawer(game.title)}

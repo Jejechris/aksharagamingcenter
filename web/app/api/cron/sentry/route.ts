@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readAuthoritativeCatalog } from "@/lib/catalog";
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
+import { resolveG2GProductUrl, getG2GGameCategoryUrl } from "@/lib/g2g";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest) {
             gameTitle: item.gameTitle,
             sellerName: live.seller_name !== "Unknown" ? live.seller_name : item.sellerName,
             offerId: item.offerId,
-            productUrl: `https://www.g2g.com/offer/${item.offerId}`,
+            productUrl: resolveG2GProductUrl(item.offerId, live.seller_name !== "Unknown" ? live.seller_name : item.sellerName, item.gameTitle),
             availableQty: live.available_qty,
             isOnline: live.is_online,
             status: live.status,
@@ -114,6 +115,7 @@ export async function GET(req: NextRequest) {
     for (const item of criticalItems) {
       const priceIdr = Math.ceil((item.priceUsd * 16350) / 100) * 100;
       const priceStr = priceIdr > 0 ? `Rp ${priceIdr.toLocaleString("id-ID")}` : "-";
+      const categoryUrl = getG2GGameCategoryUrl(item.gameTitle);
       const alertMsg = (
         `🚨 *[ALERT STOK KRITIS / SOLD OUT]*\n`
         + `━━━━━━━━━━━━━━━━━━━━━━\n`
@@ -121,7 +123,8 @@ export async function GET(req: NextRequest) {
         + `👤 *Seller:* \`${item.sellerName}\` (${item.isOnline ? "🟢 Online" : "⚪ Offline"})\n`
         + `🔴 *Sisa Stok:* *0 UNIT (HABIS)*\n`
         + `💵 *Harga Modal:* ${priceStr}\n`
-        + `🔗 *Tautan Produk Asli:*\n${item.productUrl}\n\n`
+        + `🔗 *Tautan Listing:* ${item.productUrl}\n`
+        + `🌐 *Etalase Lengkap (Semua Seller):*\n${categoryUrl}\n\n`
         + `⚠️ *TINDAKAN CEPAT:* Segera matikan listing Shopee atau switch ke supplier cadangan di web dashboard!`
       );
       await sendTelegramAlert(alertMsg);
@@ -132,6 +135,7 @@ export async function GET(req: NextRequest) {
     for (const item of warningItems) {
       const priceIdr = Math.ceil((item.priceUsd * 16350) / 100) * 100;
       const priceStr = priceIdr > 0 ? `Rp ${priceIdr.toLocaleString("id-ID")}` : "-";
+      const categoryUrl = getG2GGameCategoryUrl(item.gameTitle);
       const alertMsg = (
         `🟡 *[ALERT STOK MENIPIS]*\n`
         + `━━━━━━━━━━━━━━━━━━━━━━\n`
@@ -139,7 +143,8 @@ export async function GET(req: NextRequest) {
         + `👤 *Seller:* \`${item.sellerName}\` (${item.isOnline ? "🟢 Online" : "⚪ Offline"})\n`
         + `⚠️ *Sisa Stok:* *HANYA ${item.availableQty} UNIT TERSISA!*\n`
         + `💵 *Harga Modal:* ${priceStr}\n`
-        + `🔗 *Tautan Produk Asli:*\n${item.productUrl}\n\n`
+        + `🔗 *Tautan Listing:* ${item.productUrl}\n`
+        + `🌐 *Etalase Lengkap (Semua Seller):*\n${categoryUrl}\n\n`
         + `💡 *Saran:* Pantau pesanan masuk atau persiapkan supplier alternatif di web dashboard.`
       );
       await sendTelegramAlert(alertMsg);

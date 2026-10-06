@@ -19,6 +19,35 @@ HEADERS = {
     "Origin": "https://www.g2g.com",
 }
 
+KNOWN_DEAD_OFFERS = {
+    "G1737050259610GZ": "https://www.g2g.com/offer/G1703314890265KW",
+    "G1763801186859QT": "https://www.g2g.com/offer/G1703480907757CA",
+}
+
+GAME_CATEGORIES = {
+    "minecraft": "https://www.g2g.com/id/categories/minecraft-account",
+    "terraria": "https://www.g2g.com/id/categories/terraria-account",
+    "wukong": "https://www.g2g.com/id/categories/black-myth-wukong-accounts",
+    "gta": "https://www.g2g.com/id/categories/steam-global-account",
+    "tf2": "https://www.g2g.com/id/categories/tf2-item",
+    "fc 25": "https://www.g2g.com/id/categories/fc-25-accounts",
+    "fc25": "https://www.g2g.com/id/categories/fc-25-accounts",
+    "zomboid": "https://www.g2g.com/id/categories/project-zomboid-accounts",
+    "stardew": "https://www.g2g.com/id/categories/stardew-valley-account",
+    "rust": "https://www.g2g.com/id/categories/rus-accounts-buy",
+}
+
+def resolve_g2g_product_url(oid: str, game_title: str = "") -> str:
+    if oid in KNOWN_DEAD_OFFERS:
+        return KNOWN_DEAD_OFFERS[oid]
+    if oid and oid.startswith("G"):
+        return f"https://www.g2g.com/offer/{oid}"
+    lower = game_title.lower()
+    for k, v in GAME_CATEGORIES.items():
+        if k in lower:
+            return v
+    return "https://www.g2g.com/id/categories/steam-global-account"
+
 
 def find_catalog_path() -> Optional[str]:
     """Mencari lokasi active_catalog.json di root atau web/data."""
@@ -168,11 +197,12 @@ def build_stock_summary_report(audit_results: List[Dict[str, Any]]) -> str:
         price_str = f"Rp {price_idr:,}" if price_idr > 0 else "-"
         oid = r.get("offer_id", "")
 
+        product_url = resolve_g2g_product_url(oid, game)
         lines.append(
             f"{emoji} *{game}*\n"
             f"   • Seller: `{seller}` ({online_badge})\n"
             f"   • Stok Faktual: *{qty:,} Unit* | Modal: *{price_str}*\n"
-            f"   • 🔗 URL Produk: https://www.g2g.com/offer/{oid}"
+            f"   • 🔗 URL Produk: {product_url}"
         )
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━")
@@ -190,7 +220,8 @@ def get_critical_stock_alerts(audit_results: List[Dict[str, Any]]) -> List[str]:
             game = r.get("game_title", "Unknown")
             seller = r.get("seller_name") or r.get("recorded_seller_name", "Seller")
             oid = r.get("offer_id", "")
-            url = f"https://www.g2g.com/offer/{oid}" if oid else "https://www.g2g.com"
+            url = resolve_g2g_product_url(oid, game)
+            category_url = resolve_g2g_product_url("", game)
             
             if health == "CRITICAL":
                 alerts.append(
@@ -199,7 +230,8 @@ def get_critical_stock_alerts(audit_results: List[Dict[str, Any]]) -> List[str]:
                     f"🎮 *Game:* `{game}`\n"
                     f"👤 *Seller:* `{seller}` (`{oid}`)\n"
                     f"🔴 *Sisa Stok:* *0 UNIT (KOSONG)*\n"
-                    f"🔗 *Cek Live Offer:* {url}\n"
+                    f"🔗 *Cek Listing:* {url}\n"
+                    f"🌐 *Etalase Alternatif:* {category_url}\n"
                     f"⚠️ *TINDAKAN DIPERLUKAN:* Segera non-aktifkan listing di Shopee atau beralih ke seller cadangan!"
                 )
             elif health == "WARNING":

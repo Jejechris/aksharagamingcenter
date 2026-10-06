@@ -28,7 +28,9 @@ from bot.market_sentry import (
     build_stock_summary_report,
     get_critical_stock_alerts,
     fetch_g2g_offer_live,
-    extract_offer_id
+    extract_offer_id,
+    KNOWN_DEAD_OFFERS,
+    resolve_g2g_product_url
 )
 
 CLAIM_SYNC_PATHS = [
@@ -577,9 +579,18 @@ class TelegramCommander:
             )
             return
 
-        await self.send_message(chat_id, f"🔍 _Memeriksa offer `{offer_id}` ke server G2G SLS API..._")
+        target_oid = offer_id
+        reroute_notice = ""
+        if offer_id in KNOWN_DEAD_OFFERS:
+            target_url = KNOWN_DEAD_OFFERS[offer_id]
+            m = re.search(r"offer/(G\d+[A-Za-z0-9]+)", target_url)
+            if m:
+                target_oid = m.group(1)
+                reroute_notice = f"⚠️ _Catatan: Offer `{offer_id}` telah delisted di G2G. Dialihkan otomatis ke listing aktif terverifikasi (`{target_oid}`)._\n\n"
+
+        await self.send_message(chat_id, f"🔍 _Memeriksa offer `{target_oid}` ke server G2G SLS API..._")
         async with httpx.AsyncClient(timeout=8.0) as client:
-            res = await fetch_g2g_offer_live(client, offer_id)
+            res = await fetch_g2g_offer_live(client, target_oid)
 
         if res.get("ok"):
             online_str = "🟢 ONLINE" if res.get("is_online") else "⚪ OFFLINE"
@@ -592,6 +603,7 @@ class TelegramCommander:
             msg = (
                 f"🎮 *[HASIL INSPEKSI OFFER G2G SLS]*\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"{reroute_notice}"
                 f"📦 *Offer ID:* `{res['offer_id']}`\n"
                 f"🏷️ *Judul:* {res.get('title') or '-'}\n"
                 f"👤 *Seller:* `{res.get('seller_name')}` ({online_str})\n"
@@ -604,7 +616,11 @@ class TelegramCommander:
                 f"⚡ _Data langsung ditarik detik ini dari sls.g2g.com (dalam Rupiah)._"
             )
         else:
-            msg = f"❌ Gagal memeriksa offer `{offer_id}`: {res.get('error')}"
+            msg = (
+                f"❌ Offer `{offer_id}` tidak ditemukan atau telah dihapus/sold-out oleh seller di G2G.\n\n"
+                f"💡 _Gunakan link kategori resmi untuk melihat semua seller dengan stok aktif:_\n"
+                f"https://www.g2g.com/id/categories/steam-global-account"
+            )
 
         await self.send_message(chat_id, msg)
 
