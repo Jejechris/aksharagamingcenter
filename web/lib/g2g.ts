@@ -12,66 +12,66 @@ export interface G2GOfferMapping {
 
 // Known expired or delisted offers mapped to their active, live replacements
 export const KNOWN_DEAD_OFFERS: Record<string, string> = {
-  "G1737050259610GZ": "https://www.g2g.com/offer/G1703314890265KW", // Terraria TAceOfSpades -> HellenWong live (98,901 stock)
-  "G1763801186859QT": "https://www.g2g.com/offer/G1703480907757CA", // TF2 Sharktech -> Player live (2,000 stock)
+  "G1737050259610GZ": "https://www.g2g.com/id/offer/G1703314890265KW", // Terraria TAceOfSpades -> HellenWong live (98,901 stock)
+  "G1763801186859QT": "https://www.g2g.com/id/offer/G1703480907757CA", // TF2 Sharktech -> Player live (2,000 stock)
 };
 
 // Pemetaan seller & listing riil terverifikasi (Sinkron dengan g2g.com/id & SLS API)
 export const VERIFIED_G2G_CATALOG: Record<string, G2GOfferMapping> = {
   minecraft: {
-    defaultOffer: "https://www.g2g.com/offer/G1703129821471UK",
+    defaultOffer: "https://www.g2g.com/id/offer/G1703129821471UK",
     categoryUrl: "https://www.g2g.com/id/categories/minecraft-account",
     sellerOffers: {
-      hellenwong: "https://www.g2g.com/offer/G1703129821471UK",
-      hellenwong_hypixel: "https://www.g2g.com/offer/G1703129540216LH",
-      hellenwong_tlauncher: "https://www.g2g.com/offer/G1750132707906OD",
-      lowest: "https://www.g2g.com/offer/G1703129821471UK",
+      hellenwong: "https://www.g2g.com/id/offer/G1703129821471UK",
+      hellenwong_hypixel: "https://www.g2g.com/id/offer/G1703129540216LH",
+      hellenwong_tlauncher: "https://www.g2g.com/id/offer/G1750132707906OD",
+      lowest: "https://www.g2g.com/id/offer/G1703129821471UK",
     },
   },
   terraria: {
-    defaultOffer: "https://www.g2g.com/offer/G1703314890265KW",
+    defaultOffer: "https://www.g2g.com/id/offer/G1703314890265KW",
     categoryUrl: "https://www.g2g.com/id/categories/terraria-account",
     sellerOffers: {
-      hellenwong: "https://www.g2g.com/offer/G1703314890265KW",
-      madangna: "https://www.g2g.com/offer/G1752722558769EU",
-      lootkings: "https://www.g2g.com/offer/G1772365261655ZP",
+      hellenwong: "https://www.g2g.com/id/offer/G1703314890265KW",
+      madangna: "https://www.g2g.com/id/offer/G1752722558769EU",
+      lootkings: "https://www.g2g.com/id/offer/G1772365261655ZP",
     },
   },
   wukong: {
-    defaultOffer: "https://www.g2g.com/offer/G1735807277413VH",
+    defaultOffer: "https://www.g2g.com/id/offer/G1735807277413VH",
     categoryUrl: "https://www.g2g.com/id/categories/black-myth-wukong-accounts",
     sellerOffers: {
-      financewz: "https://www.g2g.com/offer/G1735807277413VH",
-      hellenwong: "https://www.g2g.com/offer/G1717828080220IT",
-      hellenwong_savegame: "https://www.g2g.com/offer/G1724212419124LE",
+      financewz: "https://www.g2g.com/id/offer/G1735807277413VH",
+      hellenwong: "https://www.g2g.com/id/offer/G1717828080220IT",
+      hellenwong_savegame: "https://www.g2g.com/id/offer/G1724212419124LE",
     },
   },
   gta: {
-    defaultOffer: "https://www.g2g.com/offer/G1752687998537NX",
+    defaultOffer: "https://www.g2g.com/id/offer/G1752687998537NX",
     categoryUrl: "https://www.g2g.com/id/categories/steam-global-account",
     sellerOffers: {
-      madangna: "https://www.g2g.com/offer/G1752687998537NX",
-      hellenwong: "https://www.g2g.com/offer/G1724725195838IV",
-      madangna_fivem: "https://www.g2g.com/offer/G1703491270148EB",
+      madangna: "https://www.g2g.com/id/offer/G1752687998537NX",
+      hellenwong: "https://www.g2g.com/id/offer/G1724725195838IV",
+      madangna_fivem: "https://www.g2g.com/id/offer/G1703491270148EB",
     },
   },
   tf2: {
-    defaultOffer: "https://www.g2g.com/offer/G1703480907757CA",
+    defaultOffer: "https://www.g2g.com/id/offer/G1703480907757CA",
     categoryUrl: "https://www.g2g.com/id/categories/tf2-item",
     sellerOffers: {
-      player: "https://www.g2g.com/offer/G1703480907757CA",
-      gaugau: "https://www.g2g.com/offer/G1703654832675CG",
-      hellenwong: "https://www.g2g.com/offer/G1729742255608SE",
+      player: "https://www.g2g.com/id/offer/G1703480907757CA",
+      gaugau: "https://www.g2g.com/id/offer/G1703654832675CG",
+      hellenwong: "https://www.g2g.com/id/offer/G1729742255608SE",
     },
   },
   fc25: {
-    defaultOffer: "https://www.g2g.com/offer/G1740289240129LL",
+    defaultOffer: "https://www.g2g.com/id/offer/G1740289240129LL",
     categoryUrl: "https://www.g2g.com/id/categories/fc-25-accounts",
     sellerOffers: {
-      krovler: "https://www.g2g.com/offer/G1740289240129LL",
-      hellenwong: "https://www.g2g.com/offer/G1758334661567LY",
-      lootkings: "https://www.g2g.com/offer/G1722612671951NJ",
-      cnlteam: "https://www.g2g.com/offer/G1721240119427PV",
+      krovler: "https://www.g2g.com/id/offer/G1740289240129LL",
+      hellenwong: "https://www.g2g.com/id/offer/G1758334661567LY",
+      lootkings: "https://www.g2g.com/id/offer/G1722612671951NJ",
+      cnlteam: "https://www.g2g.com/id/offer/G1721240119427PV",
     },
   },
   zomboid: {
@@ -280,7 +280,11 @@ export function resolveG2GProductUrl(
     if (KNOWN_DEAD_OFFERS[oid]) {
       return KNOWN_DEAD_OFFERS[oid];
     }
-    return `https://www.g2g.com/offer/${oid}`;
+    const catUrl = getG2GGameCategoryUrl(gameTitle || "");
+    if (catUrl.includes("/categories/")) {
+      return `${catUrl}/offer/${oid}`;
+    }
+    return `https://www.g2g.com/id/offer/${oid}`;
   }
 
   // 3. Eneba URL or Eneba Seller

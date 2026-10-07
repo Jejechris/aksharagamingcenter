@@ -107,13 +107,13 @@ function findGameIndex(catalog: any[], game_id?: string, title?: string): number
   }
 
   // Terraria
-  if (combined.includes("terraria") || combined.includes("tr-") || combined.includes("tr_")) {
+  if (combined.includes("terraria") ) {
     const idx = catalog.findIndex((g) => g.id === "game-terraria-02" || g.title.toLowerCase().includes("terraria"));
     if (idx !== -1) return idx;
   }
 
   // Black Myth: Wukong
-  if (combined.includes("wukong") || combined.includes("wk-") || combined.includes("black myth")) {
+  if (combined.includes("wukong")  || combined.includes("black myth")) {
     const idx = catalog.findIndex((g) => g.id === "game-wukong-03" || g.title.toLowerCase().includes("wukong"));
     if (idx !== -1) return idx;
   }
@@ -130,7 +130,7 @@ function findGameIndex(catalog: any[], game_id?: string, title?: string): number
   }
 
   // Team Fortress 2 / TF2
-  if (combined.includes("tf2") || combined.includes("team fortress") || combined.includes("mann co") || combined.includes("tf-")) {
+  if (combined.includes("tf2") || combined.includes("team fortress") || combined.includes("mann co") ) {
     const idx = catalog.findIndex(
       (g) => g.id === "game-tf2-05" || g.title.toLowerCase().includes("mann co") || g.title.toLowerCase().includes("tf2")
     );
@@ -138,7 +138,7 @@ function findGameIndex(catalog: any[], game_id?: string, title?: string): number
   }
 
   // EA SPORTS FC 25
-  if (combined.includes("fc25") || combined.includes("fc 25") || combined.includes("ea sports fc") || combined.includes("fc-")) {
+  if (combined.includes("fc25") || combined.includes("fc 25") || combined.includes("ea sports fc") ) {
     const idx = catalog.findIndex(
       (g) => g.id === "game-fc25-06" || g.title.toLowerCase().includes("fc 25") || g.title.toLowerCase().includes("fc25")
     );
@@ -240,7 +240,7 @@ export async function POST(req: Request) {
         reviews_count: Number(new_seller.reviews_count || new_seller.reviews) || 1000,
         price_g2g_idr: Number(new_seller.price_g2g_idr || new_seller.price_idr) || 100000,
         delivery_speed: new_seller.delivery_speed || new_seller.delivery || "Instant Delivery",
-        stock: typeof new_seller.stock === 'number' ? new_seller.stock : (new_seller.stock !== undefined && !isNaN(Number(new_seller.stock)) ? Number(new_seller.stock) : 100),
+        stock: typeof new_seller.stock === 'number' ? new_seller.stock : (!isNaN(Number(new_seller.stock)) ? Number(new_seller.stock) : 100),
         risk_score: Number(new_seller.risk_score) || 0,
         is_recommended: Boolean(new_seller.is_recommended),
         profile_url: new_seller.profile_url || "https://www.g2g.com/id",
@@ -358,7 +358,7 @@ export async function POST(req: Request) {
               reviews_count: Number(incoming.reviews_count || incoming.reviews) || 1000,
               price_g2g_idr: Number(incoming.price_g2g_idr || incoming.price_idr) || 100000,
               delivery_speed: incoming.delivery_speed || incoming.delivery || "Instant Delivery",
-              stock: Number(incoming.stock) || 20,
+              stock: typeof incoming.stock === 'number' ? incoming.stock : (!isNaN(Number(incoming.stock)) ? Number(incoming.stock) : 20),
               risk_score: Number(incoming.risk_score) || 0,
               is_recommended: Boolean(incoming.is_recommended || incoming.is_selected),
               profile_url: incoming.profile_url || "https://www.g2g.com/id",
@@ -393,7 +393,7 @@ export async function POST(req: Request) {
           reviews_count: Number(s.reviews_count || s.reviews) || 10000,
           price_g2g_idr: Number(s.price_g2g_idr || s.price_idr) || 100000,
           delivery_speed: s.delivery_speed || s.delivery || "Instant Delivery",
-          stock: Number(s.stock) || 20,
+          stock: typeof s.stock === 'number' ? s.stock : (!isNaN(Number(s.stock)) ? Number(s.stock) : 20),
           risk_score: Number(s.risk_score) || 0,
           is_recommended: Boolean(s.is_recommended || s.is_selected),
           profile_url: s.profile_url || "https://www.g2g.com/id",
@@ -493,7 +493,7 @@ export async function PATCH(req: Request) {
         reviews_count: Number(new_seller.reviews_count || new_seller.reviews) || 1000,
         price_g2g_idr: Number(new_seller.price_g2g_idr || new_seller.price_idr) || 100000,
         delivery_speed: new_seller.delivery_speed || new_seller.delivery || "Instant Delivery",
-        stock: typeof new_seller.stock === 'number' ? new_seller.stock : (new_seller.stock !== undefined && !isNaN(Number(new_seller.stock)) ? Number(new_seller.stock) : 100),
+        stock: typeof new_seller.stock === 'number' ? new_seller.stock : (!isNaN(Number(new_seller.stock)) ? Number(new_seller.stock) : 100),
         risk_score: Number(new_seller.risk_score) || 0,
         is_recommended: Boolean(new_seller.is_recommended),
         profile_url: new_seller.profile_url || "https://www.g2g.com/id",
