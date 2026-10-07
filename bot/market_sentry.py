@@ -37,17 +37,29 @@ GAME_CATEGORIES = {
     "rust": "https://www.g2g.com/id/categories/rus-accounts-buy",
 }
 
-def resolve_g2g_product_url(oid: str, game_title: str = "") -> str:
+def resolve_g2g_product_url(oid: str, game_title: str = "", is_live: bool = True) -> str:
     import urllib.parse
-    if oid in KNOWN_DEAD_OFFERS:
-        return KNOWN_DEAD_OFFERS[oid]
-    if oid and oid.startswith("G"):
-        return f"https://www.g2g.com/offer/{oid}"
-
+    
     lower = game_title.lower() if game_title else ""
     if "eneba" in lower or (oid and "eneba" in oid.lower()):
         clean = game_title.replace(":", " ").replace("&", " ").replace("-", " ").strip()
         return f"https://www.eneba.com/store/all?text={urllib.parse.quote_plus(clean)}"
+
+    # Jika produk terdeteksi sudah tidak live/sold out, jangan berikan link offer (akan 404/dead page).
+    # Berikan link ke kategori agar user bisa langsung mencari seller lain.
+    if not is_live:
+        for k, v in GAME_CATEGORIES.items():
+            if k in lower:
+                return v
+        if game_title and len(game_title.strip()) > 1:
+            clean = game_title.replace(":", " ").replace("&", " ").replace("-", " ").strip()
+            return f"https://www.g2g.com/search?q={urllib.parse.quote_plus(clean)}"
+        return "https://www.g2g.com/id/categories/steam-global-account"
+
+    if oid in KNOWN_DEAD_OFFERS:
+        return KNOWN_DEAD_OFFERS[oid]
+    if oid and oid.startswith("G"):
+        return f"https://www.g2g.com/offer/{oid}"
 
     for k, v in GAME_CATEGORIES.items():
         if k in lower:
@@ -207,8 +219,9 @@ def build_stock_summary_report(audit_results: List[Dict[str, Any]]) -> str:
         price_idr = int(math.ceil(usd * 16350 / 100) * 100) if usd > 0 else 0
         price_str = f"Rp {price_idr:,}" if price_idr > 0 else "-"
         oid = r.get("offer_id", "")
+        is_live = health != "CRITICAL"
 
-        product_url = resolve_g2g_product_url(oid, game)
+        product_url = resolve_g2g_product_url(oid, game, is_live=is_live)
         lines.append(
             f"{emoji} *{game}*\n"
             f"   • Seller: `{seller}` ({online_badge})\n"
@@ -231,8 +244,8 @@ def get_critical_stock_alerts(audit_results: List[Dict[str, Any]]) -> List[str]:
             game = r.get("game_title", "Unknown")
             seller = r.get("seller_name") or r.get("recorded_seller_name", "Seller")
             oid = r.get("offer_id", "")
-            url = resolve_g2g_product_url(oid, game)
-            category_url = resolve_g2g_product_url("", game)
+            url = resolve_g2g_product_url(oid, game, is_live=(health != "CRITICAL"))
+            category_url = resolve_g2g_product_url("", game, is_live=False)
             
             if health == "CRITICAL":
                 alerts.append(
