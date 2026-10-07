@@ -425,6 +425,16 @@ export default function EnebaTerminalPage() {
             <Sparkles className="w-3.5 h-3.5" />
             <span>{aiScannerOpen ? "Tutup Scanner AI" : "Scan CDKey Baru"}</span>
           </button>
+          
+          <button
+            type="button"
+            onClick={handleDiscoverTrend}
+            disabled={isDiscoveringTrend || loading}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer select-none"
+          >
+            <Flame className={`w-3.5 h-3.5 ${isDiscoveringTrend ? "animate-pulse" : ""}`} />
+            <span>{isDiscoveringTrend ? "Mencari Trend..." : "Auto-Discover Trend"}</span>
+          </button>
         </div>
       </div>
 
