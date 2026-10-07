@@ -73,7 +73,7 @@ export function calculateItemMetrics(item: any): CatalogGame {
   const cogsNet = cogsG2g + qrisFee;
   const sellingPrice = item.selling_price_shopee_idr || 0;
   const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
-  const packaging = 2000;
+  const packaging = 0; // A6 Card removed per user request for digital conversion
   const totalCost = cogsNet + shopeeFee + packaging;
   const netProfit = sellingPrice - totalCost;
   const netMargin = sellingPrice > 0 ? (netProfit / sellingPrice) * 100 : 0;

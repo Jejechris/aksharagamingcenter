@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readAuthoritativeCatalog } from "@/lib/catalog";
+import { queryDb } from "@/lib/db";
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { resolveG2GProductUrl, getG2GGameCategoryUrl } from "@/lib/g2g";
 
@@ -31,6 +32,13 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const forceAlert = searchParams.get("force") === "true";
     const heartbeat = searchParams.get("heartbeat") === "true";
+
+    // PING SUPABASE TO KEEP IT AWAKE
+    try {
+      await queryDb("SELECT 1 AS ping");
+    } catch (err) {
+      console.warn("Supabase ping failed:", err);
+    }
 
     const catalog = await readAuthoritativeCatalog();
     if (!catalog || catalog.length === 0) {

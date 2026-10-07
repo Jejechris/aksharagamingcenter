@@ -32,6 +32,37 @@ export function middleware(request: NextRequest) {
   }
 
   // Domain utama (Command Deck Ops) berjalan seperti biasa
+  // Tambahkan perlindungan otentikasi (Basic Auth) untuk mengakses Command Center
+  const authHeader = request.headers.get("authorization");
+  
+  // Rute API webhook/cron tidak perlu auth agar sistem eksternal (Telegram/Github) tetap bisa akses
+  if (!pathname.startsWith("/api")) {
+    const ADMIN_USER = process.env.ADMIN_USER || "senna";
+    const ADMIN_PASS = process.env.ADMIN_PASS || "akshara123";
+
+    if (!authHeader) {
+      return new NextResponse("Unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Basic realm="Akshara Command Center", charset="UTF-8"',
+        },
+      });
+    }
+
+    const auth = Buffer.from(authHeader.split(" ")[1], "base64").toString().split(":");
+    const user = auth[0];
+    const pass = auth[1];
+
+    if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
+      return new NextResponse("Forbidden", {
+        status: 403,
+        headers: {
+          "WWW-Authenticate": 'Basic realm="Akshara Command Center", charset="UTF-8"',
+        },
+      });
+    }
+  }
+
   return NextResponse.next();
 }
 

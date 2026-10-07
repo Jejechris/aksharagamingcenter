@@ -15,14 +15,14 @@ interface DescriptionRequest {
 }
 
 function generateFallbackDescription(params: DescriptionRequest) {
-  const {
-    gameTitle = "Minecraft: Java & Bedrock Edition",
-    platform = "PC / Microsoft",
-    category = "Account (Full Access)",
-    price = 190900,
-    style = "ultimate",
-    includePhysicalCard = true,
-    includeUnboxingSop = true,
+    const {
+      gameTitle = "Minecraft: Java & Bedrock Edition",
+      platform = "PC / Microsoft",
+      category = "Account (Full Access)",
+      price = 190900,
+      style = "ultimate",
+      includePhysicalCard = false,
+      includeUnboxingSop = true,
     includeFaq = true,
     includeActivationSteps = true,
     customNotes = "",
@@ -219,7 +219,7 @@ export async function POST(req: Request) {
       category = "Account (Full Access)",
       price = 190900,
       style = "ultimate",
-      includePhysicalCard = true,
+      includePhysicalCard = false,
       includeUnboxingSop = true,
       includeFaq = true,
       includeActivationSteps = true,

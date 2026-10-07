@@ -4,7 +4,6 @@ const rawConnection = process.env.DATABASE_URL || process.env.POSTGRES_URL || ""
 
 export function isDbConfigured(): boolean {
   if (!rawConnection) return false;
-  if (rawConnection.includes("intwrunyezoikoanskdt")) return false; // obsolete dead placeholder
   return rawConnection.startsWith("postgres://") || rawConnection.startsWith("postgresql://");
 }
 
