@@ -68,7 +68,7 @@ export default function TheRiskOfficerPage() {
         const mergedData = await fetchSmartCatalog();
         if (mergedData && mergedData.length > 0) {
           setCatalogGames(mergedData);
-          const firstGame = json.data[0];
+          const firstGame = mergedData[0];
           const firstSeller = firstGame?.sellers?.[0];
           if (firstSeller) {
             const sName = firstSeller.seller_name || firstSeller.name;

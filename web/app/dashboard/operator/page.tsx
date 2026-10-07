@@ -114,8 +114,8 @@ export default function OperatorPage() {
       const mergedData = await fetchSmartCatalog();
         if (mergedData && mergedData.length > 0) {
           setCatalogGames(mergedData);
-        if (json.data.length > 0) {
-          setQuickGame(json.data[0].title);
+        if (mergedData.length > 0) {
+          setQuickGame(mergedData[0].title);
         }
       }
     } catch (e) {

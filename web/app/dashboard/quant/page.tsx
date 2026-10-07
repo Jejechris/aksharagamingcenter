@@ -190,8 +190,8 @@ export default function QuantPage() {
           setCatalogGames(mergedData);
 
         if (applyToUI) {
-          if (json.data.length > 0) {
-            const matched = json.data.find((g: any) => g.id === currentGameId) || json.data[0];
+          if (mergedData && mergedData.length > 0) {
+            const matched = mergedData.find((g: any) => g.id === currentGameId) || mergedData[0];
 
             if (matched) {
               setCurrentGameId(matched.id);
@@ -236,7 +236,7 @@ export default function QuantPage() {
             setCogsG2gIdr(100000);
           }
         }
-        return json.data;
+        return mergedData;
       }
     } catch (err) {
       console.error('Failed to load initial catalog:', err);

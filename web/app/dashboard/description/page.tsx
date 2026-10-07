@@ -87,7 +87,7 @@ function DescriptionMakerContent() {
 
           // If URL param provided, auto-select
           if (initialGameParam) {
-            const found = json.data.find((g: any) =>
+            const found = mergedData.find((g: any) =>
               g.title.toLowerCase().includes(initialGameParam.toLowerCase())
             );
             if (found) {
@@ -101,7 +101,7 @@ function DescriptionMakerContent() {
           }
 
           // Default to first game (Minecraft)
-          const first = json.data[0];
+          const first = mergedData[0];
           if (first) {
             setSelectedGameId(first.id);
             setGameTitle(first.title);
