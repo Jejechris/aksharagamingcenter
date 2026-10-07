@@ -88,8 +88,8 @@ function extractOfferId(urlOrId?: string): string | null {
   return match ? match[1] : null;
 }
 
-function resolveDirectListingUrl(seller?: { profile_url?: string; offer_id?: string; seller_name?: string }, gameTitle?: string): string {
-  return resolveG2GProductUrl(seller?.profile_url || seller?.offer_id, seller?.seller_name, gameTitle);
+function resolveDirectListingUrl(seller?: { profile_url?: string; offer_id?: string; seller_name?: string; stock?: number }, gameTitle?: string, isLive: boolean = true): string {
+  return resolveG2GProductUrl(seller?.profile_url || seller?.offer_id, seller?.seller_name, gameTitle, isLive);
 }
 
 export default function StockSentryPage() {
@@ -1157,7 +1157,7 @@ export default function StockSentryPage() {
                                 if (!oid) return null;
                                 return (
                                   <a
-                                    href={resolveG2GProductUrl(oid, game.selectedSeller.seller_name, game.title)}
+                                    href={resolveG2GProductUrl(oid, game.selectedSeller.seller_name, game.title, game.stockHealth !== "CRITICAL")}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-cyan-500/40 text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 group/link"
@@ -1410,7 +1410,7 @@ export default function StockSentryPage() {
                                         <>
                                           <span>•</span>
                                           <a
-                                            href={resolveG2GProductUrl(oid, standby.seller_name, game.title)}
+                                            href={resolveG2GProductUrl(oid, standby.seller_name, game.title, Number(standby.stock) > 0)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-cyan-400 hover:text-cyan-300 text-[10px] font-mono hover:underline flex items-center gap-0.5"

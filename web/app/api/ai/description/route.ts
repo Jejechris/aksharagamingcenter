@@ -62,12 +62,12 @@ function generateFallbackDescription(params: DescriptionRequest) {
   let content = "";
 
   if (style === "ultimate") {
-    content = `🎮 AKSHARA GAMING CENTER — OFFICIAL DIGITAL LICENSE
-⚡ PRODUK 100% ORIGINAL & LEGAL | PERMANENT OWNERSHIP
-🛡️ FULL ACCESS | BISA GANTI SEMUA DATA | GARANSI RESMI
+    content = `AKSHARA GAMING CENTER — OFFICIAL DIGITAL LICENSE
+PRODUK 100% ORIGINAL & LEGAL | PERMANENT OWNERSHIP
+FULL ACCESS | BISA GANTI SEMUA DATA | GARANSI RESMI
 
 ==================================================
-🌟 DETAIL PRODUK:
+DETAIL PRODUK:
 • Game: ${gameTitle}
 • Platform: ${platform}
 • Tipe Lisensi: ${category}
@@ -76,27 +76,27 @@ function generateFallbackDescription(params: DescriptionRequest) {
 • Bahasa: Multi-language (Termasuk English)
 ==================================================
 
-💎 KEUNGGULAN BELI DI AKSHARA GAMING:
-✅ FULL ACCESS 100%: Pembeli bebas ganti Email, Password, Nickname, & Pertanyaan Keamanan.
-✅ ONLINE MULTIPLAYER RESMI: Bebas main online di seluruh server resmi publik & private.
-✅ PERMANEN MILIK ANDA: Akun/Lisensi aktif selamanya, bukan sewa bulanan.
-✅ PENGIRIMAN KILAT: Detail akun/lisensi dikirimkan secara cepat & aman via chat setelah order.
-${includePhysicalCard ? "✅ BONUS KARTU GARANSI FISIK: Dilengkapi Kartu Garansi Resmi A6 (Art Carton 260gsm) berpita hologram & QR Code verifikasi serial terdaftar!\n" : ""}${customNotes ? `📌 CATATAN TAMBAHAN: ${customNotes}\n` : ""}
+KEUNGGULAN BELI DI AKSHARA GAMING:
+- FULL ACCESS 100%: Pembeli bebas ganti Email, Password, Nickname, & Pertanyaan Keamanan.
+- ONLINE MULTIPLAYER RESMI: Bebas main online di seluruh server resmi publik & private.
+- PERMANEN MILIK ANDA: Akun/Lisensi aktif selamanya, bukan sewa bulanan.
+- PENGIRIMAN KILAT: Detail akun/lisensi dikirimkan secara cepat & aman via chat setelah order.
+${includePhysicalCard ? "- BONUS KARTU GARANSI FISIK: Dilengkapi Kartu Garansi Resmi A6 (Art Carton 260gsm) berpita hologram & QR Code verifikasi serial terdaftar!\n" : ""}${customNotes ? `CATATAN TAMBAHAN: ${customNotes}\n` : ""}
 ==================================================
-${includeActivationSteps ? `🚀 3 LANGKAH MUDAH AKTIVASI:
+${includeActivationSteps ? `3 LANGKAH MUDAH AKTIVASI:
 1. Selesaikan pembayaran di Shopee dan cek chat Shopee Anda.
 2. Tim Akshara akan mengirimkan data lisensi beserta panduan setup instan.
 3. Login ke launcher resmi ${platform}, ubah data sesuai keinginan, dan game siap dimainkan!
 
 ==================================================
-` : ""}${includeUnboxingSop ? `⚠️ SYARAT & KETENTUAN KLAIM GARANSI (SOP ANTI-FRAUD):
+` : ""}${includeUnboxingSop ? `SYARAT & KETENTUAN KLAIM GARANSI (SOP ANTI-FRAUD):
 1. Wajib membuat VIDEO UNBOXING amplop kartu garansi fisik tanpa jeda (no-cut & unedited) dari awal paket masih tersegel rapi.
 2. Segera lakukan pengecekan dan pergantian data setelah detail diterima.
 3. Garansi tidak berlaku jika akun terindikasi menggunakan cheat/third-party mod ilegal/terkena ban aktivitas sendiri.
 4. Tim Support Akshara siap membantu 24/7 jika ada kendala login awal.
 
 ==================================================
-` : ""}${includeFaq ? `❓ PERTANYAAN UMUM (FAQ):
+` : ""}${includeFaq ? `PERTANYAAN UMUM (FAQ):
 Q: Apakah produk selalu ready stok?
 A: Selalu READY STOK kak! Sistem kami autonomous, silakan langsung di-checkout saja.
 
@@ -108,13 +108,13 @@ A: Ya kak, amplop resmi berisi Kartu Garansi Akshara A6 dikirim via kurir Shopee
 
 ==================================================
 ` : ""}Terima kasih telah mempercayakan kebutuhan gaming Anda di Akshara Gaming Center!
-Happy Gaming! 🎮🔥
+Happy Gaming!
 
 ${seoHashtags}`;
   } else if (style === "security") {
-    content = `🛡️ AKSHARA GAMING CENTER — KEAMANAN LISENSI TERJAMIN 100%
-🔒 ${cleanTitle} [${platform}]
-⭐ AKUN FULL ACCESS DENGAN PROTEKSI GARANSI RESMI
+    content = `AKSHARA GAMING CENTER — KEAMANAN LISENSI TERJAMIN 100%
+${cleanTitle} [${platform}]
+AKUN FULL ACCESS DENGAN PROTEKSI GARANSI RESMI
 
 ==================================================
 KEAMANAN & LEGALITAS PRODUK:
@@ -137,19 +137,19 @@ SOP KLAIM GARANSI:
 
 ${seoHashtags}`;
   } else if (style === "flash_sale") {
-    content = `🔥 PROMO SPESIAL HARI INI — DISKON SPESIAL AKSHARA GAMING!
-⚡ ${cleanTitle} — ${formattedPrice}
-🎁 DAPATKAN LISENSI RESMI + BONUS KARTU GARANSI FISIK A6!
+    content = `PROMO SPESIAL HARI INI — DISKON SPESIAL AKSHARA GAMING!
+${cleanTitle} — ${formattedPrice}
+DAPATKAN LISENSI RESMI + BONUS KARTU GARANSI FISIK A6!
 
 STOK TERBATAS! Harga promo bisa berubah sewaktu-waktu.
 Langsung checkout sekarang sebelum kehabisan slot promo!
 
 Kenapa harus beli di Akshara Gaming?
-✅ Harga termurah se-Shopee dengan jaminan original
-✅ Akun Full Access (Bisa ubah semua data)
-✅ Pengiriman instan tanpa nunggu lama
-✅ Garansi resmi toko terpercaya bintang 5
-${customNotes ? `✅ ${customNotes}\n` : ""}
+- Harga termurah se-Shopee dengan jaminan original
+- Akun Full Access (Bisa ubah semua data)
+- Pengiriman instan tanpa nunggu lama
+- Garansi resmi toko terpercaya bintang 5
+${customNotes ? `- ${customNotes}\n` : ""}
 Langkah Order:
 1. Klik Beli Sekarang & lakukan pembayaran.
 2. Cek chat Shopee untuk panduan instalasi.
@@ -230,7 +230,7 @@ export async function POST(req: Request) {
 Tugasmu adalah membuat deskripsi produk Shopee Indonesia yang SANGAT MENARIK, PROFESIONAL, PERSUASIF, BERSIH, RAMAH ALGORITMA SHOPEE, dan MEMILIKI KONVERSI PENJUALAN TINGGI, LENGKAP DENGAN REKOMENDASI COVER 1080x1080.
 
 Aturan Penting Format Shopee:
-1. Karakteristik pembeli Shopee Indonesia menyukai teks terstruktur rapi dengan pembatas garis (=== atau ---), bullet points yang jelas, dan emoji relevan (🎮, ⚡, 🛡️, ✅, 📦, ❓).
+1. Karakteristik pembeli Shopee Indonesia menyukai teks terstruktur rapi dengan pembatas garis (=== atau ---) dan bullet points yang jelas. JANGAN GUNAKAN EMOJI SAMA SEKALI karena bisa ditolak oleh sistem Shopee terbaru.
 2. Judul SEO harus di bawah 120 karakter, huruf kapital rapi, mengandung kata kunci utama (Nama Game, Platform, Original, Full Access, Garansi).
 3. Deskripsi harus memuat:
    - Header & Keunggulan Produk (100% Legal, Bukan Shared, Full Access bisa ganti email/pass, Region Global tanpa VPN).

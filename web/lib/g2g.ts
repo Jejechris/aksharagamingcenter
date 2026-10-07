@@ -256,7 +256,8 @@ export function getG2GGameCategoryUrl(gameTitle: string): string {
 export function resolveG2GProductUrl(
   rawUrlOrId?: string,
   sellerName?: string,
-  gameTitle?: string
+  gameTitle?: string,
+  isLive: boolean = true
 ): string {
   const trimmed = (rawUrlOrId || "").trim();
 
@@ -265,6 +266,11 @@ export function resolveG2GProductUrl(
     if (trimmed.includes(deadId)) {
       return liveUrl;
     }
+  }
+
+  // Jika produk terdeteksi sudah tidak live/sold out, berikan link ke kategori agar user bisa mencari seller lain.
+  if (!isLive) {
+    return getG2GGameCategoryUrl(gameTitle || "");
   }
 
   // 2. Ekstrak Offer ID valid
