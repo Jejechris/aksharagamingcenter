@@ -624,7 +624,7 @@ async function handleShopeeCommand(chatId: string | number, argsText: string) {
     + `Q: Apakah butuh VPN untuk login atau main?\n`
     + `A: Sama sekali TIDAK. 100% region Global dan aman koneksi internet Indonesia.\n\n`
     + `Q: Apakah dikirim paket fisik ke alamat rumah?\n`
-    + `A: Ya kak, garansi digital resmi berisi Kartu Garansi Akshara A6 dikirim via kurir Shopee agar order Anda resmi dan aman regulasi.\n\n`
+    + `A: Ya kak, garansi digital resmi berisi Garansi Akshara dikirim via kurir Shopee agar order Anda resmi dan aman regulasi.\n\n`
     + `Terima kasih telah berbelanja di Akshara Gaming Center!\n`
     + `Happy Gaming! 🎮🔥\n\n`
     + `#JualGameOriginal #AksharaGaming #GamePC #GaransiResmi #ShopeeGamingID`

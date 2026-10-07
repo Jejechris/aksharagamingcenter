@@ -807,7 +807,7 @@ function DescriptionMakerContent() {
                     onChange={(e) => setIncludePhysicalCard(e.target.checked)}
                     className="w-4 h-4 rounded bg-zinc-950 border-zinc-700 text-fuchsia-600 focus:ring-0"
                   />
-                  <span>📦 Sertakan Pengiriman Fisik garansi digital</span>
+                  <span>📦 Sertakan Garansi Digital</span>
                 </label>
 
                 <label className="flex items-center gap-2.5 cursor-pointer text-zinc-300 hover:text-white transition-colors">
@@ -1194,7 +1194,7 @@ function DescriptionMakerContent() {
               </div>
               <p className="text-[11px] leading-relaxed">
                 Shopee mewajibkan resi pengiriman fisik nyata untuk menghindari penalti non-shipment atau penutupan toko.
-                Dengan menyertakan <span className="text-zinc-200 font-semibold">Kartu Garansi Fisik Resmi A6</span> pada deskripsi dan pengiriman,
+                Dengan menyertakan <span className="text-zinc-200 font-semibold">Garansi Digital Resmi A6</span> pada deskripsi dan pengiriman,
                 toko Anda 100% compliant dengan kebijakan Shopee Indonesia dan terproteksi dari klaim buyer nakal!
               </p>
             </div>

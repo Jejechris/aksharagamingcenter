@@ -59,6 +59,6 @@ export async function GET(request: Request) {
   return NextResponse.json({
     status: "not_found",
     verified: false,
-    message: "Serial ID atau Nomor Pesanan tidak terdaftar di sistem Akshara Gaming Center. Pastikan Anda memasukkan kode yang tertera di Kartu Garansi Fisik."
+    message: "Serial ID atau Nomor Pesanan tidak terdaftar di sistem Akshara Gaming Center. Pastikan Anda memasukkan kode yang tertera di Garansi Digital."
   }, { status: 404 });
 }

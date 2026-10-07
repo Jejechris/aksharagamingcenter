@@ -317,9 +317,9 @@ export default function FormatterPage() {
               >
                 <div className="flex items-center gap-1.5">
                   <FileCheck2 className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="text-[11px] font-mono font-semibold">garansi digital A6</span>
+                  <span className="text-[11px] font-mono font-semibold">garansi digital</span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-600">📦 Paket Fisik / Resi</span>
+                <span className="text-[10px] font-mono text-slate-600">📦 pengiriman digital</span>
               </button>
             </div>
           </div>

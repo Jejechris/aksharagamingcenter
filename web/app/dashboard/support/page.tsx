@@ -139,7 +139,7 @@ export default function SupportPage() {
             The Support — Warranty Claims & SOP Triage
           </h1>
           <p className="text-[13px] text-slate-500 mt-2 max-w-2xl leading-relaxed">
-            Standar Operasional Prosedur (SOP) penanganan klaim garansi garansi digital A6, verifikasi screenshot kendala, dan triase otomatis anti-fraud.
+            Standar Operasional Prosedur (SOP) penanganan klaim garansi garansi digital, verifikasi screenshot kendala, dan triase otomatis anti-fraud.
           </p>
         </div>
 

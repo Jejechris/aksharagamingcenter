@@ -38,7 +38,7 @@ const SHOPEE_GAME_COMPETITORS: Record<string, {
     max_price: 320000,
     recommended_price: 245000,
     cogs_g2g: 186000,
-    tactical_tip: "Kompetitor bermain di rentang Rp 249.000 - Rp 279.000. Pasang Rp 245.000 ditambah sertifikat fisik garansi resmi anti-hackback agar pembeli memilih tokomu dibanding seller lain.",
+    tactical_tip: "Kompetitor bermain di rentang Rp 249.000 - Rp 279.000. Pasang Rp 245.000 ditambah sertifikat digital garansi resmi anti-hackback agar pembeli memilih tokomu dibanding seller lain.",
     competitors: [
       { shop_name: "MinecraftStore.ID", price_idr: 249000, sold_count: "3.4rb terjual", rating: 4.9, product_title: "Minecraft Java & Bedrock Edition PC Original Akun Full Access", delivery_type: "Instant Chat", badge: "🔥 Terlaris" },
       { shop_name: "DigitalWorldGamer", price_idr: 265000, sold_count: "1.2rb terjual", rating: 4.8, product_title: "Akun Minecraft Microsoft PC Original Bisa Ganti Password & Skin", delivery_type: "Instant Chat", badge: "⭐ Star Seller" },

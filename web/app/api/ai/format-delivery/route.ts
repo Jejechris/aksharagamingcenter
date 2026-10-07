@@ -90,7 +90,7 @@ function buildFallbackTemplate(
 • Garansi resmi toko otomatis aktif secara digital berdasarkan No. Pesanan ini. Simpan bukti chat ini sebagai tiket garansi resmi Kakak.`
     : `🛡️ PENGINGAT GARANSI RESMI:
 • garansi digital berisi Kartu Garansi Resmi A6 Akshara sedang kami kirimkan ke alamat Kakak via ekspedisi Shopee.
-• Simpan kartu garansi fisik tersebut ya Kak. Sesuai SOP, klaim garansi memerlukan screenshot kendala garansi digital tanpa jeda/cut.`;
+`;
 
   if (isKey) {
     if (isWhatsApp) {

@@ -159,7 +159,7 @@ PANDUAN SINGKAT SETUP:
 2. Masuk ke pengaturan akun dan ubah email serta password ke data pribadi Anda.
 3. Game langsung siap diunduh dan dimainkan.
 
-INFORMASI PENGIRIMAN FISIK:
+
 garansi digital resmi berisi garansi digital berpita hologram saat ini sedang diproses oleh ekspedisi pilihan Anda di Shopee.
 
 SOP KLAIM GARANSI:

@@ -110,7 +110,7 @@ export default function ClaimLandingPage() {
             <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-2.5">
               <Video className="w-4 h-4" />
             </div>
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">1. Rekam Unboxing</h3>
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">1. Bukti Kendala</h3>
             <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
               Wajib rekam video layar/layar HP tanpa jeda (no-cut) sebelum menekan tombol buka kredensial.
             </p>
