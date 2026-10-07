@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { fetchSmartCatalog } from "@/lib/catalogClient";
 import Link from 'next/link';
 import { 
   DollarSign, Sliders, Activity, ArrowLeft, ArrowRight, Target, 
@@ -184,10 +185,9 @@ export default function QuantPage() {
   // Fetch live catalog data — stable, called only on mount or explicit refresh
   const fetchCatalogData = useCallback(async (applyToUI = true): Promise<any[]> => {
     try {
-      const res = await fetch('/api/catalog');
-      const json = await res.json();
-      if (json.status === 'success' && Array.isArray(json.data)) {
-        setCatalogGames(json.data);
+      const mergedData = await fetchSmartCatalog();
+        if (mergedData && mergedData.length > 0) {
+          setCatalogGames(mergedData);
 
         if (applyToUI) {
           if (json.data.length > 0) {

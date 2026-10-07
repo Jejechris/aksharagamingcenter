@@ -1,4 +1,5 @@
 "use client";
+import { fetchSmartCatalog } from "@/lib/catalogClient";
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -151,11 +152,8 @@ export default function StockSentryPage() {
   const fetchCatalog = async () => {
     try {
       setRefreshing(true);
-      const res = await fetch("/api/catalog");
-      const json = await res.json();
-      if (json.status === "success" && Array.isArray(json.data)) {
-        setCatalog(json.data);
-      }
+      const mergedData = await fetchSmartCatalog();
+      setCatalog(mergedData);
     } catch (err) {
       console.error("Failed to load catalog:", err);
       showToast("Gagal memuat katalog stok.", "error");

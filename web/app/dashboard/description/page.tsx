@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { fetchSmartCatalog } from "@/lib/catalogClient";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -80,10 +81,9 @@ function DescriptionMakerContent() {
   useEffect(() => {
     async function fetchCatalog() {
       try {
-        const res = await fetch("/api/catalog");
-        const json = await res.json();
-        if (json.status === "success" && Array.isArray(json.data)) {
-          setCatalogGames(json.data);
+        const mergedData = await fetchSmartCatalog();
+        if (mergedData && mergedData.length > 0) {
+          setCatalogGames(mergedData);
 
           // If URL param provided, auto-select
           if (initialGameParam) {

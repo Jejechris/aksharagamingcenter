@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { fetchSmartCatalog } from "@/lib/catalogClient";
 import Link from "next/link";
 import { 
   ShieldAlert, 
@@ -64,10 +65,9 @@ export default function TheRiskOfficerPage() {
     setMounted(true);
     async function loadCatalog() {
       try {
-        const res = await fetch("/api/catalog");
-        const json = await res.json();
-        if (json.status === "success" && Array.isArray(json.data)) {
-          setCatalogGames(json.data);
+        const mergedData = await fetchSmartCatalog();
+        if (mergedData && mergedData.length > 0) {
+          setCatalogGames(mergedData);
           const firstGame = json.data[0];
           const firstSeller = firstGame?.sellers?.[0];
           if (firstSeller) {

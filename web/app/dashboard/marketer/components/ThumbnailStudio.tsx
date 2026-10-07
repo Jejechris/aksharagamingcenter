@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { fetchSmartCatalog } from "@/lib/catalogClient";
 import { 
   Sparkles, Download, RefreshCw, Eye, Check, Copy, 
   Layers, ShieldCheck, Tag, ShoppingBag, Monitor, 
@@ -227,10 +228,9 @@ export default function ThumbnailStudio() {
   useEffect(() => {
     async function loadCatalog() {
       try {
-        const res = await fetch("/api/catalog");
-        const json = await res.json();
-        if (json.status === "success" && Array.isArray(json.data)) {
-          setCatalogGames(json.data);
+        const mergedData = await fetchSmartCatalog();
+        if (mergedData && mergedData.length > 0) {
+          setCatalogGames(mergedData);
         }
       } catch (e) {
         console.error("Failed to load catalog into ThumbnailStudio:", e);

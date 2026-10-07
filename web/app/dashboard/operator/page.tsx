@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { fetchSmartCatalog } from "@/lib/catalogClient";
 import Link from "next/link";
 import { 
   ChevronRight, 
@@ -110,10 +111,9 @@ export default function OperatorPage() {
 
   const fetchCatalog = async () => {
     try {
-      const res = await fetch("/api/catalog");
-      const json = await res.json();
-      if (json.status === "success" && Array.isArray(json.data)) {
-        setCatalogGames(json.data);
+      const mergedData = await fetchSmartCatalog();
+        if (mergedData && mergedData.length > 0) {
+          setCatalogGames(mergedData);
         if (json.data.length > 0) {
           setQuickGame(json.data[0].title);
         }
