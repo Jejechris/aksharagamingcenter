@@ -58,6 +58,7 @@ export default function EnebaTerminalPage() {
   const [customTitle, setCustomTitle] = useState("");
   const [customPlatform, setCustomPlatform] = useState("Steam");
   const [isAiScanning, setIsAiScanning] = useState(false);
+  const [isDiscoveringTrend, setIsDiscoveringTrend] = useState(false);
 
   // Shopee Competitor Intelligence Modal
   const [competitorModalGame, setCompetitorModalGame] = useState<any | null>(null);
@@ -167,6 +168,30 @@ export default function EnebaTerminalPage() {
   };
 
   // AI Live Scan
+  
+  const handleDiscoverTrend = async () => {
+    setIsDiscoveringTrend(true);
+    try {
+      const res = await fetch("/api/research/eneba-crawler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "discover_trend" }),
+      });
+      const json = await res.json();
+      if (res.ok && json.status === "success" && json.data) {
+        setGames((prev) => [json.data, ...prev]);
+        setAiScannerOpen(true);
+        showToast(`🎯 Trend Ditemukan: ${json.data.title} (${json.data.arbitrage_verdict})!`);
+      } else {
+        showToast(json.message || "Gagal menemukan trend.", "error");
+      }
+    } catch (err) {
+      showToast("Kesalahan jaringan saat mencari trend.", "error");
+    } finally {
+      setIsDiscoveringTrend(false);
+    }
+  };
+
   const handleCustomAiScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customTitle.trim()) return;

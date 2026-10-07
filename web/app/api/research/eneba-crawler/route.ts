@@ -728,6 +728,71 @@ Format JSON only:
       }
     }
 
+    // ACTION: DISCOVER TRENDS
+    if (action === "discover_trend") {
+      const prompt = `Berperanlah sebagai Market Intelligence Analyst untuk game PC.
+Temukan 1 judul game yang SAAT INI sedang trending keras (viral di Steam, Twitch, TikTok, atau rilis baru yang hype) dan memiliki potensi margin tinggi jika dibeli CDKey-nya di marketplace global (Eneba) lalu dijual di Indonesia.
+Game harus yang nyata dan populer.
+Berikan estimasi harga modal kulakan Eneba (dalam IDR), harga jual rekomendasi di Shopee Indonesia, dan platform lisensi.
+Format JSON only:
+{
+  "title": "Nama Game (Contoh: Helldivers 2)",
+  "platform": "Steam",
+  "key_type": "Steam Key Global",
+  "price_eneba_idr": 250000,
+  "recommended_shopee_price_idr": 350000,
+  "steam_indo_price_idr": 450000,
+  "tactical_reason": "Alasan mengapa game ini sedang trending dan marginnya bagus."
+}`;
+
+      try {
+        const rawAi = await callGemini(prompt);
+        const cleaned = rawAi.replace(/```json/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+
+        const qris = Math.round(parsed.price_eneba_idr * 0.007);
+        const shopeeFee = Math.round(parsed.recommended_shopee_price_idr * 0.08) + 1000;
+        const profit = parsed.recommended_shopee_price_idr - parsed.price_eneba_idr - qris - shopeeFee - 2000;
+        const margin = parsed.recommended_shopee_price_idr > 0 ? (profit / parsed.recommended_shopee_price_idr) * 100 : 0;
+
+        const resultItem: EnebaScannedGame = {
+          id: `eneba-trend-${Date.now()}`,
+          title: parsed.title,
+          platform: parsed.platform || "Steam",
+          category: "Digital Key / CDKey",
+          source_marketplace: "ENEBA",
+          eneba_direct_url: getEnebaProductUrl(parsed.title),
+          seller_name: "Trend Discovered Reseller",
+          seller_rating_pct: 99.9,
+          seller_reviews_count: 55000,
+          supplier_tier: "ultra_safe",
+          key_type: parsed.key_type || "Steam Key Global",
+          price_eneba_idr: parsed.price_eneba_idr,
+          recommended_shopee_price_idr: parsed.recommended_shopee_price_idr,
+          steam_indo_price_idr: parsed.steam_indo_price_idr || 350000,
+          qris_fee_idr: qris,
+          shopee_fee_idr: shopeeFee,
+          operational_fee_idr: 2000,
+          net_profit_idr: profit,
+          net_margin_pct: Number(margin.toFixed(1)),
+          spread_pct: Number((((parsed.recommended_shopee_price_idr - parsed.price_eneba_idr) / parsed.price_eneba_idr) * 100).toFixed(1)),
+          demand_score: 98,
+          competition_level: "Kompetitif",
+          arbitrage_verdict: margin >= 30 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
+          crawl_timestamp: "Live Trend Discovery",
+          tactical_reason: parsed.tactical_reason || "Trend tinggi di market, margin menjanjikan.",
+          instant_redeem_guide: "Sesuai Platform > Redeem Code"
+        };
+
+        return NextResponse.json({ status: "success", data: resultItem });
+      } catch (err: any) {
+        return NextResponse.json({
+          status: "error",
+          message: "Gagal menemukan trend saat ini. Coba lagi.",
+        }, { status: 500 });
+      }
+    }
+
     return NextResponse.json({ status: "error", message: "Action tidak dikenal." }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ status: "error", message: err.message }, { status: 500 });

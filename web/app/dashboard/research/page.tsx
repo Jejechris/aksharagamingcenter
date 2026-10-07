@@ -75,6 +75,7 @@ export default function ResearchCenterPage() {
   const [manualQuery, setManualQuery] = useState("");
   const [manualPlatform, setManualPlatform] = useState("Steam");
   const [isManualScanning, setIsManualScanning] = useState(false);
+  const [isDiscoveringTrend, setIsDiscoveringTrend] = useState(false);
 
   // Shopee Competitor Modal
   const [competitorModalGame, setCompetitorModalGame] = useState<G2GScannedGame | null>(null);
