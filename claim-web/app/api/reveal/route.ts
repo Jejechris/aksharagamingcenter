@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getKV, setKV } from "@/lib/db";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI";
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "7025906160";
@@ -57,15 +58,24 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const localPath = path.join(process.cwd(), "data", "claimed_credentials.json");
-    const parentPath = path.resolve(process.cwd(), "..", "web", "data", "claimed_credentials.json");
-    const targetFile = fs.existsSync(localPath) ? localPath : parentPath;
+    // 1. Fetch from KV first
+    let claims: any[] = [];
+    const dbData = await getKV("claimed_credentials");
+    
+    if (dbData && Array.isArray(dbData)) {
+      claims = dbData;
+    } else {
+      // Fallback to local files if KV empty/failing
+      const localPath = path.join(process.cwd(), "data", "claimed_credentials.json");
+      const parentPath = path.resolve(process.cwd(), "..", "web", "data", "claimed_credentials.json");
+      const targetFile = fs.existsSync(localPath) ? localPath : parentPath;
 
-    if (!fs.existsSync(targetFile)) {
-      return NextResponse.json({ status: "error", message: "Database klaim tidak ditemukan." }, { status: 500 });
+      if (!fs.existsSync(targetFile)) {
+        return NextResponse.json({ status: "error", message: "Database klaim tidak ditemukan." }, { status: 500 });
+      }
+      claims = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
     }
 
-    const claims = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
     const claimIndex = claims.findIndex((c: any) => c.claim_code.toUpperCase() === code);
 
     if (claimIndex === -1) {
@@ -111,7 +121,12 @@ export async function POST(req: NextRequest) {
 
     claims[claimIndex] = claim;
 
-    // Simpan ke file lokal & file parent web
+    // Simpan ke KV Database (Persistent Cloud Storage)
+    await setKV("claimed_credentials", claims);
+
+    // Tetap simpan ke file lokal & file parent web sebagai backup
+    const localPath = path.join(process.cwd(), "data", "claimed_credentials.json");
+    const parentPath = path.resolve(process.cwd(), "..", "web", "data", "claimed_credentials.json");
     const writeTargets = [localPath, parentPath];
     for (const tPath of writeTargets) {
       try {

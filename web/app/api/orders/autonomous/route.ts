@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { getDbOrders, saveDbOrder, deleteDbOrder, getDbVault, saveDbVaultItem } from "@/lib/db";
+import { getDbOrders, saveDbOrder, deleteDbOrder, getDbVault, saveDbVaultItem, getKV, setKV } from "@/lib/db";
 
 const DATA_FILE = path.resolve(process.cwd(), "data", "autonomous_orders.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "autonomous_orders.json");
@@ -87,6 +87,7 @@ function saveOrders(orders: any[]) {
   } catch (e) {
     // best-effort
   }
+  setKV("autonomous_orders", orders).catch(() => {});
 }
 
 function generateAutonomousMessages(params: {
@@ -178,11 +179,17 @@ export async function GET() {
   try {
     const dbOrders = await getDbOrders();
     let orders: any[];
-    if (dbOrders !== null) {
+    if (dbOrders !== null && dbOrders.length > 0) {
       orders = dbOrders;
       inMemoryOrdersCache = dbOrders;
     } else {
-      orders = getOrders();
+      const kvOrders = await getKV("autonomous_orders");
+      if (kvOrders && Array.isArray(kvOrders) && kvOrders.length > 0) {
+        orders = kvOrders;
+        inMemoryOrdersCache = kvOrders;
+      } else {
+        orders = getOrders();
+      }
     }
     const totalOrders = orders.length;
     const dispatchedWA = orders.filter((o: any) => o.dispatched_channels?.includes("WhatsApp")).length;

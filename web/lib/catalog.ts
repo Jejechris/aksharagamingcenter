@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { getDbCatalog, saveDbGame, deleteDbGame, isDbConfigured } from "@/lib/db";
+import { getDbCatalog, saveDbGame, deleteDbGame, isDbConfigured, getKV, setKV } from "@/lib/db";
 import { resolveG2GProductUrl } from "@/lib/g2g";
 import { getEnebaProductUrl, getEnebaSearchUrl } from "@/lib/eneba";
 
@@ -130,11 +130,19 @@ export async function readAuthoritativeCatalog(): Promise<any[]> {
   // If DB is configured, try reading DB first
   if (isDbConfigured()) {
     try {
+      // 1. Try relational table first
       const dbData = await getDbCatalog();
       if (dbData && dbData.length > 0) {
         inMemoryCatalogCache = dbData;
         lastCacheTimestamp = Date.now();
         return dbData;
+      }
+      // 2. Try KV table if relational is empty
+      const kvData = await getKV("active_catalog");
+      if (kvData && Array.isArray(kvData) && kvData.length > 0) {
+        inMemoryCatalogCache = kvData;
+        lastCacheTimestamp = Date.now();
+        return kvData;
       }
     } catch (err) {}
   }
@@ -193,6 +201,7 @@ export function writeAuthoritativeCatalog(catalogList: any[]): void {
   // Fire-and-forget async DB sync if configured
   if (isDbConfigured()) {
     Promise.all(catalogList.map((g) => saveDbGame(g))).catch(() => {});
+    setKV("active_catalog", catalogList).catch(() => {});
   }
 }
 

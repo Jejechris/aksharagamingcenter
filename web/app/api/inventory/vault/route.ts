@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { getDbVault, saveDbVaultItem, deleteDbVaultItem } from "@/lib/db";
+import { getDbVault, saveDbVaultItem, deleteDbVaultItem, getKV, setKV } from "@/lib/db";
 
 const DATA_FILE = path.resolve(process.cwd(), "data", "inventory_vault.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "inventory_vault.json");
@@ -102,6 +102,7 @@ function saveVault(items: VaultItem[]) {
   } catch (e) {
     // best-effort
   }
+  setKV("inventory_vault", items).catch(() => {});
 }
 
 export async function GET(req: Request) {
@@ -112,11 +113,18 @@ export async function GET(req: Request) {
 
     const dbVault = await getDbVault();
     let allItems: VaultItem[];
-    if (dbVault !== null) {
+    if (dbVault !== null && dbVault.length > 0) {
       allItems = dbVault;
       inMemoryVaultCache = dbVault;
     } else {
-      allItems = getVault();
+      // 2. Try KV table if relational is empty/unconfigured
+      const kvVault = await getKV("inventory_vault");
+      if (kvVault && Array.isArray(kvVault) && kvVault.length > 0) {
+        allItems = kvVault;
+        inMemoryVaultCache = kvVault;
+      } else {
+        allItems = getVault();
+      }
     }
     let filtered = allItems;
 

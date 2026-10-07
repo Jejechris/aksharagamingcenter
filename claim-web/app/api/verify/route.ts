@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getKV } from "@/lib/db";
 
-function getClaimsData(): any[] {
+async function getClaimsData(): Promise<any[]> {
+  const dbData = await getKV("claimed_credentials");
+  if (dbData && Array.isArray(dbData)) {
+    return dbData;
+  }
+
   // Cek lokal data atau fallback ke shared data
   const candidates = [
     path.join(process.cwd(), "data", "claimed_credentials.json"),
@@ -28,7 +34,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "error", message: "Kode klaim wajib diisi." }, { status: 400 });
     }
 
-    const claims = getClaimsData();
+    const claims = await getClaimsData();
     const claim = claims.find((c: any) => c.claim_code.toUpperCase() === code);
 
     if (!claim) {
