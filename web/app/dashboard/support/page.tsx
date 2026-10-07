@@ -36,23 +36,23 @@ interface SopCase {
 const sopCases: SopCase[] = [
   {
     id: 1,
-    title: "Case 1: Komplain Tanpa Video Unboxing",
+    title: "Case 1: Komplain Tanpa screenshot kendala",
     category: "No Evidence",
     verdict: "REJECTED",
     buyerSays: '"Akun tidak bisa login kak, tolong ganti akun baru."',
-    aiReasoning: "Tidak ada bukti rekaman video unboxing no-cut sejak amplop fisik Shopee dibuka.",
+    aiReasoning: "Tidak ada bukti rekaman screenshot kendala sejak garansi digital Shopee dibuka.",
     actionTaken: "Kirim edukasi SOP via chat Shopee, menolak klaim secara sopan sampai ada video yang sah.",
-    responseTemplate: "Mohon maaf kak, sesuai dengan deskripsi produk dan catatan garansi toko kami, klaim garansi memerlukan video unboxing no-cut (tanpa jeda/potongan) sejak amplop dibuka hingga pengetesan akun. Tanpa bukti video tersebut, mohon maaf klaim belum dapat kami proses ya kak."
+    responseTemplate: "Mohon maaf kak, sesuai dengan deskripsi produk dan catatan garansi toko kami, klaim garansi memerlukan screenshot kendala (tanpa jeda/potongan) sejak garansi digital dibuka hingga pengetesan akun. Tanpa bukti video tersebut, mohon maaf klaim belum dapat kami proses ya kak."
   },
   {
     id: 2,
-    title: "Case 2: Video Unboxing No-Cut Valid",
+    title: "Case 2: screenshot kendala Valid",
     category: "Valid Proof",
     verdict: "APPROVED",
-    buyerSays: '"Email login bermasalah kak, ini video unboxing lengkap tanpa jeda saya."',
-    aiReasoning: "Video no-cut valid dari awal pembukaan amplop hingga layar login, masalah akun terkonfirmasi.",
+    buyerSays: '"Email login bermasalah kak, ini screenshot kendala lengkap tanpa jeda saya."',
+    aiReasoning: "Video no-cut valid dari awal pembukaan garansi digital hingga layar login, masalah akun terkonfirmasi.",
     actionTaken: "Akun pengganti disiapkan otomatis dari inventori G2G dan diserahterimakan via Shopee Chat.",
-    responseTemplate: "Terima kasih banyak atas video unboxing lengkapnya kak. Kendala telah berhasil kami verifikasi. Kami sedang menyiapkan akun pengganti baru untuk kakak, mohon ditunggu sebentar ya kak."
+    responseTemplate: "Terima kasih banyak atas screenshot kendala lengkapnya kak. Kendala telah berhasil kami verifikasi. Kami sedang menyiapkan akun pengganti baru untuk kakak, mohon ditunggu sebentar ya kak."
   },
   {
     id: 3,
@@ -62,7 +62,7 @@ const sopCases: SopCase[] = [
     buyerSays: '"Ini videonya kak tapi ada bagian yang diskip sebentar."',
     aiReasoning: "Terdapat indikasi jeda rekaman / manipulasi video yang melanggar SOP anti-fraud.",
     actionTaken: "Menolak klaim dan meminta video asli yang utuh tanpa pemotongan apapun.",
-    responseTemplate: "Halo kak, setelah kami periksa, terdapat jeda/potongan pada rekaman video yang dikirim. Syarat garansi Akshara Gaming Center adalah video unboxing no-cut utuh dari awal buka paket sampai login. Silakan kirimkan file video mentah tanpa potongan agar bisa kami proses ya kak."
+    responseTemplate: "Halo kak, setelah kami periksa, terdapat jeda/potongan pada rekaman video yang dikirim. Syarat garansi Akshara Gaming Center adalah screenshot kendala utuh dari awal buka paket sampai login. Silakan kirimkan file video mentah tanpa potongan agar bisa kami proses ya kak."
   }
 ];
 
@@ -139,7 +139,7 @@ export default function SupportPage() {
             The Support — Warranty Claims & SOP Triage
           </h1>
           <p className="text-[13px] text-slate-500 mt-2 max-w-2xl leading-relaxed">
-            Standar Operasional Prosedur (SOP) penanganan klaim garansi kartu fisik A6, verifikasi video unboxing no-cut, dan triase otomatis anti-fraud.
+            Standar Operasional Prosedur (SOP) penanganan klaim garansi garansi digital A6, verifikasi screenshot kendala, dan triase otomatis anti-fraud.
           </p>
         </div>
 
@@ -220,7 +220,7 @@ export default function SupportPage() {
                 </span>
               </div>
               <p className="text-[12px] text-slate-500 mt-0.5">
-                Evaluasi otomatis keluhan pembeli berdasarkan bukti video unboxing no-cut dan siapkan draft balasan Shopee Chat.
+                Evaluasi otomatis keluhan pembeli berdasarkan bukti screenshot kendala dan siapkan draft balasan Shopee Chat.
               </p>
             </div>
           </div>
@@ -258,8 +258,8 @@ export default function SupportPage() {
                 className="w-4 h-4 rounded border-zinc-700 text-sky-500 focus:ring-0 focus:ring-offset-0 bg-zinc-900"
               />
               <div>
-                <span className="text-xs font-medium text-slate-200 block">Ada Video Unboxing No-Cut</span>
-                <span className="text-[10px] font-mono text-slate-500">Video tanpa jeda sejak amplop fisik dibuka</span>
+                <span className="text-xs font-medium text-slate-200 block">Ada screenshot kendala</span>
+                <span className="text-[10px] font-mono text-slate-500">Video tanpa jeda sejak garansi digital dibuka</span>
               </div>
             </label>
 
@@ -482,7 +482,7 @@ export default function SupportPage() {
           {[
             {
               title: "1. Tolak — Tanpa Video",
-              text: "Mohon maaf kak, sesuai SOP garansi kami wajib menyertakan video unboxing no-cut dari amplop dibuka sampai tes akun ya kak.",
+              text: "Mohon maaf kak, sesuai SOP garansi kami wajib menyertakan screenshot kendala dari garansi digital dibuka sampai tes akun ya kak.",
               border: "border-rose-500/20",
               tag: "REJECT"
             },

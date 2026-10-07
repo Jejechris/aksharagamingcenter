@@ -58,7 +58,7 @@ export default function ClaimDetailRevealerPage() {
   // Handler Buka Kredensial
   const handleReveal = async () => {
     if (!acknowledged) {
-      alert("Wajib mencentang persetujuan SOP perekaman video unboxing sebelum membuka kredensial.");
+      alert("Wajib mencentang persetujuan SOP perekaman screenshot kendala sebelum membuka kredensial.");
       return;
     }
 
@@ -205,7 +205,7 @@ export default function ClaimDetailRevealerPage() {
               )}
             </p>
             <div className="text-[11px] font-mono text-amber-400/80 pt-1 border-t border-amber-500/20">
-              ⚖️ Sesuai SOP Shopee &amp; Toko Akshara, komplain "tidak bisa login / akun invalid" setelah waktu pembukaan ini <strong>TIDAK DAPAT DITERIMA</strong> tanpa rekaman video unboxing tanpa jeda dari sebelum link dibuka.
+              ⚖️ Sesuai SOP Shopee &amp; Toko Akshara, komplain "tidak bisa login / akun invalid" setelah waktu pembukaan ini <strong>TIDAK DAPAT DITERIMA</strong> tanpa rekaman screenshot kendala tanpa jeda dari sebelum link dibuka.
             </div>
           </div>
         )}
@@ -283,10 +283,10 @@ export default function ClaimDetailRevealerPage() {
                   Saat Anda menekan tombol di bawah, <strong>waktu pembukaan detik ini, IP Address, dan perangkat Anda akan dicatat permanen</strong> sebagai bukti transaksi resmi ke server Shopee.
                 </li>
                 <li>
-                  <strong>Wajib merekam video unboxing tanpa jeda / no-cut</strong> dari sebelum menekan tombol buka sampai berhasil login ke dalam game.
+                  <strong>Wajib merekam screenshot kendala tanpa jeda / no-cut</strong> dari sebelum menekan tombol buka sampai berhasil login ke dalam game.
                 </li>
                 <li>
-                  Segala bentuk klaim <em>"akun tidak bisa login"</em> atau <em>"key sudah terpakai"</em> setelah kredensial dibuka tidak akan diterima tanpa rekaman video unboxing no-cut dari detik awal.
+                  Segala bentuk klaim <em>"akun tidak bisa login"</em> atau <em>"key sudah terpakai"</em> setelah kredensial dibuka tidak akan diterima tanpa rekaman screenshot kendala dari detik awal.
                 </li>
               </ul>
             </div>

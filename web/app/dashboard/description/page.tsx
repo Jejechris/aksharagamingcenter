@@ -44,8 +44,8 @@ function DescriptionMakerContent() {
   const [coverTheme, setCoverTheme] = useState<"violet" | "emerald" | "amber" | "cyan">("violet");
 
   // Options toggles
-  const [includePhysicalCard, setIncludePhysicalCard] = useState(true);
-  const [includeUnboxingSop, setIncludeUnboxingSop] = useState(true);
+  const [includePhysicalCard, setIncludePhysicalCard] = useState(false);
+  const [includeUnboxingSop, setIncludeUnboxingSop] = useState(false);
   const [includeFaq, setIncludeFaq] = useState(true);
   const [includeActivationSteps, setIncludeActivationSteps] = useState(true);
   const [customNotes, setCustomNotes] = useState("");
@@ -322,7 +322,7 @@ function DescriptionMakerContent() {
     const badges = [
       { icon: "🛡️", label: "100% ORIGINAL & LEGAL", sub: "Bukan Akun Shared / Bajakan" },
       { icon: "🔒", label: "FULL ACCESS EMAIL SENDIRI", sub: "Bebas Ganti Password & 2FA" },
-      { icon: "⭐", label: "GARANSI RESMI 30 HARI", sub: "Dilindungi SOP Video Unboxing" },
+      { icon: "⭐", label: "GARANSI RESMI 30 HARI", sub: "Digital Full Access" },
       { icon: "⚡", label: "PENGIRIMAN CEPAT KILAT", sub: "Proses Otomatis Tanpa Tunggu" },
     ];
 
@@ -372,7 +372,7 @@ function DescriptionMakerContent() {
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 22px 'Segoe UI', Arial, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("📦 DILENGKAPI KARTU GARANSI FISIK A6 RESMI DENGAN SERIAL QR CODE", width / 2, 882);
+    
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
     ctx.font = "16px 'Segoe UI', Arial, sans-serif";
@@ -807,7 +807,7 @@ function DescriptionMakerContent() {
                     onChange={(e) => setIncludePhysicalCard(e.target.checked)}
                     className="w-4 h-4 rounded bg-zinc-950 border-zinc-700 text-fuchsia-600 focus:ring-0"
                   />
-                  <span>📦 Sertakan Pengiriman Fisik Kartu Garansi A6</span>
+                  <span>📦 Sertakan Pengiriman Fisik garansi digital</span>
                 </label>
 
                 <label className="flex items-center gap-2.5 cursor-pointer text-zinc-300 hover:text-white transition-colors">
@@ -817,7 +817,7 @@ function DescriptionMakerContent() {
                     onChange={(e) => setIncludeUnboxingSop(e.target.checked)}
                     className="w-4 h-4 rounded bg-zinc-950 border-zinc-700 text-fuchsia-600 focus:ring-0"
                   />
-                  <span>⚠️ Sertakan SOP Video Unboxing (Anti-Fraud)</span>
+                  <span>⚠️ Sertakan SOP screenshot kendala (Anti-Fraud)</span>
                 </label>
 
                 <label className="flex items-center gap-2.5 cursor-pointer text-zinc-300 hover:text-white transition-colors">
@@ -1134,7 +1134,7 @@ function DescriptionMakerContent() {
                       </span>
                       {includePhysicalCard && (
                         <span className="px-2 py-0.5 rounded bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 font-medium">
-                          📦 Kartu Garansi A6
+                          📦 garansi digital
                         </span>
                       )}
                     </div>

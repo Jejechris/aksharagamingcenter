@@ -428,7 +428,7 @@ async function handleQuantCommand(chatId: string | number, argsText: string) {
     + "📉 *POTONGAN & BIAYA TETAP:*\n"
     + `• Shopee Admin (8%): -Rp ${shopeeAdminFee.toLocaleString("id-ID")}\n`
     + `• Shopee Service Fee: -Rp ${shopeeServiceFee.toLocaleString("id-ID")}\n`
-    + `• Amplop & Kartu A6: -Rp ${packagingCost.toLocaleString("id-ID")}\n\n`
+    + ``
     + "📊 *HASIL AKHIR:*\n"
     + `• *PROFIT BERSIH:* *Rp ${Math.round(netProfit).toLocaleString("id-ID")}*\n`
     + `• *Margin Bersih:* *${netMargin.toFixed(1)}%* (${healthEmoji})\n`
@@ -474,7 +474,7 @@ async function handleFormatCommand(chatId: string | number, argsText: string) {
     + "• Klik 'Pesanan Diterima' di Shopee dan berikan ulasan bintang 5 untuk mengaktifkan garansi toko.\n\n"
     + "3️⃣ *KLAIM GARANSI DIGITAL:*\n"
     + `• *Serial Garansi Anda:* \`${warrantyCode}\`\n`
-    + "• Simpan kartu fisik A6 resmi yang dikirimkan ke alamat Anda.\n\n"
+    + ""
     + "━━━━━━━━━━━━━━━━━━━━━━\n"
     + "✨ *Selamat Bermain & Happy Gaming!* 🚀";
 
@@ -556,9 +556,9 @@ async function handleShopeeCommand(chatId: string | number, argsText: string) {
   const priceStr = parts[1] || "Rp 199.000";
   const cleanName = gameTitle.toUpperCase();
 
-  let seoTitle = `${cleanName} [PC / DIGITAL] ORIGINAL FULL ACCESS GARANSI RESMI + KARTU A6`;
+  let seoTitle = `${cleanName} [PC / DIGITAL] ORIGINAL FULL ACCESS GARANSI RESMI`;
   if (seoTitle.length > 120) {
-    seoTitle = `${cleanName} ORIGINAL FULL ACCESS GARANSI RESMI + KARTU A6`;
+    seoTitle = `${cleanName} ORIGINAL FULL ACCESS GARANSI RESMI`;
   }
   if (seoTitle.length > 120) {
     seoTitle = seoTitle.substring(0, 117) + "...";
@@ -605,7 +605,7 @@ async function handleShopeeCommand(chatId: string | number, argsText: string) {
     + `✅ ONLINE MULTIPLAYER RESMI: Bebas main online di semua server resmi.\n`
     + `✅ PERMANEN MILIK ANDA: Akun/Lisensi aktif selamanya, bukan sewa.\n`
     + `✅ PENGIRIMAN KILAT: Detail dikirimkan via chat segera setelah order.\n`
-    + `✅ BONUS KARTU GARANSI FISIK: Dilengkapi Kartu Garansi Resmi A6 (Art Carton 260gsm) berpita hologram & QR Code!\n\n`
+    + ``
     + `==================================================\n`
     + `🚀 3 LANGKAH MUDAH AKTIVASI:\n`
     + `1. Selesaikan pembayaran di Shopee dan cek chat Shopee Anda.\n`
@@ -613,7 +613,7 @@ async function handleShopeeCommand(chatId: string | number, argsText: string) {
     + `3. Login ke launcher resmi, ubah data sesuai keinginan, dan game siap dimainkan!\n\n`
     + `==================================================\n`
     + `⚠️ SYARAT & KETENTUAN KLAIM GARANSI (SOP ANTI-FRAUD):\n`
-    + `1. Wajib membuat VIDEO UNBOXING amplop kartu garansi fisik tanpa jeda (no-cut) dari awal paket masih tersegel rapi.\n`
+    + ``
     + `2. Segera lakukan pengecekan dan pergantian data setelah detail diterima.\n`
     + `3. Garansi tidak berlaku jika akun terindikasi menggunakan cheat/mod ilegal.\n`
     + `4. Tim Support Akshara siap membantu 24/7 jika ada kendala login awal.\n\n`
@@ -624,7 +624,7 @@ async function handleShopeeCommand(chatId: string | number, argsText: string) {
     + `Q: Apakah butuh VPN untuk login atau main?\n`
     + `A: Sama sekali TIDAK. 100% region Global dan aman koneksi internet Indonesia.\n\n`
     + `Q: Apakah dikirim paket fisik ke alamat rumah?\n`
-    + `A: Ya kak, amplop resmi berisi Kartu Garansi Akshara A6 dikirim via kurir Shopee agar order Anda resmi dan aman regulasi.\n\n`
+    + `A: Ya kak, garansi digital resmi berisi Kartu Garansi Akshara A6 dikirim via kurir Shopee agar order Anda resmi dan aman regulasi.\n\n`
     + `Terima kasih telah berbelanja di Akshara Gaming Center!\n`
     + `Happy Gaming! 🎮🔥\n\n`
     + `#JualGameOriginal #AksharaGaming #GamePC #GaransiResmi #ShopeeGamingID`
@@ -910,7 +910,7 @@ async function finalizeClaim(
     + `🔑 KODE KLAIM: ${claimCode}\n`
     + `🔒 PASSCODE PIN RAHASIA: ${passcode}\n`
     + `🔗 LINK BUKA KREDENSIAL: ${claimUrl}\n\n`
-    + `⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan rekaman video unboxing tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${warrantyDays} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n`
+    + `⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan rekaman screenshot kendala tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${warrantyDays} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n`
     + `━━━━━━━━━━━━━━━━━━━━━━\n`
     + `Terima kasih dan selamat bermain! 🚀`;
 

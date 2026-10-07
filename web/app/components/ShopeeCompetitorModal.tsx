@@ -410,7 +410,7 @@ export default function ShopeeCompetitorModal({
                     <span className="text-zinc-200 font-bold">{formatRp(data.economics.qris_fee_idr)}</span>
                   </div>
                   <div>
-                    <span className="block text-slate-500 text-[10px]">Biaya Amplop/Pack:</span>
+                    <span className="block text-slate-500 text-[10px]">Biaya garansi digital/Pack:</span>
                     <span className="text-zinc-200 font-bold">Rp 2.000</span>
                   </div>
                 </div>

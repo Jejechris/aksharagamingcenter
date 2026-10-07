@@ -125,11 +125,11 @@ Halo *${buyer_name}*! Terima kasih banyak sudah order di Akshara Gaming Center. 
 2. Login menggunakan data akun yang tertera di atas.
 3. Segera ubah email pemulihan & password ke milik pribadi Anda agar 100% aman permanen!
 
-📦 *Pemberitahuan Amplop Fisik:*
-Amplop resmi bersegel berisi *Kartu Garansi Fisik A6 (Art Carton 260gsm)* berpita hologram sedang dalam proses pengiriman via kurir pilihan Anda.
+📦 *Pemberitahuan garansi digital:*
+garansi digital resmi bersegel berisi *garansi digital (Art Carton 260gsm)* berpita hologram sedang dalam proses pengiriman via kurir pilihan Anda.
 
 ⚠️ *SOP Garansi Toko:*
-Mohon rekam video unboxing amplop fisik tanpa jeda (no-cut & unedited) saat paket tiba untuk keperluan validasi klaim jika ada kendala.
+Mohon rekam screenshot kendala garansi digital tanpa jeda (no-cut & unedited) saat paket tiba untuk keperluan validasi klaim jika ada kendala.
 
 Ada kendala login? Silakan balas chat ini, Customer Care Akshara siap mendampingi 24/7.
 Selamat bermain! 🔥🎮`;
@@ -160,17 +160,17 @@ PANDUAN SINGKAT SETUP:
 3. Game langsung siap diunduh dan dimainkan.
 
 INFORMASI PENGIRIMAN FISIK:
-Amplop resmi berisi Kartu Garansi Fisik A6 berpita hologram saat ini sedang diproses oleh ekspedisi pilihan Anda di Shopee.
+garansi digital resmi berisi garansi digital berpita hologram saat ini sedang diproses oleh ekspedisi pilihan Anda di Shopee.
 
 SOP KLAIM GARANSI:
-Untuk kenyamanan bersama, harap merekam video unboxing amplop fisik tanpa terputus (no-cut) saat paket tiba.
+Untuk kenyamanan bersama, harap merekam screenshot kendala garansi digital tanpa terputus (no-cut) saat paket tiba.
 
 Jika membutuhkan bantuan teknis, silakan balas email ini atau hubungi WhatsApp Customer Care Akshara Gaming.
 
 Salam hangat,
 Akshara Gaming Center Official`;
 
-  const shopee_chat = `Halo ${buyer_name}! Pesanan ${game_title} (${order_id}) sudah selesai diproses otomatis ya kak! 🎮✨\n\nEmail/User: ${username}\nPassword: ${password}\nKode Garansi: ${serial_warranty}\n\nSilakan langsung login di launcher resmi ${platform} dan ubah datanya ya kak. Amplop fisik kartu garansi A6 juga segera meluncur ke alamat kakak via kurir Shopee. Terima kasih banyak kak! 🔥`;
+  const shopee_chat = `Halo ${buyer_name}! Pesanan ${game_title} (${order_id}) sudah selesai diproses otomatis ya kak! 🎮✨\n\nEmail/User: ${username}\nPassword: ${password}\nKode Garansi: ${serial_warranty}\n\nSilakan langsung login di launcher resmi ${platform} dan ubah datanya ya kak. Kredensial pesanan akan dikirimkan secara langsung via chat. Terima kasih banyak kak! 🔥`;
 
   return { whatsapp, gmail_subject, gmail_body, shopee_chat };
 }

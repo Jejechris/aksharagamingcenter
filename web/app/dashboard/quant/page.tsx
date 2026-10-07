@@ -59,7 +59,7 @@ export default function QuantPage() {
   const [qrisFeePct, setQrisFeePct] = useState(0.7); // Direct QRIS 0.7%
   const [shopeeAdminPct, setShopeeAdminPct] = useState(8.0);
   const [shopeeFixedFee, setShopeeFixedFee] = useState(1000);
-  const [packaging, setPackaging] = useState(2000); // Amplop + sertifikat garansi
+  const [packaging, setPackaging] = useState(2000); // garansi digital + sertifikat garansi
   
   // Multi-seller options for current product
   const [sellers, setSellers] = useState<SellerOption[]>([

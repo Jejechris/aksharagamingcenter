@@ -295,7 +295,7 @@ export default function CommandLandingPage() {
               num: "04",
               title: "Sertifikat & Garansi",
               sub: "Serial Checker & SOP No-Cut",
-              desc: "Portal verifikasi keabsahan kartu garansi fisik A6 dan pengecekan serial number pesanan.",
+              desc: "Portal verifikasi keabsahan garansi digital dan pengecekan serial number pesanan.",
               icon: <Shield className="w-5 h-5" />,
               href: null,
               iconCls: "bg-sky-500/10 border-sky-500/20 text-sky-400",
@@ -377,7 +377,7 @@ export default function CommandLandingPage() {
               Cek Keabsahan Garansi & Sertifikat
             </h3>
             <p className="text-sm text-zinc-500 max-w-sm mx-auto">
-              Validasi Serial ID unik dari kartu fisik amplop Shopee Anda secara online.
+              Validasi Serial ID unik dari garansi digital garansi digital Shopee Anda secara online.
             </p>
           </div>
 

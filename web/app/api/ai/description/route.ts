@@ -38,7 +38,7 @@ function generateFallbackDescription(params: DescriptionRequest) {
   // Optimized Shopee SEO Title (Max 120 chars)
   let seoTitle = `${cleanTitle} [${platform.toUpperCase()}] ORIGINAL FULL ACCESS GARANSI RESMI`;
   if (includePhysicalCard && seoTitle.length < 100) {
-    seoTitle += " + KARTU FISIK A6";
+    seoTitle += " + garansi digital A6";
   }
   if (seoTitle.length > 120) {
     seoTitle = seoTitle.substring(0, 117) + "...";
@@ -90,7 +90,7 @@ ${includeActivationSteps ? `3 LANGKAH MUDAH AKTIVASI:
 
 ==================================================
 ` : ""}${includeUnboxingSop ? `SYARAT & KETENTUAN KLAIM GARANSI (SOP ANTI-FRAUD):
-1. Wajib membuat VIDEO UNBOXING amplop kartu garansi fisik tanpa jeda (no-cut & unedited) dari awal paket masih tersegel rapi.
+1. Wajib membuat screenshot kendala garansi digital kartu garansi fisik tanpa jeda (no-cut & unedited) dari awal paket masih tersegel rapi.
 2. Segera lakukan pengecekan dan pergantian data setelah detail diterima.
 3. Garansi tidak berlaku jika akun terindikasi menggunakan cheat/third-party mod ilegal/terkena ban aktivitas sendiri.
 4. Tim Support Akshara siap membantu 24/7 jika ada kendala login awal.
@@ -104,7 +104,7 @@ Q: Apakah butuh VPN untuk login atau main?
 A: Sama sekali TIDAK. 100% region Global dan aman koneksi internet Indonesia (Indihome, Biznet, Telkomsel, dll).
 
 Q: Apakah dikirim paket fisik ke alamat rumah?
-A: Ya kak, amplop resmi berisi Kartu Garansi Akshara A6 dikirim via kurir Shopee agar order Anda resmi, terdaftar, dan aman regulasi.
+A: Ya kak, garansi digital resmi berisi Kartu Garansi Akshara A6 dikirim via kurir Shopee agar order Anda resmi, terdaftar, dan aman regulasi.
 
 ==================================================
 ` : ""}Terima kasih telah mempercayakan kebutuhan gaming Anda di Akshara Gaming Center!
@@ -127,11 +127,11 @@ KEAMANAN & LEGALITAS PRODUK:
 📦 KELENGKAPAN PESANAN:
 1. Akun / Lisensi ${gameTitle} Original.
 2. Panduan Keamanan Akun & Tips Mengamankan Akun dari Hackback.
-${includePhysicalCard ? "3. Surat Lisensi & Kartu Garansi Fisik A6 resmi ber-QR Serial ID.\n" : ""}4. Layanan Purna Jual CS 24 Jam.
+${includePhysicalCard ? "3. Surat Lisensi & garansi digital resmi ber-QR Serial ID.\n" : ""}4. Layanan Purna Jual CS 24 Jam.
 
 ==================================================
 SOP KLAIM GARANSI:
-• Wajib video unboxing paket amplop fisik tanpa jeda (no cut).
+• Wajib screenshot kendala paket garansi digital tanpa jeda (no cut).
 • Penggantian akun baru diberikan jika data awal tidak valid saat pertama diterima.
 • Akshara menerapkan Zero-Tolerance untuk seller scam & buyer fraud.
 
@@ -139,7 +139,7 @@ ${seoHashtags}`;
   } else if (style === "flash_sale") {
     content = `PROMO SPESIAL HARI INI — DISKON SPESIAL AKSHARA GAMING!
 ${cleanTitle} — ${formattedPrice}
-DAPATKAN LISENSI RESMI + BONUS KARTU GARANSI FISIK A6!
+DAPATKAN LISENSI RESMI + BONUS garansi digital!
 
 STOK TERBATAS! Harga promo bisa berubah sewaktu-waktu.
 Langsung checkout sekarang sebelum kehabisan slot promo!
@@ -170,7 +170,7 @@ Fitur Utama:
 - Original legal developer license
 - Akses penuh ganti email & password
 - Support online multiplayer resmi
-${includePhysicalCard ? "- Termasuk pengiriman sertifikat fisik kartu garansi A6 resmi\n" : ""}${includeUnboxingSop ? "- SOP Garansi: Wajib sertakan video unboxing amplop fisik tanpa jeda (no cut)\n" : ""}
+${includePhysicalCard ? "- Termasuk pengiriman sertifikat fisik garansi digital resmi\n" : ""}${includeUnboxingSop ? "- SOP Garansi: Wajib sertakan screenshot kendala garansi digital tanpa jeda (no cut)\n" : ""}
 Catatan: Silakan tanyakan CS jika membutuhkan bantuan panduan instalasi.
 
 ${seoHashtags}`;
@@ -186,8 +186,8 @@ ${seoHashtags}`;
       `Lisensi: ${category}`,
       "100% Original & Legal",
       "Full Access (Bisa Ganti Email & Password)",
-      "Garansi Resmi & Video Unboxing SOP",
-      includePhysicalCard ? "Termasuk Kartu Garansi Fisik A6" : "Pengiriman Cepat"
+      "Garansi Resmi & screenshot kendala SOP",
+      includePhysicalCard ? "Termasuk garansi digital" : "Pengiriman Cepat"
     ],
     cover_recommendation: {
       suggested_ratio: "1:1 (1080 x 1080 px)",
@@ -237,7 +237,7 @@ Aturan Penting Format Shopee:
    - Detail Spesifikasi (Platform, Bahasa, Fitur Online Multiplayer).
    - Kelengkapan Produk (Lisensi Akun + ${includePhysicalCard ? "Kartu Garansi Fisik Resmi A6" : "Panduan Aktivasi"}).
    ${includeActivationSteps ? "- Langkah Cara Aktivasi 3 Langkah Cepat." : ""}
-   ${includeUnboxingSop ? "- SOP Garansi & Wajib Video Unboxing No-Cut (Penting untuk melindungi toko dari buyer nakal)." : ""}
+   ${includeUnboxingSop ? "- SOP Garansi & Wajib screenshot kendala (Penting untuk melindungi toko dari buyer nakal)." : ""}
    ${includeFaq ? "- FAQ Pertanyaan Umum (Ready stok, butuh VPN, online multiplayer)." : ""}
    - Hashtags SEO bertarget di bagian paling bawah.
 4. Kembalikan HANYA JSON valid tanpa markdown backticks (atau markdown json) dengan format:
@@ -260,8 +260,8 @@ Aturan Penting Format Shopee:
 - Kategori Lisensi: ${category}
 - Harga Jual Shopee: Rp ${price.toLocaleString("id-ID")}
 - Gaya Bahasa / Style: ${style} (ultimate = visual lengkap top seller, security = fokus anti-hackback, flash_sale = promo urgency, clean = minimalis to the point)
-- Sertakan Kartu Fisik A6: ${includePhysicalCard ? "YA" : "TIDAK"}
-- Sertakan SOP Video Unboxing: ${includeUnboxingSop ? "YA" : "TIDAK"}
+- Sertakan garansi digital A6: ${includePhysicalCard ? "YA" : "TIDAK"}
+- Sertakan SOP screenshot kendala: ${includeUnboxingSop ? "YA" : "TIDAK"}
 - Sertakan FAQ: ${includeFaq ? "YA" : "TIDAK"}
 - Sertakan Langkah Aktivasi: ${includeActivationSteps ? "YA" : "TIDAK"}
 ${customNotes ? `- Catatan Khusus Seller: ${customNotes}` : ""}

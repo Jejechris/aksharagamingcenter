@@ -317,7 +317,7 @@ export default function FormatterPage() {
               >
                 <div className="flex items-center gap-1.5">
                   <FileCheck2 className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="text-[11px] font-mono font-semibold">Amplop A6</span>
+                  <span className="text-[11px] font-mono font-semibold">garansi digital A6</span>
                 </div>
                 <span className="text-[10px] font-mono text-slate-600">📦 Paket Fisik / Resi</span>
               </button>
@@ -477,7 +477,7 @@ export default function FormatterPage() {
             <ul className="text-[10px] font-mono text-slate-600 space-y-1 pl-4 list-disc leading-relaxed">
               <li>Akun wajib <span className="text-slate-500">Full Access</span> (pembeli bisa ganti email &amp; password sendiri).</li>
               <li>Pesan menyertakan <span className="text-slate-500">3 Langkah Pengamanan Akun</span>.</li>
-              <li>Edukasi pembeli soal <span className="text-slate-500">Kartu Garansi A6 &amp; Video No-Cut</span>.</li>
+              <li>Edukasi pembeli soal <span className="text-slate-500">garansi digital &amp; Video No-Cut</span>.</li>
             </ul>
           </div>
         </form>

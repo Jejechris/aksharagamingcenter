@@ -42,7 +42,7 @@ const SHOPEE_GAME_COMPETITORS: Record<string, {
     competitors: [
       { shop_name: "MinecraftStore.ID", price_idr: 249000, sold_count: "3.4rb terjual", rating: 4.9, product_title: "Minecraft Java & Bedrock Edition PC Original Akun Full Access", delivery_type: "Instant Chat", badge: "🔥 Terlaris" },
       { shop_name: "DigitalWorldGamer", price_idr: 265000, sold_count: "1.2rb terjual", rating: 4.8, product_title: "Akun Minecraft Microsoft PC Original Bisa Ganti Password & Skin", delivery_type: "Instant Chat", badge: "⭐ Star Seller" },
-      { shop_name: "VoucherGamerID", price_idr: 289000, sold_count: "650 terjual", rating: 4.9, product_title: "Minecraft PC Original Resmi Microsoft Akun Pribadi", delivery_type: "Kirim Amplop", badge: "Star+" },
+      { shop_name: "VoucherGamerID", price_idr: 289000, sold_count: "650 terjual", rating: 4.9, product_title: "Minecraft PC Original Resmi Microsoft Akun Pribadi", delivery_type: "Kirim garansi digital", badge: "Star+" },
     ]
   },
   "grand theft auto": {
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
 
       const competitorInfo = body.competitor_context || {};
       const systemPrompt = `Kamu adalah Chief Pricing Strategist & E-Commerce Shopee Specialist profesional untuk Akshara Gaming Center di Indonesia.
-Karaktermu: Sangat tajam berhitung, pragmatis, paham psikologi pembeli Shopee (suka cashback, SPayLater, voucher gratis ongkir), dan selalu menghitung margin bersih riil setelah dipotong biaya admin Shopee (8% + Rp 1.000), QRIS kulakan (0.7%), dan biaya amplop/packaging garansi (Rp 2.000).
+Karaktermu: Sangat tajam berhitung, pragmatis, paham psikologi pembeli Shopee (suka cashback, SPayLater, voucher gratis ongkir), dan selalu menghitung margin bersih riil setelah dipotong biaya admin Shopee (8% + Rp 1.000), QRIS kulakan (0.7%), dan biaya garansi digital/packaging garansi (Rp 2.000).
 
 Data Game Saat Ini:
 - Judul Game: ${gameTitle} (${platform})
@@ -241,7 +241,7 @@ Aturan Jawaban:
           sold_count: "210 terjual",
           rating: 4.7,
           product_title: `${gameTitle} Lisensi Resmi Full DLC`,
-          delivery_type: "Kirim Amplop",
+          delivery_type: "Kirim garansi digital",
           badge: "Reguler"
         }
       ];

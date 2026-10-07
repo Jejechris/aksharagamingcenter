@@ -51,7 +51,7 @@ export async function GET(request: Request) {
         warranty_days_total: 30,
         warranty_expires: "16 Oktober 2026",
         authenticity: "100% Original Microsoft Digital License",
-        sop_summary: "Wajib menyertakan video unboxing & first-login tanpa jeda (no-cut) untuk klaim penggantian baru."
+        sop_summary: "Wajib menyertakan screenshot kendala & first-login tanpa jeda (no-cut) untuk klaim penggantian baru."
       }
     });
   }

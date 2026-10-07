@@ -149,7 +149,7 @@ export default function ClaimsAdminDashboardPage() {
       `🔑 KODE KLAIM: ${item.claim_code}\n` +
       `🔒 PASSCODE PIN RAHASIA: ${pin}\n` +
       `🔗 LINK BUKA KREDENSIAL: ${claimUrl}\n\n` +
-      `⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan perekaman video unboxing tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${item.warranty_days} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n` +
+      `⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan perekaman screenshot kendala tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${item.warranty_days} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
       `Terima kasih dan selamat bermain! 🚀`
     );

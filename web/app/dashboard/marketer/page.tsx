@@ -287,7 +287,7 @@ export default function MarketerPage() {
             Marketer Hub
           </h1>
           <p className="text-[13px] text-slate-500 mt-2 max-w-2xl leading-relaxed">
-            Fulfillment & Brand Engine. Hub komando serah terima pesanan: AI Account Formatter, Shopee CS Batch Expediter, Sertifikat Fisik A6, dan Engine Voucher VIP.
+            Fulfillment & Brand Engine. Hub komando serah terima pesanan: AI Account Formatter, Shopee CS Batch Expediter, Digital Certificate, dan Engine Voucher VIP.
           </p>
         </div>
       </div>
@@ -409,7 +409,7 @@ export default function MarketerPage() {
                           : "text-slate-400 hover:text-white"
                       }`}
                     >
-                      Fisik A6
+                      Sertifikat Digital
                     </button>
                   </div>
                 </div>
@@ -705,7 +705,7 @@ export default function MarketerPage() {
               <div className="v0-card card-division-marketer rounded-2xl p-6 flex flex-col items-center justify-center min-h-[480px] [perspective:1000px]">
                 <div className="flex items-center justify-between w-full mb-4">
                   <div>
-                    <h3 className="text-sm font-bold text-white">Preview A6 Card</h3>
+                    <h3 className="text-sm font-bold text-white">Preview Sertifikat</h3>
                     <p className="text-[10px] text-slate-400 font-mono mt-1">Interactive 3D view</p>
                   </div>
                   <button
@@ -772,8 +772,8 @@ export default function MarketerPage() {
                         </div>
                         <div className="space-y-3 text-[10px] text-slate-300 flex-1">
                           <div className="p-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800">
-                            <strong className="text-white block mb-0.5">1. Video Unboxing:</strong>
-                            Wajib merekam video pembukaan fisik tanpa jeda.
+                            <strong className="text-white block mb-0.5">1. Garansi Digital:</strong>
+                            Klaim garansi dapat dilakukan secara digital melalui CS kami.
                           </div>
                           <div className="p-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800">
                             <strong className="text-white block mb-0.5">2. Amankan Kredensial:</strong>
@@ -843,7 +843,7 @@ export default function MarketerPage() {
                   className="w-full py-2.5 px-4 rounded-xl bg-white text-black font-bold text-xs flex items-center justify-center gap-2 transition-all hover:bg-zinc-200 mt-2"
                 >
                   <Printer className="w-4 h-4" />
-                  Cetak / Print A6
+                  Download Sertifikat
                 </button>
               </div>
             </div>

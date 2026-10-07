@@ -26,7 +26,7 @@ async function notifyTelegramReveal(claim: any, ip: string, userAgent: string, i
       + `• *Perangkat / User-Agent:* \`${userAgent.slice(0, 80)}\`\n`
       + `• *Status Garansi:* AKTIF (${claim.warranty_days} Hari)\n`
       + "━━━━━━━━━━━━━━━━━━━━━━\n"
-      + "_Catatan: Bukti ini sah dan permanen. Jika pembeli mengajukan komplain akun bermasalah setelah detik ini, wajib melampirkan video unboxing tanpa jeda dari sebelum link dibuka._";
+      + "_Catatan: Bukti ini sah dan permanen. Jika pembeli mengajukan komplain akun bermasalah setelah detik ini, wajib melampirkan screenshot kendala tanpa jeda dari sebelum link dibuka._";
 
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
