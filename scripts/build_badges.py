@@ -1,7 +1,8 @@
 import os
 from PIL import Image, ImageDraw
 
-dest_dir = r"C:\Users\jesen\OneDrive\Desktop\Scrt\web\public\assets\platforms"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+dest_dir = os.path.join(BASE_DIR, "web", "public", "assets", "platforms")
 os.makedirs(dest_dir, exist_ok=True)
 
 # 1. PlayStation (playstation.svg)
@@ -37,14 +38,4 @@ xbox_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" widt
 with open(os.path.join(dest_dir, "xbox.svg"), "w", encoding="utf-8") as f:
     f.write(xbox_svg)
 
-# 4. Epic Games (epic.svg)
-epic_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <path d="M12 12 H88 V66 L50 92 L12 66 Z" fill="#1c1c20" stroke="#4a4a55" stroke-width="3" />
-  <text x="50" y="46" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="900" text-anchor="middle" letter-spacing="1">EPIC</text>
-  <text x="50" y="65" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" letter-spacing="2">GAMES</text>
-</svg>"""
-
-with open(os.path.join(dest_dir, "epic.svg"), "w", encoding="utf-8") as f:
-    f.write(epic_svg)
-
-print("SVGs successfully written to:", dest_dir)
+print(f"Platform badges created successfully in: {dest_dir}")

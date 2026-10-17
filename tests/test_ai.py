@@ -1,8 +1,22 @@
+import os
+import sys
 import httpx
 import json
 
-key = 'AQ.Ab8RN6JJaaf2otbjX9Ppo22_tDfUsB9_6S6q7uEEnoDJLFPpTw'
-url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={key}'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+key = os.getenv("GEMINI_API_KEY", "")
+if not key:
+    env_file = os.path.join(BASE_DIR, ".env")
+    if os.path.exists(env_file):
+        with open(env_file, "r") as f:
+            for line in f:
+                if line.startswith("GEMINI_API_KEY="):
+                    key = line.split("=", 1)[1].strip().strip('"').strip("'")
+
+url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={key}"
 
 systemPrompt = """Kamu adalah Chief Quant & Gaming Market Analyst profesional untuk Akshara Gaming Center (toko game digital di Indonesia).
 Tugasmu adalah memberikan estimasi harga modal g2g.com/id dan harga jual Shopee yang SANGAT AKURAT dan REALISTIS sesuai tier/kategori game:
@@ -33,10 +47,21 @@ Format output HARUS JSON murni tanpa markdown:
   "ai_pricing_reasoning": "<1-2 kalimat penjelasan logis penetapan harga>"
 }"""
 
-payload = {
-    'contents': [{'parts': [{'text': 'Analisis produk game ini: "terreria"'}]}],
-    'systemInstruction': {'parts': [{'text': systemPrompt}]}
-}
-r = httpx.post(url, json=payload, timeout=10.0)
-print('Status:', r.status_code)
-print('Output:', r.json()['candidates'][0]['content']['parts'][0]['text'])
+if __name__ == "__main__":
+    if not key:
+        print("[SKIP] GEMINI_API_KEY belum diset. Lewati pengujian live.")
+        sys.exit(0)
+
+    payload = {
+        'contents': [{'parts': [{'text': 'Analisis produk game ini: "terreria"'}]}],
+        'systemInstruction': {'parts': [{'text': systemPrompt}]}
+    }
+    try:
+        r = httpx.post(url, json=payload, timeout=10.0)
+        print('Status:', r.status_code)
+        if r.status_code == 200:
+            print('Output:', r.json()['candidates'][0]['content']['parts'][0]['text'])
+        else:
+            print('Error response:', r.text[:200])
+    except Exception as e:
+        print('Request error:', e)
