@@ -4,8 +4,15 @@ import path from "path";
 import os from "os";
 import { getDbCatalog } from "@/lib/db";
 import { VERIFIED_ENEBA_CATALOG, getEnebaSearchUrl } from "@/lib/eneba";
+import {
+  getG2GGameCategoryUrl,
+  getG2GSellerUrl,
+  extractG2GOfferId,
+  G2G_CATEGORY_SLUGS,
+  resolveGameKey,
+} from "@/lib/g2g";
 
-const USD_TO_IDR_RATE = 16000;
+const USD_TO_IDR_RATE = 16350;
 
 function cleanGameTitle(rawTitle: string): string {
   if (!rawTitle) return "Custom Game";
@@ -51,6 +58,7 @@ function detectPlatform(rawTitle: string, catPath?: string): string {
   if (lower.includes("xbox")) return "Xbox";
   if (lower.includes("playstation") || lower.includes("psn")) return "PlayStation";
   if (lower.includes("gog")) return "GOG";
+  if (lower.includes("ea") || lower.includes("origin")) return "EA App / PC";
   return "PC";
 }
 
@@ -61,12 +69,6 @@ function detectCategory(rawTitle: string): string {
   if (lower.includes("item") || lower.includes("crate") || lower.includes("skin"))
     return "In-Game Items";
   return "Account (Full Access)";
-}
-
-function extractOfferId(urlOrId: string): string | null {
-  if (!urlOrId) return null;
-  const match = urlOrId.trim().match(/(?:offer\/|item\/|^)?(G\d{10,}[A-Za-z0-9]*)/);
-  return match ? match[1] : null;
 }
 
 export async function POST(req: Request) {
@@ -83,7 +85,8 @@ export async function POST(req: Request) {
 
     // 1. Cek apakah ini link Eneba
     if (inputUrl.includes("eneba.com")) {
-      const urlObj = new URL(inputUrl.startsWith("http") ? inputUrl : `https://${inputUrl}`);
+      const urlClean = inputUrl.replace("eneba.com/id/store", "eneba.com/store");
+      const urlObj = new URL(urlClean.startsWith("http") ? urlClean : `https://${urlClean}`);
       const queryText = urlObj.searchParams.get("text") || "";
       const pathSlug = urlObj.pathname.replace(/^\/+/g, "");
 
@@ -125,66 +128,153 @@ export async function POST(req: Request) {
           success_orders: 50000,
           delivery_speed: "Instant Key Delivery",
           profile_url: getEnebaSearchUrl(cleanTitle),
+          fallback_search_url: getEnebaSearchUrl(cleanTitle),
           is_eneba: true,
         },
       });
     }
 
     // 2. Ekstrak Offer ID G2G
-    const offerId = extractOfferId(inputUrl);
+    const offerId = extractG2GOfferId(inputUrl);
+
+    // 2b. Jika input adalah URL Kategori G2G (tanpa offer_id spesifik)
+    if (!offerId && (inputUrl.includes("g2g.com/categories/") || inputUrl.includes("g2g.com/id/categories/") || inputUrl.includes("g2g.com/search"))) {
+      const urlClean = inputUrl.replace("g2g.com/id/categories/", "g2g.com/categories/");
+      let catSlug = "";
+      let searchQ = "";
+
+      try {
+        const urlObj = new URL(urlClean.startsWith("http") ? urlClean : `https://${urlClean}`);
+        const slugMatch = urlObj.pathname.match(/categories\/([^/?#]+)/);
+        catSlug = slugMatch ? slugMatch[1] : "";
+        searchQ = urlObj.searchParams.get("q") || "";
+      } catch (e) {
+        catSlug = "steam-global-account";
+      }
+
+      let detectedTitle = searchQ || catSlug.replace(/-/g, " ");
+      for (const [key, slug] of Object.entries(G2G_CATEGORY_SLUGS)) {
+        if (catSlug.includes(slug) || catSlug.includes(key)) {
+          detectedTitle = key.charAt(0).toUpperCase() + key.slice(1);
+          break;
+        }
+      }
+      const cleanTitle = cleanGameTitle(detectedTitle);
+      const platform = detectPlatform(cleanTitle, catSlug);
+      const category = detectCategory(cleanTitle);
+      const safeUrl = catSlug
+        ? `https://www.g2g.com/categories/${catSlug}${searchQ ? `?q=${encodeURIComponent(searchQ)}` : ""}`
+        : `https://www.g2g.com/search?q=${encodeURIComponent(cleanTitle)}`;
+
+      return NextResponse.json({
+        status: "success",
+        marketplace: "G2G",
+        data: {
+          offer_id: null,
+          raw_title: detectedTitle,
+          clean_title: cleanTitle,
+          platform,
+          category,
+          seller_name: searchQ || "G2G Verified Sellers",
+          real_stock: 100,
+          actual_qty: 100,
+          is_sold_out: false,
+          status: "live",
+          price_usd: 10.0,
+          price_idr: 160000,
+          recommended_shopee_price_idr: 219900,
+          is_online: true,
+          rating_pct: 99.8,
+          reviews_count: 5000,
+          success_orders: 10000,
+          delivery_speed: "Instant / Fast Delivery",
+          profile_url: safeUrl,
+          fallback_search_url: safeUrl,
+          is_category_link: true,
+        },
+      });
+    }
+
     if (!offerId) {
       return NextResponse.json(
         {
           status: "error",
           message:
-            "Format link tidak dikenali. Pastikan memasukkan link offer G2G (contoh: https://www.g2g.com/.../offer/G1703129821471UK) atau ID Offer (G1703129821471UK).",
+            "Format link tidak dikenali. Masukkan link offer G2G (contoh: https://www.g2g.com/offer/G1703129821471UK), link kategori, atau ID Offer (G1703129821471UK).",
         },
         { status: 400 }
       );
     }
 
-    // 3. Request langsung ke server resmi G2G SLS API
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 7500);
+    // 3. Request langsung ke server resmi G2G SLS API (Timeout 6s)
+    let p: any = null;
+    let slsError: string | null = null;
 
-    const slsRes = await fetch(`https://sls.g2g.com/offer/${offerId}`, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "application/json, text/plain, */*",
-        Referer: "https://www.g2g.com/",
-        Origin: "https://www.g2g.com",
-      },
-      signal: controller.signal,
-      cache: "no-store",
-    });
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
 
-    clearTimeout(timeout);
-
-    if (!slsRes.ok) {
-      return NextResponse.json(
-        {
-          status: "error",
-          message: `G2G SLS mengembalikan status HTTP ${slsRes.status}. Listing mungkin delisted atau ID tidak valid.`,
+      const slsRes = await fetch(`https://sls.g2g.com/offer/${offerId}`, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Accept: "application/json, text/plain, */*",
+          Referer: "https://www.g2g.com/",
+          Origin: "https://www.g2g.com",
         },
-        { status: 404 }
-      );
+        signal: controller.signal,
+        cache: "no-store",
+      });
+
+      clearTimeout(timeout);
+
+      if (slsRes.ok) {
+        const slsJson = await slsRes.json();
+        p = slsJson.payload;
+      } else {
+        slsError = `HTTP ${slsRes.status}`;
+      }
+    } catch (fetchErr: any) {
+      slsError = fetchErr.message || "Connection timeout";
     }
 
-    const slsJson = await slsRes.json();
-    const p = slsJson.payload;
-
+    // 4. Jika G2G Offer mati / delisted / 404:
+    // Sesuai Task 2: JANGAN lempar 404 error, otomatis flag delisted dan beri safe category search URL
     if (!p) {
-      return NextResponse.json(
-        {
-          status: "error",
-          message: "Data listing tidak ditemukan di server G2G SLS.",
+      const fallbackTitle = cleanGameTitle(inputUrl) || "G2G Product";
+      const safeCategoryUrl = getG2GGameCategoryUrl(fallbackTitle);
+
+      return NextResponse.json({
+        status: "success",
+        marketplace: "G2G",
+        warning: `Offer ${offerId} sudah delisted atau tidak ditemukan di G2G (${slsError || "Delisted"}). Sistem otomatis mengalihkan ke URL kategori aman.`,
+        data: {
+          offer_id: offerId,
+          raw_title: `G2G Listing (${offerId})`,
+          clean_title: fallbackTitle,
+          platform: "PC",
+          category: "Account (Full Access)",
+          seller_name: "G2G Merchant",
+          real_stock: 0,
+          actual_qty: 0,
+          is_sold_out: true,
+          status: "delisted",
+          price_usd: 0,
+          price_idr: 0,
+          recommended_shopee_price_idr: 0,
+          is_online: false,
+          rating_pct: 95.0,
+          reviews_count: 500,
+          success_orders: 500,
+          delivery_speed: "Standard Delivery",
+          profile_url: safeCategoryUrl,
+          fallback_search_url: safeCategoryUrl,
+          offer_delisted: true,
         },
-        { status: 404 }
-      );
+      });
     }
 
-    // 4. Transform data faktual
+    // 5. Transform data faktual live
     const rawTitle = p.title || "Game Title";
     const cleanTitle = cleanGameTitle(rawTitle);
     const platform = detectPlatform(rawTitle, p.cat_path);
@@ -201,9 +291,14 @@ export async function POST(req: Request) {
     const reviewsCount = Number(p.total_rating ?? 1000);
     const isOnline = Boolean(p.is_online);
     const deliverySpeed = p.delivery_speed === "instant" ? "Instant Delivery" : "Fast Delivery (1-10 Menit)";
-    const verifiedUrl = `https://www.g2g.com/id/offer/${offerId}`;
 
-    // 5. Cek kecocokan dengan katalog lokal / database
+    // Canonical direct offer URL (NEVER /categories/.../offer/!)
+    const verifiedUrl = isSoldOut
+      ? getG2GGameCategoryUrl(cleanTitle, sellerName)
+      : `https://www.g2g.com/offer/${offerId}`;
+    const fallbackSearchUrl = getG2GGameCategoryUrl(cleanTitle, sellerName);
+
+    // 6. Cek kecocokan dengan katalog lokal / database
     let matchingGameId: string | null = null;
     let matchingGameTitle: string | null = null;
     let isExistingSeller = false;
@@ -219,10 +314,10 @@ export async function POST(req: Request) {
             matchingGameId = g.id;
             matchingGameTitle = g.title;
 
-            // Cek apakah seller ini sudah ada di game ini
             const sMatch = (g.sellers || []).find(
               (s: any) =>
                 s.seller_name.toLowerCase().trim() === sellerName.toLowerCase().trim() ||
+                (s.offer_id && s.offer_id === offerId) ||
                 (s.profile_url && s.profile_url.includes(offerId))
             );
             if (sMatch) {
@@ -258,6 +353,7 @@ export async function POST(req: Request) {
         success_orders: successOrders,
         delivery_speed: deliverySpeed,
         profile_url: verifiedUrl,
+        fallback_search_url: fallbackSearchUrl,
         matching_game_id: matchingGameId,
         matching_game_title: matchingGameTitle,
         is_existing_seller: isExistingSeller,

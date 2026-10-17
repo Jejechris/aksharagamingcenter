@@ -8,8 +8,6 @@ import { syncCatalogWithG2GLive, fetchG2GLiveOffer } from "@/lib/g2gStock";
 const catalogPath = path.resolve(process.cwd(), "..", "output", "active_catalog.json");
 const bundledCatalogPath = path.resolve(process.cwd(), "data", "active_catalog.json");
 const tmpCatalogPath = path.resolve(os.tmpdir(), "akshara_active_catalog.json");
-const replicaOutputPath = "C:\\Users\\jesen\\Desktop\\scrt\\output\\active_catalog.json";
-const replicaWebPath = "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\active_catalog.json";
 
 function getLocalCatalogData(): any[] {
   if (fs.existsSync(tmpCatalogPath)) {
@@ -46,7 +44,7 @@ function getLocalCatalogData(): any[] {
 
 function saveCatalogData(data: any[]) {
   const jsonStr = JSON.stringify(data, null, 2);
-  const targets = [tmpCatalogPath, catalogPath, bundledCatalogPath, replicaOutputPath, replicaWebPath];
+  const targets = [tmpCatalogPath, catalogPath, bundledCatalogPath];
   for (const t of targets) {
     try {
       const dir = path.dirname(t);

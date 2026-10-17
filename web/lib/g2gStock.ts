@@ -234,17 +234,22 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
   results.forEach((res) => {
     if (res.status === "fulfilled") {
       const { task, liveData } = res.value;
-      if (!liveData.error) {
-        const game = updatedCatalog[task.gameIndex];
-        const seller = game.sellers[task.sellerIndex];
+      const game = updatedCatalog[task.gameIndex];
+      const seller = game.sellers[task.sellerIndex];
 
-        // Perbarui stok real live
+      if (!liveData.error) {
+        const isLive = !liveData.is_sold_out && liveData.status === "live" && liveData.available_qty > 0;
+        const resolvedUrl = resolveG2GProductUrl(task.offerId, task.sellerName, task.gameTitle, isLive);
+
+        // Perbarui data real live
         seller.stock = liveData.available_qty;
         seller.is_sold_out = liveData.is_sold_out;
         seller.is_online = liveData.is_online;
         seller.live_status = liveData.status;
         seller.live_synced_at = liveData.synced_at;
         seller.total_success_order = liveData.success_orders;
+        seller.profile_url = resolvedUrl;
+        seller.fallback_search_url = resolveG2GProductUrl(task.offerId, task.sellerName, task.gameTitle, false);
         if (liveData.rating_pct > 0) {
           seller.rating_pct = liveData.rating_pct;
         }
@@ -260,7 +265,7 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
           game_title: task.gameTitle,
           seller_name: task.sellerName,
           offer_id: task.offerId,
-          product_url: resolveG2GProductUrl(task.offerId, task.sellerName, task.gameTitle),
+          product_url: resolvedUrl,
           previous_stock: task.previousStock,
           live_stock: liveData.available_qty,
           is_online: liveData.is_online,
@@ -269,6 +274,25 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
         });
 
         syncedCount++;
+      } else {
+        // Offer delisted / SLS 404
+        const safeFallbackUrl = resolveG2GProductUrl(task.offerId, task.sellerName, task.gameTitle, false);
+        seller.live_status = "delisted";
+        seller.is_sold_out = true;
+        seller.profile_url = safeFallbackUrl;
+        seller.fallback_search_url = safeFallbackUrl;
+
+        auditLogs.push({
+          game_title: task.gameTitle,
+          seller_name: task.sellerName,
+          offer_id: task.offerId,
+          product_url: safeFallbackUrl,
+          previous_stock: task.previousStock,
+          live_stock: 0,
+          is_online: false,
+          status: "delisted",
+          health: "CRITICAL",
+        });
       }
     }
   });

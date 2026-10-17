@@ -80,7 +80,7 @@ class SupplierScraper:
                 stock_available=34,
                 account_type="Full Access (Changeable Email)",
                 warranty_hours=48,
-                listing_url="https://www.g2g.com/id/offer/G2G-MC-001"
+                listing_url="https://www.g2g.com/categories/minecraft-account?q=AlphaVault"
             ),
             SupplierListing(
                 id="G2G-MC-002",
@@ -95,7 +95,7 @@ class SupplierScraper:
                 stock_available=12,
                 account_type="Full Access",
                 warranty_hours=12,
-                listing_url="https://www.g2g.com/id/offer/G2G-MC-002"
+                listing_url="https://www.g2g.com/categories/minecraft-account?q=QuickGameDeals"
             ),
             SupplierListing(
                 id="G2G-MC-003",
@@ -110,7 +110,7 @@ class SupplierScraper:
                 stock_available=99,
                 account_type="Shared Account (Non-changeable)",
                 warranty_hours=0,
-                listing_url="https://www.g2g.com/id/offer/G2G-MC-003"
+                listing_url="https://www.g2g.com/categories/minecraft-account?q=sketchy_gaming"
             ),
             SupplierListing(
                 id="G2G-MC-004",
@@ -125,7 +125,7 @@ class SupplierScraper:
                 stock_available=0,
                 account_type="Full Access (Changeable Email)",
                 warranty_hours=24,
-                listing_url="https://www.g2g.com/id/offer/G2G-MC-004"
+                listing_url="https://www.g2g.com/categories/minecraft-account?q=PrimeKeysDirect"
             ),
             SupplierListing(
                 id="G2G-TF2-005",
@@ -140,6 +140,6 @@ class SupplierScraper:
                 stock_available=450,
                 account_type="Steam Trade Offer / Liquidity Key",
                 warranty_hours=72,
-                listing_url="https://www.g2g.com/id/offer/G2G-TF2-005"
+                listing_url="https://www.g2g.com/categories/tf2-item?q=TF2_Liquidity_Hub"
             )
         ]
