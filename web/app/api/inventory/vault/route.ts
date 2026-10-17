@@ -6,7 +6,6 @@ import { getDbVault, saveDbVaultItem, deleteDbVaultItem, getKV, setKV } from "@/
 
 const DATA_FILE = path.resolve(process.cwd(), "data", "inventory_vault.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "inventory_vault.json");
-const REPLICA_FILE = path.resolve("C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\inventory_vault.json");
 const TMP_FILE = path.resolve(os.tmpdir(), "akshara_inventory_vault.json");
 
 export interface VaultItem {
@@ -91,13 +90,6 @@ function saveVault(items: VaultItem[]) {
   try {
     if (fs.existsSync(path.dirname(OUTPUT_FILE))) {
       fs.writeFileSync(OUTPUT_FILE, content, "utf-8");
-    }
-  } catch (e) {
-    // best-effort
-  }
-  try {
-    if (fs.existsSync(path.dirname(REPLICA_FILE))) {
-      fs.writeFileSync(REPLICA_FILE, content, "utf-8");
     }
   } catch (e) {
     // best-effort
@@ -191,12 +183,14 @@ export async function POST(req: Request) {
     const vault = getVault();
     const nowStr = new Date().toISOString().replace("T", " ").substring(0, 19);
 
-    // Mode A: Bulk Import via multiline text
-    if (body.bulk_raw && typeof body.bulk_raw === "string") {
-      const lines = body.bulk_raw
+    // Mode A: Bulk Import via multiline text (action: "bulk_import" or body.bulk_raw/raw_lines)
+    const rawInput = body.raw_lines || body.bulk_raw;
+    if (body.action === "bulk_import" || (rawInput && typeof rawInput === "string")) {
+      const lines = String(rawInput || "")
         .split(/\r?\n/)
         .map(l => l.trim())
-        .filter(l => l.length > 0);
+        .filter(l => l.length > 0)
+        .slice(0, 50); // 1 sampai 50 baris
 
       const addedItems: VaultItem[] = [];
       const gameTitle = body.game_title || "Minecraft: Java & Bedrock Edition";

@@ -6,7 +6,6 @@ import { getDbOrders, saveDbOrder, deleteDbOrder, getDbVault, saveDbVaultItem, g
 
 const DATA_FILE = path.resolve(process.cwd(), "data", "autonomous_orders.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "autonomous_orders.json");
-const REPLICA_FILE = path.resolve("C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\autonomous_orders.json");
 const TMP_FILE = path.resolve(os.tmpdir(), "akshara_autonomous_orders.json");
 
 // In-memory cache fallback for serverless environments (Vercel)
@@ -79,13 +78,6 @@ function saveOrders(orders: any[]) {
     }
   } catch (e) {
     // best-effort for local output
-  }
-  try {
-    if (fs.existsSync(path.dirname(REPLICA_FILE))) {
-      fs.writeFileSync(REPLICA_FILE, content, "utf-8");
-    }
-  } catch (e) {
-    // best-effort
   }
   setKV("autonomous_orders", orders).catch(() => {});
 }
