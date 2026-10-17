@@ -4,8 +4,7 @@
 > *Tanggal Dibuat:* 07 Oktober 2026  
 > *Repository Utama:* [https://github.com/Jejechris/aksharagamingcenter.git](https://github.com/Jejechris/aksharagamingcenter.git)  
 > *Secondary Claim Repo:* [https://github.com/Jejechris/claimakshara.git](https://github.com/Jejechris/claimakshara.git)  
-> *Owner / Founder:* Senna (Akshara Gaming Center)  
-> *Admin Telegram Chat ID:* `7025906160`  
+> *Admin Telegram Chat ID:* `process.env.TELEGRAM_ADMIN_CHAT_ID`  
 > *Production Web Deck:* `https://asksharagaming.vercel.app`  
 > *Production Claim Vault:* `https://claimakshara.vercel.app`  
 
@@ -138,17 +137,17 @@ Path: `aksharagamingcenter/.env`
 # AKSHARA GAMING CENTER - LIVE ENVIRONMENT CONFIGURATION
 
 # Telegram Bot HITL (Human-in-the-Loop)
-TELEGRAM_BOT_TOKEN=8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI
-TELEGRAM_ADMIN_CHAT_ID=7025906160
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+TELEGRAM_ADMIN_CHAT_ID=your_telegram_admin_chat_id_here
 
 # Shopee Email Listener (IMAP Gmail Resmi Akshara)
 IMAP_SERVER=imap.gmail.com
 IMAP_PORT=993
-IMAP_EMAIL=aksharagamingcenter@gmail.com
-IMAP_APP_PASSWORD=udngsjduigzjghke
+IMAP_EMAIL=your_email@gmail.com
+IMAP_APP_PASSWORD=your_app_password
 
 # Google Gemini AI Integration (Default: gemini-3.5-flash-lite)
-GEMINI_API_KEY=AQ.Ab8RN6JJaaf2otbjX9Ppo22_tDfUsB9_6S6q7uEEnoDJLFPpTw
+GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_DEFAULT_MODEL=gemini-3.5-flash-lite
 
 # Financial Defaults
@@ -163,18 +162,18 @@ DEFAULT_TARGET_NET_MARGIN_PCT=25.0
 ### B. Web App `.env.local` (Command Center)
 Path: `aksharagamingcenter/web/.env.local`
 ```env
-GEMINI_API_KEY=AQ.Ab8RN6JJaaf2otbjX9Ppo22_tDfUsB9_6S6q7uEEnoDJLFPpTw
+GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_DEFAULT_MODEL=gemini-3.5-flash-lite
 NEXT_PUBLIC_AI_MODEL=gemini-3.5-flash-lite
-TELEGRAM_BOT_TOKEN=8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI
-TELEGRAM_ADMIN_CHAT_ID=7025906160
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+TELEGRAM_ADMIN_CHAT_ID=your_telegram_admin_chat_id_here
 ```
 
 ### C. Claim Vault `.env.local` (Customer Portal)
 Path: `aksharagamingcenter/claim-web/.env.local`
 ```env
-TELEGRAM_BOT_TOKEN=8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI
-TELEGRAM_ADMIN_CHAT_ID=7025906160
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+TELEGRAM_ADMIN_CHAT_ID=your_telegram_admin_chat_id_here
 NEXT_PUBLIC_SITE_NAME="Akshara Digital License Vault"
 ```
 
@@ -325,7 +324,7 @@ npm run build
 2. **Anti-Broken Link:** Setiap kali membuat link produk untuk Telegram atau dashboard, pastikan URL mengarah ke domain valid (format `https://www.eneba.com/store/all?text=...` untuk Eneba, dan `resolveG2GProductUrl` untuk G2G).
 3. **Desain UI Konsisten:** Gunakan design tokens yang sudah ada: `v0-card`, `v0-btn-primary`, `v0-btn-secondary`, palet Tailwind `zinc` (dark mode neutral), aksen `emerald` (sukses/profit), `violet` (Eneba), dan `amber` (peringatan).
 4. **Git Sync Disiplin:** Setelah melakukan perubahan, selalu pastikan build lulus (`npm run build`), lalu commit dan push ke `origin main`. Jika ada folder replika, sinkronkan juga.
-5. **Human-in-the-Loop Safe:** Bot Telegram dan sistem otomatisasi dirancang untuk mempercepat pekerjaan Senna, bukan menggantikannya tanpa pengawasan. Notifikasi kritis harus selalu dikirim ke admin Telegram (`7025906160`).
+5. **Human-in-the-Loop Safe:** Bot Telegram dan sistem otomatisasi dirancang untuk mempercepat pekerjaan Senna, bukan menggantikannya tanpa pengawasan. Notifikasi kritis harus selalu dikirim ke admin Telegram (`TELEGRAM_ADMIN_CHAT_ID`).
 
 ---
 *Dokumen ini adalah ringkasan arsitektur final dan terverifikasi dari Akshara Gaming Center. Selamat bekerja di workstation baru!* 🚀

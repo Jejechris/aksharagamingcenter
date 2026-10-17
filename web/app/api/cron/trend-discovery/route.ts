@@ -5,11 +5,15 @@ import { bulkAddOrUpdateGames } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI";
-const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "7025906160";
-const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
+const TELEGRAM_API = BOT_TOKEN ? `https://api.telegram.org/bot${BOT_TOKEN}` : "";
 
 async function sendTelegramAlert(text: string) {
+  if (!BOT_TOKEN || !ADMIN_CHAT_ID || !TELEGRAM_API) {
+    console.warn("[Cron Trend] TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID is not configured, skipping alert.");
+    return;
+  }
   try {
     await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",

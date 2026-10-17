@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readAuthoritativeCatalog } from "@/lib/catalog";
+import { readAuthoritativeCatalog, writeAuthoritativeCatalog } from "@/lib/catalog";
 import { queryDb } from "@/lib/db";
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { resolveG2GProductUrl, getG2GGameCategoryUrl } from "@/lib/g2g";
 
 export const dynamic = "force-dynamic";
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI";
-const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "7025906160";
-const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
+const TELEGRAM_API = BOT_TOKEN ? `https://api.telegram.org/bot${BOT_TOKEN}` : "";
 
 async function sendTelegramAlert(text: string) {
+  if (!BOT_TOKEN || !ADMIN_CHAT_ID || !TELEGRAM_API) {
+    console.warn("[Cron Sentry] TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID is not configured, skipping alert.");
+    return;
+  }
   try {
     await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",
@@ -46,10 +50,16 @@ export async function GET(req: NextRequest) {
     }
 
     const sellersToCheck: Array<{
+      gameId: string;
       gameTitle: string;
+      sellingPriceShopeeIdr: number;
+      selectedSellerId: string;
+      sellerId: string;
       sellerName: string;
       offerId: string;
+      recordedPriceIdr: number;
       previousStock: number;
+      isSelected: boolean;
     }> = [];
 
     for (const game of catalog) {
@@ -59,10 +69,16 @@ export async function GET(req: NextRequest) {
           const offerId = extractG2GOfferId(rawId);
           if (offerId) {
             sellersToCheck.push({
+              gameId: game.id,
               gameTitle: game.title,
+              sellingPriceShopeeIdr: game.selling_price_shopee_idr || 100000,
+              selectedSellerId: game.selected_seller_id,
+              sellerId: s.seller_id,
               sellerName: s.seller_name,
               offerId,
+              recordedPriceIdr: s.price_g2g_idr || 0,
               previousStock: s.stock || 0,
+              isSelected: s.seller_id === game.selected_seller_id,
             });
           }
         }
@@ -71,7 +87,9 @@ export async function GET(req: NextRequest) {
 
     // Limit concurrency to 5 requests at a time
     const auditResults: Array<{
+      gameId: string;
       gameTitle: string;
+      sellerId: string;
       sellerName: string;
       offerId: string;
       productUrl: string;
@@ -79,6 +97,11 @@ export async function GET(req: NextRequest) {
       isOnline: boolean;
       status: string;
       priceUsd: number;
+      livePriceIdr: number;
+      recordedPriceIdr: number;
+      liveMarginPct: number;
+      priceAlert: "MARGIN_DANGER" | "NORMAL";
+      isSelected: boolean;
       health: "CRITICAL" | "WARNING" | "SAFE";
       error?: string;
     }> = [];
@@ -95,8 +118,24 @@ export async function GET(req: NextRequest) {
           } else if (live.available_qty <= 4) {
             health = "WARNING";
           }
+
+          // Price Spike Guard calculations
+          const livePriceIdr = live.price_usd > 0 ? Math.ceil((live.price_usd * 16350) / 100) * 100 : item.recordedPriceIdr;
+          const liveCogsNet = Math.round(livePriceIdr * 1.007);
+          const shopeeFee = Math.round(item.sellingPriceShopeeIdr * 0.08) + 1000;
+          const liveNetProfit = item.sellingPriceShopeeIdr - liveCogsNet - shopeeFee;
+          const liveMarginPct = item.sellingPriceShopeeIdr > 0 ? (liveNetProfit / item.sellingPriceShopeeIdr) * 100 : 0;
+
+          let priceAlert: "MARGIN_DANGER" | "NORMAL" = "NORMAL";
+          const isPriceSpike = liveMarginPct < 12.0 || (item.recordedPriceIdr > 0 && livePriceIdr > item.recordedPriceIdr * 1.15);
+          if (isPriceSpike && live.price_usd > 0) {
+            priceAlert = "MARGIN_DANGER";
+          }
+
           return {
+            gameId: item.gameId,
             gameTitle: item.gameTitle,
+            sellerId: item.sellerId,
             sellerName: live.seller_name !== "Unknown" ? live.seller_name : item.sellerName,
             offerId: item.offerId,
             productUrl: resolveG2GProductUrl(item.offerId, live.seller_name !== "Unknown" ? live.seller_name : item.sellerName, item.gameTitle),
@@ -104,6 +143,11 @@ export async function GET(req: NextRequest) {
             isOnline: live.is_online,
             status: live.status,
             priceUsd: live.price_usd,
+            livePriceIdr,
+            recordedPriceIdr: item.recordedPriceIdr,
+            liveMarginPct,
+            priceAlert,
+            isSelected: item.isSelected,
             health,
             error: live.error,
           };
@@ -112,12 +156,58 @@ export async function GET(req: NextRequest) {
       auditResults.push(...batchResults);
     }
 
+    // Auto-Failover: Check for price spikes on currently selected sellers
+    let catalogModified = false;
+    const failoverAlerts: string[] = [];
+
+    for (const audited of auditResults) {
+      if (audited.isSelected && audited.priceAlert === "MARGIN_DANGER") {
+        const game = catalog.find((g: any) => g.id === audited.gameId);
+        if (game && Array.isArray(game.sellers)) {
+          // Cari seller cadangan di game yang sama dengan stock > 5 dan margin >= 15.0%
+          const backupSeller = game.sellers.find((s: any) => {
+            if (s.seller_id === audited.sellerId) return false;
+            const sStock = s.stock || 0;
+            const sMargin = s.net_margin_pct !== undefined ? s.net_margin_pct : 0;
+            const sStatus = s.live_status || "live";
+            return sStock > 5 && sMargin >= 15.0 && sStatus !== "dead" && sStatus !== "out_of_stock";
+          });
+
+          if (backupSeller) {
+            console.log(`[Auto-Failover] Price spike on ${game.title} (Seller: ${audited.sellerName}). Switching to backup: ${backupSeller.seller_name}`);
+            game.selected_seller_id = backupSeller.seller_id;
+            catalogModified = true;
+
+            const failoverMsg = (
+              `🚨 *[AUTO-FAILOVER: LONJAKAN HARGA SUPPLIER]*\n`
+              + `━━━━━━━━━━━━━━━━━━━━━━\n`
+              + `🎮 *Game:* \`${game.title}\`\n`
+              + `⚠️ *Lonjakan Terdeteksi:* Supplier utama (\`${audited.sellerName}\`) mengalami lonjakan harga!\n`
+              + `• Modal Baru: *Rp ${audited.livePriceIdr.toLocaleString("id-ID")}* (Sebelumnya: Rp ${audited.recordedPriceIdr.toLocaleString("id-ID")})\n`
+              + `• Proyeksi Margin: *${audited.liveMarginPct.toFixed(1)}%* (Batas Bahaya: < 12.0%)\n\n`
+              + `🛡️ *Tindakan Otonom:* Otomatis dialihkan ke Supplier Cadangan Sehat:\n`
+              + `• Supplier Baru: *${backupSeller.seller_name}*\n`
+              + `• Margin Supplier Baru: *${(backupSeller.net_margin_pct || 0).toFixed(1)}%* | Stok: *${backupSeller.stock} Unit*\n`
+              + `━━━━━━━━━━━━━━━━━━━━━━\n`
+              + `⚡ _Katalog Shopee & Web Store telah diperbarui otonom tanpa jeda penjualan._`
+            );
+            await sendTelegramAlert(failoverMsg);
+            failoverAlerts.push(game.id);
+          }
+        }
+      }
+    }
+
+    if (catalogModified) {
+      writeAuthoritativeCatalog(catalog);
+    }
+
     // Filter alerts
     const criticalItems = auditResults.filter((r) => r.health === "CRITICAL");
     const warningItems = auditResults.filter((r) => r.health === "WARNING");
     const safeCount = auditResults.filter((r) => r.health === "SAFE").length;
 
-    const alertsSent: string[] = [];
+    const alertsSent: string[] = [...failoverAlerts];
 
     // Send Critical Alerts (0 Stock / Sold Out)
     for (const item of criticalItems) {

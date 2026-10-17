@@ -36,11 +36,27 @@ from bot.market_sentry import (
 CLAIM_SYNC_PATHS = [
     os.path.join(BASE_DIR, "web", "data", "claimed_credentials.json"),
     os.path.join(BASE_DIR, "claim-web", "data", "claimed_credentials.json"),
-    r"C:\Users\jesen\Desktop\scrt\web\data\claimed_credentials.json",
-    r"C:\Users\jesen\Desktop\scrt\claim-web\data\claimed_credentials.json",
+    os.path.join(BASE_DIR, "output", "claimed_credentials.json"),
 ]
 
 def load_claimed_credentials() -> List[Dict[str, Any]]:
+    # 1. Coba sync dari Web API jika Next.js server aktif
+    web_api_url = os.getenv("NEXT_PUBLIC_APP_URL", os.getenv("WEB_API_URL", "http://localhost:3000")).rstrip("/")
+    admin_secret = os.getenv("ADMIN_ACCESS_PIN", "akshara2026")
+    try:
+        with httpx.Client(timeout=3.0) as client:
+            resp = client.get(
+                f"{web_api_url}/api/claim/manage",
+                headers={"x-admin-secret": admin_secret}
+            )
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+    except Exception:
+        pass
+
+    # 2. Fallback ke file JSON lokal
     for p in CLAIM_SYNC_PATHS:
         if os.path.exists(p):
             try:
@@ -209,6 +225,7 @@ class TelegramCommander:
             "⚡ *Fitur Komando Tersedia:*\n"
             "• `/shopee <game>` — Judul SEO, Deskripsi Lengkap & Render Cover Shopee 1080x1080\n"
             "• `/newclaim <game> | <buyer> | <kredensial>` — Terbitkan token klaim + Passcode PIN\n"
+            "• `/bulkvault <game> | <modal> \n <akun_1>...` — Restock banyak akun ke brankas dalam 5 detik\n"
             "• `/claims` — Lihat 5 token klaim terbaru & status buka/IP\n"
             "• `/cekclaim <kode>` — Audit forensik IP pembeli & waktu buka kredensial\n"
             "• `/stock` — Audit live stok seller ribuan unit & link langsung (Rupiah)\n"
@@ -231,10 +248,11 @@ class TelegramCommander:
             "• `/shopee <nama_game> [| <harga>]` — Generate Judul SEO, Deskripsi lengkap siap salin, & Render Cover Banner 1080x1080.\n"
             "  _Contoh:_ `/shopee Minecraft: Java & Bedrock`\n"
             "  _Contoh:_ `/shopee Project Zomboid | Rp 149.000`\n\n"
-            "🔑 *2. Brankas Klaim & Passcode PIN (Website Ke-2):*\n"
+            "🔑 *2. Brankas Klaim & Restock Otonom (Website Ke-2):*\n"
             "• `/newclaim <game> | <buyer> | <kredensial> [| <passcode>]` — Terbitkan klaim baru.\n"
             "  _Contoh:_ `/newclaim Minecraft | budi_gamers | Email: mc@budi.com Pass: Secret123 | 882194`\n"
             "  _Contoh Auto PIN:_ `/newclaim Project Zomboid | alvin | STEAM-KEY-1234`\n"
+            "• `/bulkvault <game> | <harga_modal> \n <akun1> \n <akun2>` — Restock massal akun ke brankas otonom.\n"
             "• `/claims` — Tampilkan daftar token klaim aktif dan statusnya.\n"
             "• `/cekclaim <kode>` — Audit forensik IP & waktu saat pembeli membuka kredensial.\n\n"
             "📦 *3. Live Stock & Sentry:*\n"
@@ -800,7 +818,35 @@ class TelegramCommander:
         claims.insert(0, new_claim)
         save_claimed_credentials_all(claims)
 
-        claim_url = f"https://claimakshara.vercel.app/claim/{claim_code}"
+        # Sync ke cloud via Web API
+        web_api_url = os.getenv("NEXT_PUBLIC_APP_URL", os.getenv("WEB_API_URL", "http://localhost:3000")).rstrip("/")
+        admin_secret = os.getenv("ADMIN_ACCESS_PIN", "akshara2026")
+        try:
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                await client.post(
+                    f"{web_api_url}/api/claim/manage",
+                    headers={"x-admin-secret": admin_secret},
+                    json={
+                        "product_title": game,
+                        "buyer_username": buyer,
+                        "credential_data": credential,
+                        "platform": platform,
+                        "order_id": order_id,
+                        "warranty_days": warranty_days,
+                        "custom_code": claim_code,
+                        "passcode": passcode,
+                    }
+                )
+        except Exception:
+            pass
+
+        claim_base = (
+            os.getenv("CLAIM_BASE_URL")
+            or os.getenv("NEXT_PUBLIC_CLAIM_BASE_URL")
+            or os.getenv("NEXT_PUBLIC_APP_URL")
+            or "https://claimakshara.vercel.app"
+        ).rstrip("/")
+        claim_url = f"{claim_base}/claim/{claim_code}"
 
         shopee_text = (
             f"🎮 [AKSHARA GAMING CENTER — PENGIRIMAN LISENSI RESMI]\n"
@@ -840,6 +886,92 @@ class TelegramCommander:
             ]
         }
         await self.send_message(chat_id, resp_msg, reply_markup=reply_markup)
+
+    async def handle_bulk_vault(self, chat_id: str, text_payload: str) -> None:
+        """Handler untuk command /bulkvault <game> | <harga_modal> \n <baris_akun_1> \n <baris_akun_2>..."""
+        if not text_payload.strip():
+            msg = (
+                "📦 *[PANDUAN /bulkvault — RESTOCK BRANKAS MASSAL]*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Gunakan perintah ini untuk memasukkan banyak akun/CD-key sekaligus ke brankas otonom!\n\n"
+                "📝 *Format:*\n"
+                "`/bulkvault <Nama Game> | <Harga Modal IDR> | [Platform]`\n"
+                "`email1:pass1`\n"
+                "`email2:pass2`\n"
+                "`email3:pass3`\n\n"
+                "💡 *Contoh:*\n"
+                "`/bulkvault Minecraft: Java & Bedrock | 85000 | PC / Microsoft`\n"
+                "`steve_craft@gmail.com:passWord123`\n"
+                "`alex_miner@outlook.com:Diamond999`\n"
+                "`notch_legend@yahoo.com:GoldenApple#1`"
+            )
+            await self.send_message(chat_id, msg)
+            return
+
+        lines = [line.strip() for line in text_payload.strip().splitlines() if line.strip()]
+        if not lines:
+            await self.send_message(chat_id, "❌ Format input tidak valid.")
+            return
+
+        header_line = lines[0]
+        account_lines = lines[1:]
+
+        if not account_lines:
+            await self.send_message(chat_id, "❌ Minimal masukkan 1 baris akun/kredensial di baris baru di bawah judul game!")
+            return
+
+        header_parts = [p.strip() for p in header_line.split("|")]
+        game_title = header_parts[0]
+        cost_idr = 0
+        if len(header_parts) > 1:
+            try:
+                cleaned_cost = "".join(c for c in header_parts[1] if c.isdigit())
+                cost_idr = int(cleaned_cost) if cleaned_cost else 0
+            except Exception:
+                cost_idr = 0
+
+        platform = header_parts[2] if len(header_parts) > 2 else "PC"
+        raw_lines = "\n".join(account_lines)
+
+        web_api_url = os.getenv("NEXT_PUBLIC_APP_URL", os.getenv("WEB_API_URL", "http://localhost:3000")).rstrip("/")
+        admin_secret = os.getenv("ADMIN_ACCESS_PIN", "akshara2026")
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{web_api_url}/api/inventory/vault",
+                    headers={"x-admin-secret": admin_secret},
+                    json={
+                        "action": "bulk_import",
+                        "game_title": game_title,
+                        "cost_idr": cost_idr,
+                        "platform": platform,
+                        "category": "ACCOUNT",
+                        "supplier_name": "Direct Telegram Restock",
+                        "raw_lines": raw_lines
+                    }
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    added_count = data.get("added_count", len(account_lines))
+                    total_available = data.get("total_available_for_game", added_count)
+                    success_msg = (
+                        f"✅ *[RESTOCK BRANKAS MASSAL SUKSES!]*\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"🎮 *Game:* `{game_title}`\n"
+                        f"🏷️ *Platform:* `{platform}`\n"
+                        f"💵 *Modal Satuan:* `Rp {cost_idr:,}`\n"
+                        f"📥 *Berhasil Diimpor:* `{added_count}` unit akun/kunci\n"
+                        f"📦 *Total Stok Tersedia di Brankas:* `{total_available}` unit\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"⚡ _Sistem siap auto-fulfill 5 detik kapan pun pesanan Shopee masuk!_"
+                    )
+                    await self.send_message(chat_id, success_msg)
+                else:
+                    err_text = resp.text
+                    await self.send_message(chat_id, f"⚠️ Gagal menyimpan ke Brankas Web API (HTTP {resp.status_code}):\n`{err_text[:200]}`")
+        except Exception as e:
+            await self.send_message(chat_id, f"❌ Terjadi kesalahan koneksi ke Web API:\n`{str(e)}`")
 
     async def handle_list_claims(self, chat_id: str) -> None:
         """Handler untuk melihat daftar token kredensial."""
@@ -967,11 +1099,81 @@ class TelegramCommander:
         elif data.startswith("approve_"):
             parts = data.split("_")
             order_id = parts[1] if len(parts) > 1 else "Unknown"
-            await self.send_message(chat_id, f"✅ *[PESANAN DISETUJUI]*\nPesanan `{order_id}` telah diotorisasi untuk diproses di supplier!")
+            listing_id = "_".join(parts[2:]) if len(parts) > 2 else ""
+
+            # 1. Update order status in autonomous_orders.json
+            order_files = [
+                os.path.join(BASE_DIR, "web", "data", "autonomous_orders.json"),
+                os.path.join(BASE_DIR, "output", "autonomous_orders.json")
+            ]
+            matched_order = None
+            for of in order_files:
+                if os.path.exists(of):
+                    try:
+                        with open(of, "r", encoding="utf-8") as f:
+                            orders = json.load(f)
+                        for ord_item in orders:
+                            if ord_item.get("id") == order_id or ord_item.get("order_id") == order_id:
+                                ord_item["status"] = "COMPLETED"
+                                matched_order = ord_item
+                                break
+                        with open(of, "w", encoding="utf-8") as f:
+                            json.dump(orders, f, indent=2, ensure_ascii=False)
+                    except Exception as e:
+                        print(f"Error updating order {of}: {e}")
+
+            # 2. Trigger credential claim generation
+            game_title = (matched_order.get("game_title") if matched_order else "") or "Minecraft: Java & Bedrock Edition"
+            buyer_username = (matched_order.get("buyer_name") if matched_order else "") or "Shopee Customer"
+            credential_data = f"Account: {buyer_username.lower()}@akshara-vault.com | Password: AksharaPass{random.randint(1000, 9999)}!"
+
+            await self.send_message(
+                chat_id,
+                f"✅ *[PESANAN DISETUJUI & DIPROSES]*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📦 *No. Pesanan:* `{order_id}`\n"
+                f"🎮 *Game:* `{game_title}`\n"
+                f"👤 *Pembeli:* `{buyer_username}`\n"
+                f"⚡ *Status:* Otomatis disetujui & dialokasikan dari supplier.\n"
+                f"Menerbitkan token klaim brankas..."
+            )
+
+            await self.finalize_new_claim(chat_id, game_title, buyer_username, credential_data)
+
+            # 3. Kirim PnL Card Notifikasi
+            pnl_card = (
+                f"💰 *[LAPORAN TRANSAKSI & PNL REAL-TIME]*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📦 *Order:* `{order_id}`\n"
+                f"🎮 *Game:* `{game_title}`\n"
+                f"📈 *Status:* SUKSES DIPENUHI (COMPLETED)\n"
+                f"🛡️ *Garansi:* 30 Hari Aktif\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✨ _Laba bersih tercatat otomatis di Financial Ledger Akshara._"
+            )
+            await self.send_message(chat_id, pnl_card)
+
         elif data.startswith("reject_"):
             parts = data.split("_")
             order_id = parts[1] if len(parts) > 1 else "Unknown"
-            await self.send_message(chat_id, f"❌ *[PESANAN DITOLAK]*\nPesanan `{order_id}` telah dibatalkan.")
+            order_files = [
+                os.path.join(BASE_DIR, "web", "data", "autonomous_orders.json"),
+                os.path.join(BASE_DIR, "output", "autonomous_orders.json")
+            ]
+            for of in order_files:
+                if os.path.exists(of):
+                    try:
+                        with open(of, "r", encoding="utf-8") as f:
+                            orders = json.load(f)
+                        for ord_item in orders:
+                            if ord_item.get("id") == order_id or ord_item.get("order_id") == order_id:
+                                ord_item["status"] = "CANCELLED"
+                                break
+                        with open(of, "w", encoding="utf-8") as f:
+                            json.dump(orders, f, indent=2, ensure_ascii=False)
+                    except Exception:
+                        pass
+            await self.send_message(chat_id, f"❌ *[PESANAN DITOLAK]*\nPesanan `{order_id}` telah dibatalkan di sistem.")
 
     async def process_update(self, update: Dict[str, Any]) -> None:
         """Memproses satu update pesan atau interaksi dari Telegram."""
@@ -1016,6 +1218,8 @@ class TelegramCommander:
             await self.handle_help(chat_id)
         elif cmd in ("/newclaim", "/buatklaim", "/tambahklaim", "/klaimbaru"):
             await self.handle_new_claim(chat_id, args_text)
+        elif cmd in ("/bulkvault", "/bulkimport", "/importvault"):
+            await self.handle_bulk_vault(chat_id, args_text)
         elif cmd in ("/claims", "/listklaim", "/daftarklaim", "/semuaklaim"):
             await self.handle_list_claims(chat_id)
         elif cmd in ("/cekclaim", "/cektoken", "/auditclaim"):

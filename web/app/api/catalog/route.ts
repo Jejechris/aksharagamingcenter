@@ -13,8 +13,12 @@ import { resolveG2GProductUrl } from "@/lib/g2g";
 import { getEnebaProductUrl } from "@/lib/eneba";
 
 async function notifyTelegramNewGame(newItem: any) {
-  const token = process.env.TELEGRAM_BOT_TOKEN || "8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI";
-  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID || "7025906160";
+  const token = process.env.TELEGRAM_BOT_TOKEN || "";
+  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
+  if (!token || !chatId) {
+    console.warn("[Telegram Catalog] TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID not configured, skipping.");
+    return;
+  }
   try {
     const isEneba = newItem.category?.toLowerCase().includes("key") ||
                     newItem.category?.toLowerCase().includes("cdkey") ||
@@ -243,7 +247,7 @@ export async function POST(req: Request) {
         stock: typeof new_seller.stock === 'number' ? new_seller.stock : (!isNaN(Number(new_seller.stock)) ? Number(new_seller.stock) : 100),
         risk_score: Number(new_seller.risk_score) || 0,
         is_recommended: Boolean(new_seller.is_recommended),
-        profile_url: new_seller.profile_url || "https://www.g2g.com/id",
+        profile_url: resolveG2GProductUrl(new_seller.profile_url, new_seller.seller_name, targetGame.title),
       };
 
       // Check if seller with same seller_name exists
@@ -361,7 +365,7 @@ export async function POST(req: Request) {
               stock: typeof incoming.stock === 'number' ? incoming.stock : (!isNaN(Number(incoming.stock)) ? Number(incoming.stock) : 20),
               risk_score: Number(incoming.risk_score) || 0,
               is_recommended: Boolean(incoming.is_recommended || incoming.is_selected),
-              profile_url: incoming.profile_url || "https://www.g2g.com/id",
+              profile_url: resolveG2GProductUrl(incoming.profile_url, incoming.seller_name || incoming.name, existing.title),
             };
 
             if (existingSellerIdx >= 0) {
@@ -396,7 +400,7 @@ export async function POST(req: Request) {
           stock: typeof s.stock === 'number' ? s.stock : (!isNaN(Number(s.stock)) ? Number(s.stock) : 20),
           risk_score: Number(s.risk_score) || 0,
           is_recommended: Boolean(s.is_recommended || s.is_selected),
-          profile_url: s.profile_url || "https://www.g2g.com/id",
+          profile_url: resolveG2GProductUrl(s.profile_url, s.seller_name || s.name, body.title),
         }));
 
         const newItem = {
@@ -496,7 +500,7 @@ export async function PATCH(req: Request) {
         stock: typeof new_seller.stock === 'number' ? new_seller.stock : (!isNaN(Number(new_seller.stock)) ? Number(new_seller.stock) : 100),
         risk_score: Number(new_seller.risk_score) || 0,
         is_recommended: Boolean(new_seller.is_recommended),
-        profile_url: new_seller.profile_url || "https://www.g2g.com/id",
+        profile_url: resolveG2GProductUrl(new_seller.profile_url, new_seller.seller_name, game.title),
       };
 
       const existingSellerIdx = game.sellers.findIndex(

@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { G2GScannedGame } from "@/app/api/research/g2g-crawler/route";
 import { ArbitrageOpportunity } from "@/app/api/research/opportunities/route";
-import { getG2GSellerUrl } from "@/lib/g2g";
+import { getG2GSellerUrl, resolveG2GProductUrl } from "@/lib/g2g";
 import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
 
 export default function ResearchCenterPage() {
@@ -996,7 +996,7 @@ export default function ResearchCenterPage() {
                           <>
                             <span>Supplier G2G:</span>
                             <a
-                              href={game.g2g_direct_url}
+                              href={resolveG2GProductUrl(game.g2g_direct_url, game.seller_name, game.title)}
                               target="_blank"
                               rel="noreferrer"
                               className="text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 font-semibold"
@@ -1119,7 +1119,7 @@ export default function ResearchCenterPage() {
                               setelah checkout kulakan).
                             </p>
                             <a
-                              href={game.g2g_direct_url}
+                              href={resolveG2GProductUrl(game.g2g_direct_url, game.seller_name, game.title)}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold underline pt-1"
@@ -1203,7 +1203,7 @@ export default function ResearchCenterPage() {
                         </a>
                       ) : (
                         <a
-                          href={game.g2g_direct_url}
+                          href={resolveG2GProductUrl(game.g2g_direct_url, game.seller_name, game.title)}
                           target="_blank"
                           rel="noreferrer"
                           className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition-colors"

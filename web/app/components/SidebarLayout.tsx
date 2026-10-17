@@ -204,6 +204,10 @@ export default function SidebarLayout({
     return pathname.startsWith(href);
   };
 
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
+
   return (
     <>
       {/* ── Mobile overlay ─────────────────────────────────── */}

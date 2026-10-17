@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { callGemini } from "@/lib/gemini";
-import { getG2GSellerUrl } from "@/lib/g2g";
+import { getG2GSellerUrl, resolveG2GProductUrl } from "@/lib/g2g";
 import { getDbCatalog } from "@/lib/db";
 
 export interface ArbitrageOpportunity {
@@ -374,6 +374,7 @@ export async function GET() {
 
       return {
         ...opp,
+        profile_url: resolveG2GProductUrl(opp.profile_url, opp.best_supplier?.name, opp.title),
         is_already_in_catalog: isAlreadyInCatalog,
       };
     });

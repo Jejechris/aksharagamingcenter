@@ -18,7 +18,12 @@ import {
   ArrowLeft,
   Search,
   Globe,
-  Smartphone
+  Smartphone,
+  Printer,
+  FileText,
+  Scale,
+  X,
+  Check
 } from "lucide-react";
 
 export default function ClaimsAdminDashboardPage() {
@@ -27,7 +32,15 @@ export default function ClaimsAdminDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [claimBaseUrl, setClaimBaseUrl] = useState<string>("https://claimakshara.vercel.app");
+  const [claimBaseUrl, setClaimBaseUrl] = useState<string>(
+    process.env.NEXT_PUBLIC_CLAIM_BASE_URL ||
+    process.env.NEXT_PUBLIC_CLAIM_WEB_URL ||
+    "https://claimakshara.vercel.app"
+  );
+
+  // Dispute Dossier Modal State
+  const [dossierClaim, setDossierClaim] = useState<any | null>(null);
+  const [copiedDefenseText, setCopiedDefenseText] = useState(false);
 
   // Modal Create
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -61,6 +74,14 @@ export default function ClaimsAdminDashboardPage() {
 
   useEffect(() => {
     fetchClaims();
+    if (typeof window !== "undefined") {
+      const envUrl = process.env.NEXT_PUBLIC_CLAIM_BASE_URL || process.env.NEXT_PUBLIC_CLAIM_WEB_URL;
+      if (envUrl) {
+        setClaimBaseUrl(envUrl.replace(/\/$/, ""));
+      } else {
+        setClaimBaseUrl(window.location.origin);
+      }
+    }
   }, []);
 
   const handleOpenModal = () => {
@@ -276,6 +297,16 @@ export default function ClaimsAdminDashboardPage() {
           />
           <button
             type="button"
+            onClick={() => {
+              if (typeof window !== "undefined") setClaimBaseUrl(window.location.origin);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[11px] font-mono text-emerald-400 border border-zinc-800 shrink-0"
+            title="Gunakan domain web saat ini"
+          >
+            Origin Web
+          </button>
+          <button
+            type="button"
             onClick={() => setClaimBaseUrl("https://claimakshara.vercel.app")}
             className="px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[11px] font-mono text-zinc-300 border border-zinc-800 shrink-0"
             title="Reset ke domain default Vercel"
@@ -368,15 +399,29 @@ export default function ClaimsAdminDashboardPage() {
 
                       <td className="py-3 px-3">
                         {isRev ? (
-                          <div>
+                          <div className="space-y-1">
                             <div className="text-zinc-300 text-[11px] font-bold flex items-center gap-1">
                               <Clock className="w-3 h-3 text-amber-400" />
                               <span>{revTime} WIB</span>
                             </div>
-                            <div className="text-[10px] text-zinc-500 mt-0.5 flex items-center gap-1">
+                            <div className="text-[10px] text-zinc-400 flex items-center gap-1">
                               <Globe className="w-3 h-3 text-cyan-400" />
                               <span>IP: <code className="text-cyan-300">{item.revealed_ip || "-"}</code></span>
                             </div>
+                            {item.forensics && (
+                              <div className="text-[10px] space-y-0.5 pt-1 border-t border-white/[0.04]">
+                                <div className="text-zinc-400">
+                                  <span>📍 {item.forensics.city || "ID"}, {item.forensics.country || "ID"} ({item.forensics.isp || "ISP"})</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 font-mono">
+                                  <span className={item.forensics.is_vpn_or_proxy ? "text-rose-400 font-bold" : "text-emerald-400"}>
+                                    {item.forensics.is_vpn_or_proxy ? "⚠️ VPN/Proxy" : "🛡️ ISP Residential"}
+                                  </span>
+                                  <span className="text-zinc-600">•</span>
+                                  <span className="text-zinc-500">{item.forensics.screen_resolution}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span className="text-zinc-600 text-[11px]">-</span>
@@ -385,6 +430,21 @@ export default function ClaimsAdminDashboardPage() {
 
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {isRev && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDossierClaim(item);
+                                setCopiedDefenseText(false);
+                              }}
+                              className="px-2 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-[11px] font-mono text-amber-300 border border-amber-500/30 flex items-center gap-1 transition-colors"
+                              title="Cetak Bukti Sengketa Shopee (Forensic Dossier)"
+                            >
+                              <Scale className="w-3 h-3 text-amber-400" />
+                              <span className="hidden sm:inline">Bukti Sengketa</span>
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => handleCopyShopeeChat(item)}
@@ -395,14 +455,15 @@ export default function ClaimsAdminDashboardPage() {
                             <span>{copiedCode === item.claim_code ? "Tersalin!" : "Chat Shopee"}</span>
                           </button>
 
-                          <Link
-                            href={`/claim/${item.claim_code}`}
+                          <a
+                            href={`${(claimBaseUrl && claimBaseUrl.trim() ? claimBaseUrl.trim() : "").replace(/\/$/, "")}/claim/${item.claim_code}`}
                             target="_blank"
+                            rel="noreferrer"
                             className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors"
                             title="Buka halaman klaim pembeli"
                           >
                             <ExternalLink className="w-3 h-3" />
-                          </Link>
+                          </a>
 
                           <button
                             type="button"
@@ -589,6 +650,197 @@ export default function ClaimsAdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cetak Bukti Sengketa Shopee (Forensic Dossier) */}
+      {dossierClaim && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto print:p-0 print:bg-white print:static">
+          <div className="w-full max-w-3xl rounded-2xl bg-slate-950 border border-amber-500/30 shadow-2xl p-6 sm:p-8 space-y-6 text-slate-100 print:border-none print:shadow-none print:text-black print:bg-white">
+            {/* Header Sertifikat */}
+            <div className="border-b border-amber-500/20 pb-4 flex items-start justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold uppercase tracking-wider mb-2">
+                  <Scale className="w-3.5 h-3.5" />
+                  <span>Akshara Digital Forensics — Dispute Proof</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-white print:text-black tracking-tight">
+                  BUKTI SAH SERAH TERIMA LISENSI DIGITAL
+                </h2>
+                <p className="text-xs text-slate-400 print:text-slate-600 font-mono mt-0.5">
+                  Dokumen Pembuktian Resmi Sengketa Transaksi Shopee Resolution Center
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDossierClaim(null)}
+                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors print:hidden"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Metadata Transaksi */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-slate-900/60 border border-slate-800 font-mono text-xs print:bg-slate-50 print:border-slate-300">
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase">No. Pesanan Shopee</span>
+                <span className="font-bold text-white print:text-black">{dossierClaim.order_id || "-"}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase">Username Pembeli</span>
+                <span className="font-bold text-emerald-400 print:text-black">@{dossierClaim.buyer_username}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase">Produk / Game</span>
+                <span className="font-bold text-white print:text-black truncate block">{dossierClaim.product_title}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase">Kode Klaim Unik</span>
+                <span className="font-bold text-amber-300 print:text-black">{dossierClaim.claim_code}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase">PIN Akses Rahasia</span>
+                <span className="font-bold text-cyan-300 print:text-black">{dossierClaim.passcode}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase">Serial Garansi Toko</span>
+                <span className="font-bold text-white print:text-black">{dossierClaim.warranty_code || "-"}</span>
+              </div>
+            </div>
+
+            {/* Bukti Kriptografis & Audit Log Server */}
+            <div className="space-y-3 font-mono text-xs">
+              <h3 className="font-bold text-amber-400 flex items-center gap-2 text-xs uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Bukti Kriptografis &amp; Log Forensik Akses</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 print:bg-slate-50 print:border-slate-300">
+                <div className="flex items-center justify-between border-b border-slate-800/50 pb-1.5">
+                  <span className="text-slate-400 text-[11px]">Waktu Akses WIB:</span>
+                  <span className="font-bold text-white print:text-black">
+                    {dossierClaim.revealed_at ? new Date(dossierClaim.revealed_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) : "-"} WIB
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-800/50 pb-1.5">
+                  <span className="text-slate-400 text-[11px]">Alamat IP Pembeli:</span>
+                  <span className="font-bold text-cyan-300 print:text-black">{dossierClaim.revealed_ip || dossierClaim.forensics?.ip || "-"}</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-800/50 pb-1.5">
+                  <span className="text-slate-400 text-[11px]">Penyedia Internet (ISP):</span>
+                  <span className="font-bold text-white print:text-black">{dossierClaim.forensics?.isp || "Residential Network"}</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-800/50 pb-1.5">
+                  <span className="text-slate-400 text-[11px]">Geolokasi Pembeli:</span>
+                  <span className="font-bold text-white print:text-black">
+                    {dossierClaim.forensics?.city || "Unknown"}, {dossierClaim.forensics?.country || "Indonesia"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-800/50 pb-1.5">
+                  <span className="text-slate-400 text-[11px]">Perangkat / OS / Resolusi:</span>
+                  <span className="font-bold text-white print:text-black truncate max-w-[200px]">
+                    {dossierClaim.forensics?.platform_os || "Unknown"} ({dossierClaim.forensics?.screen_resolution || "Standard"})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-800/50 pb-1.5">
+                  <span className="text-slate-400 text-[11px]">Status VPN / Proxy:</span>
+                  <span className={`font-bold ${dossierClaim.forensics?.is_vpn_or_proxy ? "text-rose-400" : "text-emerald-400"}`}>
+                    {dossierClaim.forensics?.is_vpn_or_proxy ? "⚠️ Terdeteksi VPN / Datacenter" : "🛡️ Aman (Residential ISP Asli)"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between sm:col-span-2 pt-1">
+                  <span className="text-slate-400 text-[11px]">Device Fingerprint Hash:</span>
+                  <code className="bg-slate-950 px-2 py-0.5 rounded text-emerald-400 border border-slate-800 text-[10px]">
+                    {dossierClaim.forensics?.device_hash || "AKSH-SEC-HASH-OK"}
+                  </code>
+                </div>
+              </div>
+            </div>
+
+            {/* SOP Persetujuan Video */}
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-center gap-2 text-emerald-300 font-mono">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>
+                <strong>SOP Uncut Video Disetujui:</strong> Pembeli telah menyetujui syarat wajib menyertakan video rekaman tanpa jeda sebelum kredensial didekripsi di layar.
+              </span>
+            </div>
+
+            {/* Format Argumen Sengketa untuk Hakim Shopee */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Argumen Mediasi Formal Shopee (Tinggal Paste)</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = (document.getElementById("formal-dispute-text") as HTMLTextAreaElement)?.value || "";
+                    navigator.clipboard.writeText(text);
+                    setCopiedDefenseText(true);
+                    setTimeout(() => setCopiedDefenseText(false), 2500);
+                  }}
+                  className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-mono flex items-center gap-1 border border-amber-500/30 transition-colors"
+                >
+                  {copiedDefenseText ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Argumen Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Salin Teks Pembelaan</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <textarea
+                id="formal-dispute-text"
+                readOnly
+                rows={7}
+                value={`Yth. Tim Hakim Mediasi & Resolusi Shopee Indonesia,
+
+Menanggapi pengajuan komplain pembeli (@${dossierClaim.buyer_username || "Pembeli"}) untuk No. Pesanan ${dossierClaim.order_id || "-"}:
+
+1. Toko Akshara Gaming Center telah menyerahkan lisensi/kredensial digital secara resmi melalui Portal Kredensial Terenkripsi Bank-Grade (claim.aksharagaming.com).
+2. Pembeli telah BERHASIL melakukan autentikasi menggunakan PIN Rahasia 6-Digit (${dossierClaim.passcode}) yang hanya dikirimkan ke chat privat pembeli.
+3. Kredensial telah DIBUKA & DIDEKRIPSI secara sah pada:
+   • Waktu Akses: ${dossierClaim.revealed_at ? new Date(dossierClaim.revealed_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) : "-"} WIB
+   • Alamat IP: ${dossierClaim.revealed_ip || dossierClaim.forensics?.ip || "-"} (${dossierClaim.forensics?.isp || "ISP"})
+   • Lokasi: ${dossierClaim.forensics?.city || "Indonesia"}, ${dossierClaim.forensics?.country || "ID"}
+   • Perangkat/OS: ${dossierClaim.forensics?.platform_os || "Device"} (${dossierClaim.forensics?.screen_resolution || "Standard"})
+   • Device Fingerprint Hash: ${dossierClaim.forensics?.device_hash || "AKSH-VERIFIED"}
+   • Total Akses Pembeli: ${dossierClaim.reveal_count || 1} kali
+4. Sesuai SOP & Ketentuan Garansi Toko yang telah disetujui pembeli sebelum kredensial dibuka di portal, pembeli WAJIB melampirkan video login tanpa jeda (uncut video) sejak pertama kali PIN dimasukkan. Pembeli TIDAK dapat menunjukkan bukti video uncut yang sah.
+5. Berdasarkan bukti rekam jejak audit forensik digital server di atas, pesanan telah diterima dan diakses penuh oleh pembeli. Mohon dana pesanan diteruskan ke penjual. Terima kasih.`}
+                className="w-full p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300 focus:outline-none resize-none leading-relaxed"
+              />
+            </div>
+
+            {/* Tombol Aksi */}
+            <div className="border-t border-slate-800 pt-4 flex items-center justify-between print:hidden">
+              <span className="text-[11px] text-slate-500 font-mono">
+                Sertifikat bukti digital berstatus autentik &amp; sah hukum e-commerce.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-mono text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-colors"
+                >
+                  <Printer className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Cetak / Simpan PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDossierClaim(null)}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition-colors"
+                >
+                  Selesai
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

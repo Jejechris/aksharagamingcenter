@@ -11,9 +11,12 @@ const outputCatalogPath = path.resolve(process.cwd(), "..", "output", "active_ca
 const tmpCatalogPath = path.resolve(os.tmpdir(), "akshara_active_catalog.json");
 const starterBackupPath = path.resolve(process.cwd(), "data", "starter_catalog_backup.json");
 
-// Secondary Desktop replica paths
-const replicaOutputPath = "C:\\Users\\jesen\\Desktop\\scrt\\output\\active_catalog.json";
-const replicaWebPath = "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\active_catalog.json";
+// Financial Constants
+export const USD_IDR_RATE = 16350;
+export const QRIS_FEE_PCT = 0.007; // 0.7%
+export const SHOPEE_ADMIN_FEE_PCT = 0.08; // 8.0%
+export const SHOPEE_FIXED_FEE_IDR = 1000;
+export const PACKAGING_COST_IDR = 0; // Pure digital mode = Rp 0; Physical Envelope = Rp 2.000
 
 // In-memory catalog cache
 let inMemoryCatalogCache: any[] | null = null;
@@ -69,15 +72,15 @@ export function calculateItemMetrics(item: any): CatalogGame {
     item.sellers?.[0] || { price_g2g_idr: 100000, seller_name: "Default Seller" };
 
   const cogsG2g = selectedSeller.price_g2g_idr || 0;
-  const qrisFee = Math.round(cogsG2g * 0.007);
+  const qrisFee = Math.round(cogsG2g * QRIS_FEE_PCT);
   const cogsNet = cogsG2g + qrisFee;
   const sellingPrice = item.selling_price_shopee_idr || 0;
-  const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
-  const packaging = 0; // A6 Card removed per user request for digital conversion
+  const shopeeFee = Math.round(sellingPrice * SHOPEE_ADMIN_FEE_PCT) + SHOPEE_FIXED_FEE_IDR;
+  const packaging = PACKAGING_COST_IDR; // Digital mode: Rp 0; Envelope: Rp 2.000
   const totalCost = cogsNet + shopeeFee + packaging;
   const netProfit = sellingPrice - totalCost;
   const netMargin = sellingPrice > 0 ? (netProfit / sellingPrice) * 100 : 0;
-  const breakEven = Math.round((cogsNet + 1000 + packaging) / (1 - 0.08));
+  const breakEven = Math.round((cogsNet + SHOPEE_FIXED_FEE_IDR + packaging) / (1 - SHOPEE_ADMIN_FEE_PCT));
 
   const enrichedSellers: Seller[] = (item.sellers || []).map((s: any) => {
     const sCogsG2g = s.price_g2g_idr || 0;
@@ -150,7 +153,7 @@ export async function readAuthoritativeCatalog(): Promise<any[]> {
   // Find candidate files on disk and pick the one with most entries or highest priority
   const candidates: Array<{ path: string; data: any[] }> = [];
 
-  const checkPaths = [bundledCatalogPath, outputCatalogPath, tmpCatalogPath, replicaWebPath, replicaOutputPath, starterBackupPath];
+  const checkPaths = [bundledCatalogPath, outputCatalogPath, tmpCatalogPath, starterBackupPath];
   for (const p of checkPaths) {
     const data = tryReadJson(p);
     if (data) {
@@ -184,8 +187,6 @@ export function writeAuthoritativeCatalog(catalogList: any[]): void {
     bundledCatalogPath,
     outputCatalogPath,
     tmpCatalogPath,
-    replicaWebPath,
-    replicaOutputPath,
   ];
 
   for (const targetPath of targets) {
@@ -426,8 +427,12 @@ export async function deleteGameFromCatalog(gameId: string): Promise<CatalogGame
 }
 
 async function notifyTelegramCatalogEvent(item: any) {
-  const token = process.env.TELEGRAM_BOT_TOKEN || "8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI";
-  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID || "7025906160";
+  const token = process.env.TELEGRAM_BOT_TOKEN || "";
+  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
+  if (!token || !chatId) {
+    console.warn("[Telegram Catalog Event] TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID not configured, skipping.");
+    return;
+  }
   try {
     const isEneba = item.category?.toLowerCase().includes("key") ||
                     item.category?.toLowerCase().includes("cdkey") ||

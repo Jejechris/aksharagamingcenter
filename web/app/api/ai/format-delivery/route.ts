@@ -78,19 +78,19 @@ function buildFallbackTemplate(
 
   const warrantySectionWa = isDigital
     ? `🛡️ *PENGINGAT GARANSI RESMI:*
-• Pesanan ini diproses 100% *DIGITAL* (Non-Fisik). Tidak ada paket/garansi digital yang dikirim melalui kurir ekspedisi.
+• Pesanan ini diproses 100% *DIGITAL* (Non-Fisik). Tidak ada paket/kartu garansi fisik yang dikirim melalui kurir ekspedisi.
 • Garansi resmi Akshara Gaming Center otomatis aktif secara digital berdasarkan No. Pesanan & riwayat chat WhatsApp ini.`
     : `🛡️ *PENGINGAT GARANSI RESMI:*
-• garansi digital berisi *garansi digital Akshara* sedang dikirimkan via ekspedisi.
-• Simpan garansi digital tersebut ya Kak. Sesuai SOP, klaim garansi memerlukan *screenshot kendala garansi digital tanpa jeda (no-cut)*.`;
+• Amplop fisik berisi *Kartu Garansi Resmi A6 Akshara* sedang dikirimkan via ekspedisi.
+• Simpan kartu garansi tersebut ya Kak. Sesuai SOP, klaim garansi memerlukan *video unboxing amplop tanpa jeda (no-cut)*.`;
 
   const warrantySectionShopee = isDigital
     ? `🛡️ PENGINGAT GARANSI RESMI:
-• Pesanan ini diproses 100% DIGITAL (Non-Fisik / Instant Delivery via Shopee Chat). Tidak ada paket/garansi digital yang dikirimkan ke kurir.
+• Pesanan ini diproses 100% DIGITAL (Non-Fisik / Instant Delivery via Shopee Chat). Tidak ada paket fisik yang dikirimkan ke kurir.
 • Garansi resmi toko otomatis aktif secara digital berdasarkan No. Pesanan ini. Simpan bukti chat ini sebagai tiket garansi resmi Kakak.`
     : `🛡️ PENGINGAT GARANSI RESMI:
-• garansi digital berisi Kartu Garansi Resmi A6 Akshara sedang kami kirimkan ke alamat Kakak via ekspedisi Shopee.
-`;
+• Amplop fisik berisi Kartu Garansi Resmi A6 Akshara sedang kami kirimkan ke alamat Kakak via ekspedisi Shopee.
+• Simpan amplop & kartu garansi tersebut. Sesuai SOP toko, klaim garansi memerlukan video unboxing tanpa jeda (no-cut & unedited).`;
 
   if (isKey) {
     if (isWhatsApp) {
@@ -227,13 +227,13 @@ export async function POST(req: Request) {
 
     // Delivery Mode Directive
     const deliveryModeRules = isDigital
-      ? `ATURAN MODE PENGIRIMAN: 100% DIGITAL (NON-FISIK / TANPA garansi digital / TANPA KURIR):
-- DILARANG KERAS menyebutkan kata "garansi digital", "resi pengiriman kurir", atau "ekspedisi sedang mengantar paket"!
+      ? `ATURAN MODE PENGIRIMAN: 100% DIGITAL (NON-FISIK / TANPA AMPLOP FISIK / TANPA KURIR):
+- DILARANG KERAS menyebutkan kata "amplop fisik", "resi pengiriman kurir", atau "ekspedisi sedang mengantar paket"!
 - Jelaskan bahwa pesanan ini diproses secara 100% DIGITAL langsung melalui chat ini.
 - Jelaskan bahwa garansi toko otomatis aktif secara DIGITAL berbasis No. Pesanan dan riwayat chat ini.`
-      : `ATURAN MODE PENGIRIMAN: PAKET AMPLUP FISIK (garansi digital):
-- Sertakan pengingat bahwa garansi digital resmi berisi garansi digital Akshara sedang dikirimkan via kurir ekspedisi ke alamat pembeli.
-- Ingatkan pembeli untuk merekam screenshot kendala garansi digital tanpa jeda/cut jika suatu saat membutuhkan klaim garansi.`;
+      : `ATURAN MODE PENGIRIMAN: PAKET AMPLOP FISIK (Kartu Garansi Resmi A6):
+- Sertakan pengingat bahwa amplop fisik resmi berisi Kartu Garansi A6 Akshara sedang dikirimkan via kurir ekspedisi ke alamat pembeli.
+- Ingatkan pembeli untuk merekam video unboxing amplop tanpa jeda/cut jika suatu saat membutuhkan klaim garansi.`;
 
     // Dynamic Channel Directives
     const channelRules = isWhatsApp
@@ -271,7 +271,7 @@ STRUKTUR PESAN WAJIB:
 1. Salam Pembuka yang hangat, sopan, dan apresiasi tulus atas pembelian. Sapa pembeli dengan: "${buyerName}".
 2. Box Kredensial / CDKey yang rapi dan terstruktur.
 3. 3 Langkah Cepat Pengamanan / Aktivasi (Actionable SOP bagi pembeli).
-4. Catatan Garansi Akshara Gaming Center sesuai mode: ${isDigital ? "100% Digital via No. Pesanan & Chat" : "garansi digital via Ekspedisi + screenshot kendala"}.
+4. Catatan Garansi Akshara Gaming Center sesuai mode: ${isDigital ? "100% Digital via No. Pesanan & Chat" : "Amplop Fisik Kartu Garansi A6 via Ekspedisi + Video Unboxing"}.
 5. Penutup yang hangat sesuai channel ${channel}, mendoakan have fun gaming, dan reminder review bintang 5.
 
 FORMAT OUTPUT HARUS JSON MURNI TANPA MARKDOWN KUTIPAN KODE:
@@ -300,7 +300,7 @@ FORMAT OUTPUT HARUS JSON MURNI TANPA MARKDOWN KUTIPAN KODE:
     };
 
     try {
-      const userPrompt = `Data Akun Mentah:\n${rawInput}\n\nGame: ${gameTitle}\nPlatform: ${platform}\nNama Pembeli: ${buyerName}\nChannel: ${channel}\nMode Pengiriman: ${isDigital ? "Digital Murni (Non-Fisik)" : "Paket garansi digital"}\nTone: ${tone}`;
+      const userPrompt = `Data Akun Mentah:\n${rawInput}\n\nGame: ${gameTitle}\nPlatform: ${platform}\nNama Pembeli: ${buyerName}\nChannel: ${channel}\nMode Pengiriman: ${isDigital ? "Digital Murni (Non-Fisik)" : "Paket Amplop Kartu Garansi Fisik A6"}\nTone: ${tone}`;
       const aiResponse = await callGemini(userPrompt, systemPrompt);
 
       let cleaned = aiResponse.trim();

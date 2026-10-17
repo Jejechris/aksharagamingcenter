@@ -31,7 +31,7 @@
 3. Framework Preset: **Next.js** (Root Directory: `./`).
 4. Set Environment Variables di Vercel:
    - `TELEGRAM_BOT_TOKEN`: Token bot Telegram Anda.
-   - `TELEGRAM_ADMIN_CHAT_ID`: Chat ID Telegram admin (e.g. `7025906160`).
+   - `TELEGRAM_ADMIN_CHAT_ID`: Chat ID Telegram admin (e.g. didapat via @userinfobot).
 5. Klik **Deploy**. Website akan langsung aktif (misalnya `https://claimakshara.vercel.app`).
 
 ---

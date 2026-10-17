@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { callGemini } from "@/lib/gemini";
 import fs from "fs";
 import path from "path";
+import { getKV } from "@/lib/db";
 
 export async function GET() {
   try {
@@ -15,22 +16,36 @@ export async function GET() {
     let txCount = 0;
     let catalogCount = 0;
 
-    const targetLedger = fs.existsSync(ledgerPath) ? ledgerPath : fs.existsSync(bundledLedgerPath) ? bundledLedgerPath : null;
-    if (targetLedger) {
-      try {
-        const ledger = JSON.parse(fs.readFileSync(targetLedger, "utf-8"));
-        totalGmv = ledger.total_gmv_idr || 0;
-        totalProfit = ledger.total_net_profit_idr || 0;
-        txCount = ledger.transactions?.length || 0;
-      } catch (e) {}
+    // 1. Fetch financial ledger from Cloud KV first, fallback to files
+    let ledger: any = await getKV("financial_ledger");
+    if (!ledger) {
+      const targetLedger = fs.existsSync(ledgerPath) ? ledgerPath : fs.existsSync(bundledLedgerPath) ? bundledLedgerPath : null;
+      if (targetLedger) {
+        try {
+          ledger = JSON.parse(fs.readFileSync(targetLedger, "utf-8"));
+        } catch (e) {}
+      }
     }
 
-    const targetCatalog = fs.existsSync(catalogPath) ? catalogPath : fs.existsSync(bundledCatalogPath) ? bundledCatalogPath : null;
-    if (targetCatalog) {
-      try {
-        const catalog = JSON.parse(fs.readFileSync(targetCatalog, "utf-8"));
-        catalogCount = catalog.length;
-      } catch (e) {}
+    if (ledger) {
+      const txList = Array.isArray(ledger) ? ledger : (ledger.transactions || []);
+      totalGmv = txList.reduce((sum: number, t: any) => sum + (Number(t.gross_revenue_idr) || 0), 0);
+      totalProfit = txList.reduce((sum: number, t: any) => sum + (Number(t.net_profit_idr) || 0), 0);
+      txCount = txList.length;
+    }
+
+    // 2. Fetch active catalog from Cloud KV first, fallback to files
+    let catalog: any = await getKV("active_catalog");
+    if (!catalog) {
+      const targetCatalog = fs.existsSync(catalogPath) ? catalogPath : fs.existsSync(bundledCatalogPath) ? bundledCatalogPath : null;
+      if (targetCatalog) {
+        try {
+          catalog = JSON.parse(fs.readFileSync(targetCatalog, "utf-8"));
+        } catch (e) {}
+      }
+    }
+    if (catalog && Array.isArray(catalog)) {
+      catalogCount = catalog.length;
     }
 
     const systemPrompt = `Kamu adalah Chief AI Operations Advisor untuk Senna (Mahasiswa Informatika ITS sekaligus Founder Akshara Gaming Center).

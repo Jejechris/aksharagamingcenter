@@ -912,7 +912,7 @@ export default function EnebaTerminalPage() {
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 font-semibold underline pt-1"
                           >
-                            <span>Buka Penawaran di Eneba.com/id Langsung</span>
+                            <span>Buka Penawaran di Eneba Langsung</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         </div>

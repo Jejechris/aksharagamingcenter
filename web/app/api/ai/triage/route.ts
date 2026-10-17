@@ -12,10 +12,10 @@ export async function POST(req: Request) {
 
     const systemPrompt = `Kamu adalah Sistem AI Triage Garansi Otomatis untuk Akshara Gaming Center.
 SOP Garansi Ketat Akshara:
-1. Wajib ada rekaman screenshot kendala dari garansi digital masih tersegel utuh. Jika video tidak ada atau terpotong/diedit, klaim WAJIB DITOLAK (REJECTED_NO_UNCUT_VIDEO).
-
+1. Wajib ada Rekaman Video Tanpa Jeda (No-Cut Video Recording saat membuka brankas klaim / login pertama). Jika video tidak ada atau terpotong/diedit, klaim WAJIB DITOLAK (REJECTED_NO_UNCUT_VIDEO).
+2. Bukti kendala harus terlihat jelas pada saat proses percobaan login pertama kali.
 3. Produk digital yang sudah diaktivasi tidak dapat di-refund karena alasan berubah pikiran (REJECTED_BUYER_REMORSE).
-4. Jika video no-cut valid dan masalah terkonfirmasi (misal email lock), setujui penggantian akun (APPROVED_FOR_REPLACEMENT).
+4. Jika video no-cut valid dan masalah terkonfirmasi (misal kredensial invalid/email lock), setujui penggantian akun (APPROVED_FOR_REPLACEMENT).
 
 Format output HARUS JSON murni tanpa markdown:
 {
@@ -27,7 +27,7 @@ Format output HARUS JSON murni tanpa markdown:
 
     const prompt = `Data Komplain Masuk:
 - No. Pesanan: ${order_id || "#240916MC99211A"}
-- Ada screenshot kendala: ${has_uncut_video ? "YA, VIDEO VALID NO-CUT" : "TIDAK ADA / VIDEO TERPOTONG"}
+- Ada Rekaman Video Tanpa Jeda (No-Cut Video Recording): ${has_uncut_video ? "YA, VIDEO VALID NO-CUT" : "TIDAK ADA / VIDEO TERPOTONG"}
 - Komplain Pembeli: "${claim_text}"`;
 
     try {
@@ -46,12 +46,12 @@ Format output HARUS JSON murni tanpa markdown:
       console.warn("Gemini triage fallback:", aiErr);
       const decision = !has_uncut_video ? "REJECTED_NO_UNCUT_VIDEO" : "APPROVED_FOR_REPLACEMENT";
       const reason = !has_uncut_video
-        ? "SOP Garansi Akshara mewajibkan bukti screenshot untuk validasi klaim."
-        : "screenshot kendala terverifikasi valid, disetujui untuk penanganan penggantian akun.";
+        ? "SOP Garansi Akshara mewajibkan bukti Rekaman Video Tanpa Jeda (No-Cut Video Recording saat membuka brankas klaim / login pertama) untuk validasi klaim."
+        : "Rekaman Video Tanpa Jeda (No-Cut Video Recording) terverifikasi valid, disetujui untuk penanganan penggantian akun.";
       const riskLevel = !has_uncut_video ? "HIGH" : "LOW";
       const autoReply = !has_uncut_video
-        ? "Halo Kak, mohon maaf sesuai SOP resmi toko yang tertera pada deskripsi produk dan garansi digital bersegel, setiap klaim kendala akun wajib melampirkan screenshot kendala. Mohon kirimkan video tersebut untuk kami proses lebih lanjut ya Kak."
-        : "Halo Kak, terima kasih sudah melampirkan screenshot kendala valid sesuai SOP. Kami mohon maaf atas ketidaknyamanannya, tim support kami sedang menyiapkan kredensial akun pengganti baru untuk Anda dalam 5-15 menit.";
+        ? "Halo Kak, mohon maaf sesuai SOP resmi toko yang tertera pada deskripsi produk dan portal klaim, setiap klaim kendala akun wajib melampirkan Rekaman Video Tanpa Jeda (No-Cut Video Recording saat membuka brankas klaim hingga login pertama). Mohon kirimkan video tersebut untuk kami proses lebih lanjut ya Kak."
+        : "Halo Kak, terima kasih sudah melampirkan Rekaman Video Tanpa Jeda (No-Cut Video Recording) valid sesuai SOP. Kami mohon maaf atas ketidaknyamanannya, tim support kami sedang menyiapkan kredensial akun pengganti baru untuk Anda dalam 5-15 menit.";
 
       return NextResponse.json({
         status: "success",

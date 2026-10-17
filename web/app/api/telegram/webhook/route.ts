@@ -5,12 +5,17 @@ import { resolveG2GProductUrl, KNOWN_DEAD_OFFERS, getG2GGameCategoryUrl } from "
 import { readAuthoritativeCatalog } from "@/lib/catalog";
 import fs from "fs";
 import path from "path";
+import { getKV, setKV } from "@/lib/db";
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI";
-const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "7025906160";
-const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
+const TELEGRAM_API = BOT_TOKEN ? `https://api.telegram.org/bot${BOT_TOKEN}` : "";
 
 async function sendTelegramMessage(chatId: string | number, text: string, replyMarkup?: any) {
+  if (!BOT_TOKEN || !TELEGRAM_API) {
+    console.warn("[Telegram Webhook] TELEGRAM_BOT_TOKEN is not configured, skipping.");
+    return;
+  }
   try {
     await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",
@@ -29,6 +34,7 @@ async function sendTelegramMessage(chatId: string | number, text: string, replyM
 }
 
 async function answerCallbackQuery(callbackQueryId: string, text?: string) {
+  if (!BOT_TOKEN || !TELEGRAM_API) return;
   try {
     await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
       method: "POST",
@@ -69,15 +75,33 @@ export async function GET(req: NextRequest) {
   const webhookUrl = searchParams.get("url");
 
   if (action === "set" && webhookUrl) {
+    if (!TELEGRAM_API) return NextResponse.json({ status: "error", message: "Bot token not configured" }, { status: 500 });
     const res = await fetch(`${TELEGRAM_API}/setWebhook?url=${encodeURIComponent(webhookUrl)}`);
     const data = await res.json();
     return NextResponse.json({ status: "setWebhook", result: data });
   }
 
   if (action === "delete") {
+    if (!TELEGRAM_API) return NextResponse.json({ status: "error", message: "Bot token not configured" }, { status: 500 });
     const res = await fetch(`${TELEGRAM_API}/deleteWebhook`);
     const data = await res.json();
     return NextResponse.json({ status: "deleteWebhook", result: data });
+  }
+
+  if (action === "test") {
+    if (!TELEGRAM_API || !ADMIN_CHAT_ID) return NextResponse.json({ ok: false, description: "Bot credentials not configured in environment" });
+    const msg = searchParams.get("message") || "Tes koneksi monitoring bot";
+    const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: ADMIN_CHAT_ID,
+        text: `🚀 *[TES KONEKSI MONITORING BOT]*\n━━━━━━━━━━━━━━━━━━━━━━\n${msg}\n━━━━━━━━━━━━━━━━━━━━━━\nStatus: 🟢 VERIFIED ONLINE`,
+        parse_mode: "Markdown"
+      })
+    });
+    const data = await res.json();
+    return NextResponse.json(data);
   }
 
   // Get info
@@ -665,11 +689,16 @@ function getClaimsFilePath(): string {
   return path.join(process.cwd(), "data", "claimed_credentials.json");
 }
 
-function readClaimsData(): any[] {
+async function readClaimsData(): Promise<any[]> {
+  const dbData = await getKV("claimed_credentials");
+  if (dbData && Array.isArray(dbData)) {
+    return dbData;
+  }
+
   const candidates = [
     getClaimsFilePath(),
     path.resolve(process.cwd(), "..", "claim-web", "data", "claimed_credentials.json"),
-    "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\claimed_credentials.json",
+    path.resolve(process.cwd(), "..", "output", "claimed_credentials.json"),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) {
@@ -681,23 +710,19 @@ function readClaimsData(): any[] {
   return [];
 }
 
-function saveClaimsData(claims: any[]): void {
-  const p = getClaimsFilePath();
-  const dir = path.dirname(p);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(claims, null, 2), "utf-8");
+async function saveClaimsData(claims: any[]): Promise<void> {
+  await setKV("claimed_credentials", claims);
 
   const syncTargets = [
+    getClaimsFilePath(),
     path.resolve(process.cwd(), "..", "claim-web", "data", "claimed_credentials.json"),
-    "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\claimed_credentials.json",
-    "C:\\Users\\jesen\\Desktop\\scrt\\claim-web\\data\\claimed_credentials.json",
+    path.resolve(process.cwd(), "..", "output", "claimed_credentials.json"),
   ];
   for (const target of syncTargets) {
     try {
       const d = path.dirname(target);
-      if (fs.existsSync(d)) {
-        fs.writeFileSync(target, JSON.stringify(claims, null, 2), "utf-8");
-      }
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(target, JSON.stringify(claims, null, 2), "utf-8");
     } catch (e) {}
   }
 }
@@ -870,7 +895,7 @@ async function finalizeClaim(
   credential: string,
   customPin?: string
 ) {
-  const claims = readClaimsData();
+  const claims = await readClaimsData();
   const passcode = customPin && customPin.trim() ? customPin.trim() : generateUniquePasscode(claims);
   const claimCode = generateUniqueClaimCode(claims, game);
   const orderId = `SHP-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}${Math.floor(1000 + Math.random() * 9000)}`;
@@ -899,9 +924,15 @@ async function finalizeClaim(
   };
 
   claims.unshift(newClaim);
-  saveClaimsData(claims);
+  await saveClaimsData(claims);
 
-  const claimUrl = `https://claimakshara.vercel.app/claim/${claimCode}`;
+  const claimBase = (
+    process.env.NEXT_PUBLIC_CLAIM_BASE_URL ||
+    process.env.NEXT_PUBLIC_CLAIM_WEB_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://claimakshara.vercel.app"
+  ).replace(/\/$/, "");
+  const claimUrl = `${claimBase}/claim/${claimCode}`;
 
   const shopeeText =
     `🎮 [AKSHARA GAMING CENTER — PENGIRIMAN LISENSI RESMI]\n`
@@ -910,7 +941,7 @@ async function finalizeClaim(
     + `🔑 KODE KLAIM: ${claimCode}\n`
     + `🔒 PASSCODE PIN RAHASIA: ${passcode}\n`
     + `🔗 LINK BUKA KREDENSIAL: ${claimUrl}\n\n`
-    + `⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan rekaman screenshot kendala tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${warrantyDays} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n`
+    + `⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan rekaman VIDEO UNBOXING / SCREEN RECORDING tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${warrantyDays} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n`
     + `━━━━━━━━━━━━━━━━━━━━━━\n`
     + `Terima kasih dan selamat bermain! 🚀`;
 
@@ -943,7 +974,7 @@ async function finalizeClaim(
 }
 
 async function handleListClaimsCommand(chatId: string | number) {
-  const claims = readClaimsData();
+  const claims = await readClaimsData();
   if (claims.length === 0) {
     await sendTelegramMessage(chatId, "ℹ️ Belum ada token klaim terdaftar di brankas.");
     return;
@@ -981,7 +1012,7 @@ async function handleCheckClaimCommand(chatId: string | number, codeQuery: strin
     return;
   }
 
-  const claims = readClaimsData();
+  const claims = await readClaimsData();
   const found = claims.find((c: any) => c.claim_code?.toUpperCase() === q);
 
   if (!found) {

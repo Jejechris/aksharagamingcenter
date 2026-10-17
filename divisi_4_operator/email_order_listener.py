@@ -46,9 +46,11 @@ class EmailOrderListener:
         order_sn_match = re.search(r"(?:No\.?\s*Pesanan|Order\s*ID)[:\s]*([0-9A-Z]{12,25})", raw_html_or_text, re.IGNORECASE)
         buyer_match = re.search(r"(?:Username|Pembeli|Customer)[:\s]*([a-zA-Z0-9_\.\-]+)", raw_html_or_text, re.IGNORECASE)
         price_match = re.search(r"(?:Total|Harga|Jumlah)[:\s]*Rp\s*([\d\.,]+)", raw_html_or_text, re.IGNORECASE)
+        product_match = re.search(r"(?:Produk|Nama Produk|Item|Product)[:\s]*([^\r\n<]+)", raw_html_or_text, re.IGNORECASE)
 
         order_id = order_sn_match.group(1) if order_sn_match else "240916MC99881A"
         buyer = buyer_match.group(1) if buyer_match else "gamer_surabaya"
+        product_title = product_match.group(1).strip() if product_match else "Minecraft: Java & Bedrock Edition - Full Access"
         
         price = 219900.0
         if price_match:
@@ -58,14 +60,16 @@ class EmailOrderListener:
             except ValueError:
                 price = 219900.0
 
+        from datetime import datetime
+
         return ShopeeOrder(
             order_id=order_id,
             buyer_username=buyer,
             buyer_phone="081234567890",
-            product_title="Minecraft: Java & Bedrock Edition - Full Access",
+            product_title=product_title,
             product_variation="PC Edition",
             selling_price_idr=price,
-            order_timestamp="2026-09-16 12:00:00",
+            order_timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             status=OrderStatus.RECEIVED
         )
 

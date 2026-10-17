@@ -117,15 +117,7 @@ export default function BotHealthMonitoringPage() {
     setSendingTest(true);
     setTestResult(null);
     try {
-      const res = await fetch("https://api.telegram.org/bot8911523018:AAFvUAesNmjOov7gWiuL9Sf9DePavy2fUpI/sendMessage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: "7025906160",
-          text: `🚀 *[TES KONEKSI MONITORING BOT]*\n━━━━━━━━━━━━━━━━━━━━━━\n${testMessage}\n━━━━━━━━━━━━━━━━━━━━━━\nStatus: 🟢 VERIFIED ONLINE`,
-          parse_mode: "Markdown"
-        })
-      });
+      const res = await fetch(`/api/telegram/webhook?action=test&message=${encodeURIComponent(testMessage)}`);
       const data = await res.json();
       if (data.ok) {
         setTestResult("✅ Pesan berhasil terkirim ke Telegram HP Anda!");
@@ -188,7 +180,7 @@ export default function BotHealthMonitoringPage() {
             <span>Identitas Bot</span>
           </div>
           <div className="text-sm font-bold font-mono text-white truncate">Akshara Ops Bot</div>
-          <div className="text-[10px] text-zinc-500 font-mono mt-1">ID: 8911523018</div>
+          <div className="text-[10px] text-zinc-500 font-mono mt-1">Configured (.env)</div>
         </div>
 
         <div className="v0-card p-4 rounded-2xl border-cyan-500/20 bg-cyan-950/10">
@@ -209,7 +201,7 @@ export default function BotHealthMonitoringPage() {
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>Admin Channel (HITL)</span>
           </div>
-          <div className="text-sm font-bold font-mono text-emerald-300">7025906160</div>
+          <div className="text-sm font-bold font-mono text-emerald-300">Admin Telegram (Senna)</div>
           <div className="text-[10px] text-zinc-500 font-mono mt-1">Terverifikasi HP Senna</div>
         </div>
 

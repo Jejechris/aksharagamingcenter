@@ -9,9 +9,17 @@ from typing import List, Optional
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 
-def get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    """Mengambil font dari sistem Windows dengan fallback aman."""
-    font_names = ["arialbd.ttf" if bold else "arial.ttf", "segoeuib.ttf" if bold else "segoeui.ttf", "tahoma.ttf"]
+def get_font(size: int, bold: bool = False):
+    """Mengambil font dari sistem (Windows, Linux, Docker) dengan fallback aman."""
+    font_names = [
+        "arialbd.ttf" if bold else "arial.ttf",
+        "segoeuib.ttf" if bold else "segoeui.ttf",
+        "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "LiberationSans-Bold.ttf" if bold else "LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "tahoma.ttf",
+    ]
     for font_name in font_names:
         try:
             return ImageFont.truetype(font_name, size)

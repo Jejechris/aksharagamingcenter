@@ -31,8 +31,8 @@ class WarrantyCardGenerator:
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def _create_qr_code_image(self, payload_text: str) -> str:
-        """Membuat QR code PNG dinamis dengan border halus."""
+    def _create_qr_code_image(self, payload_text: str) -> io.BytesIO:
+        """Membuat QR code PNG dinamis dalam buffer memori BytesIO."""
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -43,9 +43,10 @@ class WarrantyCardGenerator:
         qr.make(fit=True)
         img = qr.make_image(fill_color="#0F172A", back_color="#FFFFFF")
         
-        qr_path = os.path.join(self.output_dir, "temp_qr.png")
-        img.save(qr_path)
-        return qr_path
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        return buffer
 
     def generate_pdf(self, data: WarrantyCardData) -> str:
         """
@@ -197,8 +198,8 @@ class WarrantyCardGenerator:
         # =========================================================================
         # Generate real QR Code linking to verification endpoint
         verify_url = f"https://akshara-game.id/verify?sn={data.serial_number}&order={data.order_id}"
-        qr_file = self._create_qr_code_image(verify_url)
-        qr_img = RLImage(qr_file, width=48, height=48)
+        qr_buffer = self._create_qr_code_image(verify_url)
+        qr_img = RLImage(qr_buffer, width=48, height=48)
 
         metadata_rows = [
             [Paragraph("No. Pesanan:", label_bold), Paragraph(data.order_id, val_style)],
@@ -305,12 +306,4 @@ class WarrantyCardGenerator:
 
         # Render PDF
         doc.build(story)
-
-        # Bersihkan file temp QR jika ada
-        if os.path.exists(qr_file):
-            try:
-                os.remove(qr_file)
-            except Exception:
-                pass
-
         return file_path
