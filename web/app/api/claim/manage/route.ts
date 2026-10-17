@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getDbClaims, upsertDbClaim, deleteDbClaim, getKV, setKV } from "@/lib/db";
+import { encryptCredential, decryptCredential } from "@/lib/cryptoVault";
 
 function getClaimsFilePath() {
   return path.join(process.cwd(), "data", "claimed_credentials.json");
 }
 
-function readClaims(): any[] {
+async function readClaims(): Promise<any[]> {
+  const dbClaims = await getDbClaims();
+  if (dbClaims && Array.isArray(dbClaims) && dbClaims.length > 0) {
+    return dbClaims;
+  }
+
+  const dbData = await getKV("claimed_credentials");
+  if (dbData && Array.isArray(dbData)) {
+    return dbData;
+  }
+
   const p = getClaimsFilePath();
   if (fs.existsSync(p)) {
     try {
@@ -18,37 +30,39 @@ function readClaims(): any[] {
   return [];
 }
 
-function saveClaims(claims: any[]) {
-  const p = getClaimsFilePath();
-  const dir = path.dirname(p);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(claims, null, 2), "utf-8");
+async function saveClaims(claims: any[]): Promise<void> {
+  // 1. Simpan ke Supabase PostgreSQL KV (Backup Source of Truth)
+  await setKV("claimed_credentials", claims).catch(() => {});
 
-  // Sinkronkan ke replika jika ada
+  // 2. Simpan ke file disk lokal sebagai fallback
   const replicaPaths = [
-    "C:\\Users\\jesen\\Desktop\\scrt\\web\\data\\claimed_credentials.json",
+    getClaimsFilePath(),
     path.resolve(process.cwd(), "..", "output", "claimed_credentials.json"),
     path.resolve(process.cwd(), "..", "claim-web", "data", "claimed_credentials.json"),
-    "C:\\Users\\jesen\\Desktop\\scrt\\claim-web\\data\\claimed_credentials.json",
   ];
   for (const rPath of replicaPaths) {
     try {
       const d = path.dirname(rPath);
-      if (fs.existsSync(d)) {
-        fs.writeFileSync(rPath, JSON.stringify(claims, null, 2), "utf-8");
-      }
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(rPath, JSON.stringify(claims, null, 2), "utf-8");
     } catch (e) {}
   }
 }
 
 export async function GET() {
-  const claims = readClaims();
+  const claims = await readClaims();
+  const decryptedClaims = claims.map((c: any) => ({
+    ...c,
+    credential_data: decryptCredential(c.credential_data, c.passcode),
+    is_encrypted: Boolean(c.credential_data && c.credential_data.startsWith("ENCv1:")),
+  }));
+
   return NextResponse.json({
     status: "success",
     total: claims.length,
     unclaimed_count: claims.filter((c: any) => c.status !== "REVEALED").length,
     revealed_count: claims.filter((c: any) => c.status === "REVEALED").length,
-    data: claims,
+    data: decryptedClaims,
   });
 }
 
@@ -72,7 +86,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const claims = readClaims();
+    const claims = await readClaims();
     
     // Otomatiskan PIN Passcode unik (Anti-Tabrakan)
     const existingPasscodes = new Set(claims.map((c: any) => String(c.passcode || "").trim()));
@@ -107,6 +121,9 @@ export async function POST(req: NextRequest) {
     const cleanOrderId = order_id || `SHP-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}${Math.floor(1000 + Math.random() * 9000)}`;
     const warrantySerial = `AKSHARA-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
+    const rawCredentials = credential_data.trim();
+    const encryptedCreds = encryptCredential(rawCredentials, generatedPasscode);
+
     const newClaim = {
       claim_code: rndCode.toUpperCase(),
       passcode: generatedPasscode,
@@ -114,7 +131,8 @@ export async function POST(req: NextRequest) {
       buyer_username: buyer_username.trim(),
       product_title: product_title.trim(),
       platform: platform.trim(),
-      credential_data: credential_data.trim(),
+      credential_data: encryptedCreds,
+      is_encrypted: true,
       warranty_days: Number(warranty_days) || 30,
       warranty_code: warrantySerial,
       status: "UNCLAIMED",
@@ -126,13 +144,19 @@ export async function POST(req: NextRequest) {
       reveal_history: [],
     };
 
+    // Row-level atomic insert to PostgreSQL claims_vault
+    await upsertDbClaim(newClaim).catch(() => {});
+
     claims.unshift(newClaim);
-    saveClaims(claims);
+    await saveClaims(claims);
 
     return NextResponse.json({
       status: "success",
       message: "Kode klaim berhasil dibuat.",
-      data: newClaim,
+      data: {
+        ...newClaim,
+        credential_data: rawCredentials, // return plaintext to the creator
+      },
     });
   } catch (error: any) {
     return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
@@ -147,13 +171,16 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ status: "error", message: "Kode klaim wajib diisi." }, { status: 400 });
   }
 
-  const claims = readClaims();
+  // Row-level atomic delete from PostgreSQL claims_vault
+  await deleteDbClaim(code).catch(() => {});
+
+  const claims = await readClaims();
   const filtered = claims.filter((c: any) => c.claim_code.toUpperCase() !== code);
 
   if (filtered.length === claims.length) {
     return NextResponse.json({ status: "not_found", message: "Kode tidak ditemukan." }, { status: 404 });
   }
 
-  saveClaims(filtered);
+  await saveClaims(filtered);
   return NextResponse.json({ status: "success", message: "Kode klaim berhasil dihapus." });
 }

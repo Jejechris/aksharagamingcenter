@@ -1,8 +1,13 @@
+require('dotenv').config();
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-const DB_URL = "postgresql://postgres:Jesen310108!@db.intwrunyezoikoanskdt.supabase.co:5432/postgres";
+const DB_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
+if (!DB_URL) {
+  console.error("DATABASE_URL or POSTGRES_URL environment variable is required.");
+  process.exit(1);
+}
 
 async function main() {
   const client = new Client({

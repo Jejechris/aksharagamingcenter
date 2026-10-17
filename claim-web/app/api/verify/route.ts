@@ -1,9 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { getKV } from "@/lib/db";
+import { getDbClaimByCode, upsertDbClaim, getDbClaims, getKV, setKV } from "@/lib/db";
+
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
+
+async function notifyTelegramBruteForceAlert(claim: any, ip: string, userAgent: string) {
+  if (!BOT_TOKEN || !ADMIN_CHAT_ID) {
+    console.warn("[Telegram Security Alert] TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID is not configured, skipping.");
+    return;
+  }
+  try {
+    const timeStr = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
+    const msg =
+      `🚨 *[ALERT KEAMANAN: BRUTE-FORCE DETECTED]*\n`
+      + "━━━━━━━━━━━━━━━━━━━━━━\n"
+      + "⚠️ *Upaya pembobolan PIN terdeteksi!*\n"
+      + `🎮 *Game:* \`${claim.product_title}\`\n`
+      + `👤 *Pembeli:* \`${claim.buyer_username}\`\n`
+      + `📦 *Order:* \`${claim.order_id}\`\n`
+      + `🔑 *Kode Klaim:* \`${claim.claim_code}\`\n`
+      + `📍 *IP Address:* \`${ip}\`\n`
+      + `📱 *User-Agent:* \`${userAgent.slice(0, 80)}\`\n`
+      + `⏱️ *Waktu:* ${timeStr} WIB\n`
+      + "🔒 *Tindakan:* Akun otomatis DIKUNCI sementara selama 15 menit demi keamanan sistem.";
+
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: ADMIN_CHAT_ID,
+        text: msg,
+        parse_mode: "Markdown",
+        disable_web_page_preview: true,
+      }),
+    });
+  } catch (err) {
+    console.error("[Telegram Security Alert Error]", err);
+  }
+}
 
 async function getClaimsData(): Promise<any[]> {
+  const dbClaims = await getDbClaims();
+  if (dbClaims && Array.isArray(dbClaims) && dbClaims.length > 0) {
+    return dbClaims;
+  }
+
   const dbData = await getKV("claimed_credentials");
   if (dbData && Array.isArray(dbData)) {
     return dbData;
@@ -24,6 +67,21 @@ async function getClaimsData(): Promise<any[]> {
   return [];
 }
 
+function syncLocalDisk(claims: any[]) {
+  const candidates = [
+    path.join(process.cwd(), "data", "claimed_credentials.json"),
+    path.resolve(process.cwd(), "..", "web", "data", "claimed_credentials.json"),
+  ];
+  for (const p of candidates) {
+    try {
+      const d = path.dirname(p);
+      if (fs.existsSync(d)) {
+        fs.writeFileSync(p, JSON.stringify(claims, null, 2), "utf-8");
+      }
+    } catch (e) {}
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -34,8 +92,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "error", message: "Kode klaim wajib diisi." }, { status: 400 });
     }
 
+    let claim = await getDbClaimByCode(code);
     const claims = await getClaimsData();
-    const claim = claims.find((c: any) => c.claim_code.toUpperCase() === code);
+    const claimIndex = claims.findIndex((c: any) => c.claim_code.toUpperCase() === code);
+
+    if (!claim && claimIndex !== -1) {
+      claim = claims[claimIndex];
+    }
 
     if (!claim) {
       return NextResponse.json({
@@ -44,15 +107,61 @@ export async function POST(req: NextRequest) {
       }, { status: 404 });
     }
 
+    // Deteksi IP Address Pembeli
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const realIp = req.headers.get("x-real-ip");
+    const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : realIp || "127.0.0.1";
+    const userAgent = req.headers.get("user-agent") || "Unknown Device";
+
+    // Cek apakah akun sedang terkunci karena brute-force PIN
+    if (claim.locked_until && new Date(claim.locked_until) > new Date()) {
+      return NextResponse.json({
+        status: "rate_limited",
+        message: "Terlalu banyak percobaan PIN salah. Akun dikunci sementara selama 15 menit demi keamanan."
+      }, { status: 429 });
+    }
+
     // Jika passcode disertakan, periksa apakah cocok
     let isPasscodeValid = false;
     if (passcode) {
       isPasscodeValid = claim.passcode === passcode;
       if (!isPasscodeValid) {
+        claim.failed_attempts = (claim.failed_attempts || 0) + 1;
+        const isLocked = claim.failed_attempts >= 5;
+        if (isLocked) {
+          claim.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+          await notifyTelegramBruteForceAlert(claim, ip, userAgent);
+        }
+
+        // Simpan pembaruan atomic row-level ke PostgreSQL claims_vault
+        await upsertDbClaim(claim).catch(() => {});
+
+        if (claimIndex !== -1) {
+          claims[claimIndex] = claim;
+          await setKV("claimed_credentials", claims).catch(() => {});
+          syncLocalDisk(claims);
+        }
+
+        if (isLocked) {
+          return NextResponse.json({
+            status: "rate_limited",
+            message: "Terlalu banyak percobaan PIN salah. Akun dikunci sementara selama 15 menit demi keamanan."
+          }, { status: 429 });
+        }
+
         return NextResponse.json({
           status: "invalid_passcode",
-          message: "Passcode PIN salah! Harap periksa PIN rahasia yang diberikan penjual di chat Shopee."
+          message: `Passcode PIN salah! Sisa percobaan: ${5 - claim.failed_attempts}. Harap periksa PIN rahasia yang diberikan penjual di chat Shopee.`
         }, { status: 401 });
+      } else {
+        // Reset counter saat passcode valid
+        if (claim.failed_attempts || claim.locked_until) {
+          claim.failed_attempts = 0;
+          claim.locked_until = null;
+          claims[claimIndex] = claim;
+          await setKV("claimed_credentials", claims);
+          syncLocalDisk(claims);
+        }
       }
     }
 

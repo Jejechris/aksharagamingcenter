@@ -18,6 +18,13 @@ if os.path.exists(_env_path):
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 
+USD_IDR_RATE = 16350.0
+QRIS_FEE_PCT = 0.007
+SHOPEE_ADMIN_FEE_PCT = 0.08
+SHOPEE_FIXED_FEE_IDR = 1000.0
+PACKAGING_COST_IDR = 2000.0
+
+
 class RiskConfig(BaseModel):
     min_rating_pct: float = Field(default=98.0, description="Rating minimal seller G2G (%)")
     min_reviews_count: int = Field(default=5000, description="Batas minimum total transaksi/review seller")
@@ -38,23 +45,23 @@ class FinancialConfig(BaseModel):
     # G2G Indonesia (g2g.com/id) Payment & Currency Settings
     g2g_portal_url: str = "https://www.g2g.com/id"
     g2g_currency: str = "IDR"
-    qris_payment_fee_pct: float = float(os.getenv("DEFAULT_QRIS_FEE_PCT", "0.7"))  # Standard QRIS MDR (0.7%)
+    qris_payment_fee_pct: float = QRIS_FEE_PCT  # Standard QRIS MDR (0.7%)
     
     # Marketplace Selling Fees (Shopee)
-    shopee_admin_fee_pct: float = float(os.getenv("DEFAULT_SHOPEE_ADMIN_FEE_PCT", "8.0"))
-    shopee_fixed_fee_idr: float = float(os.getenv("DEFAULT_SHOPEE_FIXED_FEE_IDR", "1000.0"))
-    packaging_and_envelope_cost_idr: float = float(os.getenv("DEFAULT_PACKAGING_COST_IDR", "2000.0"))
+    shopee_admin_fee_pct: float = SHOPEE_ADMIN_FEE_PCT * 100.0
+    shopee_fixed_fee_idr: float = SHOPEE_FIXED_FEE_IDR
+    packaging_and_envelope_cost_idr: float = PACKAGING_COST_IDR
     target_min_net_margin_pct: float = float(os.getenv("DEFAULT_TARGET_NET_MARGIN_PCT", "25.0"))
     
     # Fallback USD/IDR reference if listing is quoted in USD
-    usd_idr_exchange_rate: float = float(os.getenv("DEFAULT_USD_IDR_RATE", "16350.0"))
+    usd_idr_exchange_rate: float = USD_IDR_RATE
     card_fx_fee_pct: float = float(os.getenv("DEFAULT_CARD_FX_FEE_PCT", "2.0"))
 
 
 class SystemConfig(BaseModel):
     # Telegram Bot HITL Credentials
-    telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "mock_telegram_token")
-    telegram_admin_chat_id: str = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "mock_admin_chat_id")
+    telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    telegram_admin_chat_id: str = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "")
     
     # WhatsApp Gateway (Fonnte)
     fonnte_api_token: str = os.getenv("FONNTE_API_TOKEN", "mock_fonnte_token")

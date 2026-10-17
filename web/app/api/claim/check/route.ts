@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getDbClaimByCode, getDbClaims, getKV } from "@/lib/db";
 
-function getClaimsData(): any[] {
+async function getClaimsData(): Promise<any[]> {
+  const dbClaims = await getDbClaims();
+  if (dbClaims && Array.isArray(dbClaims) && dbClaims.length > 0) {
+    return dbClaims;
+  }
+
+  const dbData = await getKV("claimed_credentials");
+  if (dbData && Array.isArray(dbData)) {
+    return dbData;
+  }
+
   const filePath = path.join(process.cwd(), "data", "claimed_credentials.json");
   if (fs.existsSync(filePath)) {
     try {
@@ -22,8 +33,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status: "error", message: "Kode klaim tidak boleh kosong." }, { status: 400 });
   }
 
-  const claims = getClaimsData();
-  const claim = claims.find((c: any) => c.claim_code.toUpperCase() === code);
+  // Row-level atomic lookup from claims_vault
+  let claim = await getDbClaimByCode(code);
+  if (!claim) {
+    const claims = await getClaimsData();
+    claim = claims.find((c: any) => c.claim_code.toUpperCase() === code);
+  }
 
   if (!claim) {
     return NextResponse.json({
@@ -48,6 +63,7 @@ export async function GET(req: NextRequest) {
       revealed_at: claim.revealed_at,
       reveal_count: claim.reveal_count || 0,
       is_already_revealed: claim.status === "REVEALED",
+      is_locked: !!(claim.locked_until && new Date(claim.locked_until) > new Date()),
     }
   });
 }

@@ -1,8 +1,14 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env.local') });
+require('dotenv').config();
 const { Pool } = require('pg');
 const fs = require('fs');
-const path = require('path');
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres.intwrunyezoikoanskdt:W8pX4Gczovlqpqw9@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres';
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+if (!connectionString) {
+  console.error("DATABASE_URL or POSTGRES_URL environment variable is required.");
+  process.exit(1);
+}
 
 const pool = new Pool({
   connectionString,

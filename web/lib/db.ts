@@ -254,3 +254,144 @@ export async function setKV(key: string, value: any): Promise<boolean> {
   } catch (err) {}
   return false;
 }
+
+// -------------------------------------------------------------
+// Atomic Claims Vault Helpers (Row-Level Concurrency Guard)
+// -------------------------------------------------------------
+
+function mapClaimRow(r: any): any {
+  if (!r) return null;
+  return {
+    claim_code: r.claim_code,
+    passcode: r.passcode,
+    order_id: r.order_id,
+    buyer_username: r.buyer_username,
+    product_title: r.product_title,
+    platform: r.platform,
+    credential_data: r.credential_data,
+    is_encrypted: Boolean(r.is_encrypted),
+    warranty_days: Number(r.warranty_days) || 30,
+    warranty_code: r.warranty_code,
+    status: r.status,
+    created_at: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+    revealed_at: r.revealed_at ? new Date(r.revealed_at).toISOString() : null,
+    revealed_ip: r.revealed_ip || null,
+    revealed_user_agent: r.revealed_user_agent || null,
+    reveal_count: Number(r.reveal_count) || 0,
+    failed_attempts: Number(r.failed_attempts) || 0,
+    locked_until: r.locked_until ? new Date(r.locked_until).toISOString() : null,
+    forensics: typeof r.forensics === "string" ? JSON.parse(r.forensics) : r.forensics || {},
+    reveal_history: typeof r.reveal_history === "string" ? JSON.parse(r.reveal_history) : r.reveal_history || [],
+  };
+}
+
+export async function upsertDbClaim(claim: any): Promise<boolean> {
+  if (!isDbConfigured()) return false;
+  try {
+    await queryDb(
+      `INSERT INTO claims_vault (
+        claim_code, passcode, order_id, buyer_username, product_title, platform,
+        credential_data, is_encrypted, warranty_days, warranty_code, status,
+        created_at, revealed_at, revealed_ip, revealed_user_agent, reveal_count,
+        failed_attempts, locked_until, forensics, reveal_history
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+      ON CONFLICT (claim_code) DO UPDATE SET
+        passcode = EXCLUDED.passcode,
+        order_id = COALESCE(EXCLUDED.order_id, claims_vault.order_id),
+        buyer_username = COALESCE(EXCLUDED.buyer_username, claims_vault.buyer_username),
+        product_title = COALESCE(EXCLUDED.product_title, claims_vault.product_title),
+        platform = COALESCE(EXCLUDED.platform, claims_vault.platform),
+        credential_data = EXCLUDED.credential_data,
+        is_encrypted = EXCLUDED.is_encrypted,
+        warranty_days = EXCLUDED.warranty_days,
+        warranty_code = COALESCE(EXCLUDED.warranty_code, claims_vault.warranty_code),
+        status = EXCLUDED.status,
+        revealed_at = EXCLUDED.revealed_at,
+        revealed_ip = EXCLUDED.revealed_ip,
+        revealed_user_agent = EXCLUDED.revealed_user_agent,
+        reveal_count = EXCLUDED.reveal_count,
+        failed_attempts = EXCLUDED.failed_attempts,
+        locked_until = EXCLUDED.locked_until,
+        forensics = EXCLUDED.forensics,
+        reveal_history = EXCLUDED.reveal_history`,
+      [
+        claim.claim_code,
+        claim.passcode,
+        claim.order_id || null,
+        claim.buyer_username || "anonymous",
+        claim.product_title || "Game Account",
+        claim.platform || "PC",
+        claim.credential_data || "",
+        Boolean(claim.is_encrypted ?? (claim.credential_data && claim.credential_data.startsWith("ENCv1:"))),
+        Number(claim.warranty_days) || 30,
+        claim.warranty_code || null,
+        claim.status || "UNCLAIMED",
+        claim.created_at || new Date().toISOString(),
+        claim.revealed_at || null,
+        claim.revealed_ip || null,
+        claim.revealed_user_agent || null,
+        Number(claim.reveal_count) || 0,
+        Number(claim.failed_attempts) || 0,
+        claim.locked_until || null,
+        JSON.stringify(claim.forensics || {}),
+        JSON.stringify(claim.reveal_history || []),
+      ]
+    );
+    return true;
+  } catch (err) {
+    console.warn("Notice: upsertDbClaim failed:", err);
+    return false;
+  }
+}
+
+export async function getDbClaims(): Promise<any[] | null> {
+  if (!isDbConfigured()) return null;
+  try {
+    const rows = await queryDb(
+      "SELECT * FROM claims_vault ORDER BY created_at DESC"
+    );
+    if (rows && rows.length > 0) {
+      return rows.map(mapClaimRow);
+    }
+    // Auto-seed from KV if table is empty
+    const kvClaims = await getKV("claimed_credentials");
+    if (Array.isArray(kvClaims) && kvClaims.length > 0) {
+      for (const c of kvClaims) {
+        await upsertDbClaim(c).catch(() => {});
+      }
+      return kvClaims;
+    }
+    return [];
+  } catch (err) {
+    console.warn("Notice: getDbClaims failed, falling back to KV:", err);
+    return null;
+  }
+}
+
+export async function getDbClaimByCode(code: string): Promise<any | null> {
+  if (!isDbConfigured() || !code) return null;
+  try {
+    const rows = await queryDb(
+      "SELECT * FROM claims_vault WHERE UPPER(claim_code) = UPPER($1) LIMIT 1",
+      [code.trim()]
+    );
+    if (rows && rows.length > 0) {
+      return mapClaimRow(rows[0]);
+    }
+  } catch (err) {
+    console.warn("Notice: getDbClaimByCode failed:", err);
+  }
+  return null;
+}
+
+export async function deleteDbClaim(code: string): Promise<boolean> {
+  if (!isDbConfigured() || !code) return false;
+  try {
+    await queryDb("DELETE FROM claims_vault WHERE UPPER(claim_code) = UPPER($1)", [code.trim()]);
+    return true;
+  } catch (err) {
+    console.warn("Notice: deleteDbClaim failed:", err);
+    return false;
+  }
+}
+

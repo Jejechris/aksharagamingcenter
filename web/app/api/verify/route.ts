@@ -51,7 +51,7 @@ export async function GET(request: Request) {
         warranty_days_total: 30,
         warranty_expires: "16 Oktober 2026",
         authenticity: "100% Original Microsoft Digital License",
-        sop_summary: "Wajib menyertakan screenshot kendala & first-login tanpa jeda (no-cut) untuk klaim penggantian baru."
+        sop_summary: "Wajib menyertakan video unboxing / screen recording & first-login tanpa jeda (no-cut) untuk klaim penggantian baru."
       }
     });
   }
@@ -59,6 +59,6 @@ export async function GET(request: Request) {
   return NextResponse.json({
     status: "not_found",
     verified: false,
-    message: "Serial ID atau Nomor Pesanan tidak terdaftar di sistem Akshara Gaming Center. Pastikan Anda memasukkan kode yang tertera di Garansi Digital."
+    message: "Serial ID atau Nomor Pesanan tidak terdaftar di sistem Akshara Gaming Center. Pastikan Anda memasukkan kode yang tertera di Garansi / Bukti Pembelian."
   }, { status: 404 });
 }
