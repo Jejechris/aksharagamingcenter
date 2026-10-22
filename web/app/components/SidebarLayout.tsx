@@ -66,6 +66,13 @@ const navSections: NavSection[] = [
     title: "INTELLIGENCE & TOOLS",
     items: [
       {
+        label: "Shopee 1-Flow Launchpad",
+        href: "/dashboard/shopee-launchpad",
+        icon: <ShoppingBag className="w-4 h-4 shrink-0 text-orange-400" />,
+        badge: "1-FLOW",
+        color: "text-orange-400"
+      },
+      {
         label: "Radar Katalog",
         href: "/dashboard/catalog",
         icon: <Store className="w-4 h-4 shrink-0 text-amber-400" />,

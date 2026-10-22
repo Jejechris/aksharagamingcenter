@@ -5,7 +5,7 @@ import { fetchSmartCatalog } from "@/lib/catalogClient";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  FileText, Sparkles, Copy, Check, ArrowLeft, RefreshCw,
+  FileText, Sparkles, Copy, Check, ArrowLeft, ArrowRight, RefreshCw,
   Download, ShoppingBag, ShieldCheck, CheckCircle2, Sliders,
   HelpCircle, AlertTriangle, Smartphone, Eye, Tag, Zap,
   ExternalLink, Layers, Store, Award, Info, Palette, Image as ImageIcon
@@ -553,6 +553,33 @@ function DescriptionMakerContent() {
               <span>{isGenerating ? "Sedang Menyusun..." : "Generate Ulang AI"}</span>
             </button>
           </div>
+        </div>
+
+        {/* 1-Flow Launchpad Innovation Banner */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-transparent border border-orange-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30 shrink-0">
+              <ShoppingBag className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white block">Mau Semua Lengkap di 1 Layar Tanpa Pindah Halaman?</span>
+                <span className="text-[9px] font-mono font-bold bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full border border-orange-500/30 uppercase">
+                  FITUR BARU
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-400 leading-snug block mt-0.5">
+                Buka <strong>Shopee 1-Flow Launchpad</strong>: Cover HD 1080x1080, Judul SEO, Deskripsi Lengkap, dan Kalkulasi Laba Bersih tampil bersamaan berdampingan siap salin!
+              </span>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/shopee-launchpad"
+            className="btn-cyber-emerald px-4 py-2.5 rounded-xl text-xs font-mono font-bold whitespace-nowrap shrink-0 shadow-md flex items-center gap-1.5"
+          >
+            <span>Buka 1-Flow Launchpad</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
 
         {/* Quick Inventory Game Chips */}
