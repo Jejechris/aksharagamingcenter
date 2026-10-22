@@ -26,6 +26,8 @@ interface Seller {
   risk_score: number;
   is_recommended: boolean;
   profile_url?: string;
+  fallback_search_url?: string;
+  offer_id?: string;
   tier?: 'ultra_safe' | 'lowest_price' | 'mid_level' | string;
   tier_label?: string;
   tier_desc?: string;
@@ -662,7 +664,7 @@ export default function CatalogDashboardPage() {
           stock: 25,
           risk_score: 0,
           is_recommended: true,
-          profile_url: 'https://www.g2g.com/id'
+          profile_url: 'https://www.g2g.com/categories/steam-global-account'
         }
       ]
     };
@@ -1125,7 +1127,7 @@ export default function CatalogDashboardPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          const url = selectedSeller?.profile_url || getValidSellerUrl(selectedSeller, game.title);
+                          const url = selectedSeller?.fallback_search_url || selectedSeller?.profile_url || getValidSellerUrl(selectedSeller, game.title);
                           handleDetectLink(url);
                         }}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition-all cursor-pointer"
@@ -1488,7 +1490,7 @@ export default function CatalogDashboardPage() {
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          const url = s.profile_url || getValidSellerUrl(s, game.title);
+                                          const url = s.fallback_search_url || s.profile_url || getValidSellerUrl(s, game.title);
                                           handleDetectLink(url);
                                         }}
                                         className="p-1 rounded-md text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors cursor-pointer"

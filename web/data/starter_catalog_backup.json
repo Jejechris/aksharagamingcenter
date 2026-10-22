@@ -22,7 +22,7 @@
         "stock": 6604,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1703129821471UK",
+        "profile_url": "https://www.g2g.com/categories/minecraft-account?q=HellenWong",
         "qris_fee_idr": 1302,
         "cogs_net_idr": 187302,
         "net_profit_idr": 39606,
@@ -46,7 +46,7 @@
         "stock": 8796,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1703129540216LH",
+        "profile_url": "https://www.g2g.com/categories/minecraft-account?q=HellenWong",
         "qris_fee_idr": 1037,
         "cogs_net_idr": 149137,
         "net_profit_idr": 77771,
@@ -55,7 +55,7 @@
         "live_status": "live",
         "live_synced_at": "2026-09-22T11:15:39.325Z",
         "offer_id": "G1703129540216LH",
-        "fallback_search_url": "https://www.g2g.com/categories/minecraft-account?q=HellenWong_Hypixel"
+        "fallback_search_url": "https://www.g2g.com/categories/minecraft-account?q=HellenWong"
       },
       {
         "seller_id": "g2g-mc-rising",
@@ -70,7 +70,7 @@
         "stock": 9114,
         "risk_score": 0,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/offer/G1750132707906OD",
+        "profile_url": "https://www.g2g.com/categories/minecraft-account?q=HellenWong",
         "qris_fee_idr": 126,
         "cogs_net_idr": 18126,
         "net_profit_idr": 208782,
@@ -79,7 +79,7 @@
         "live_status": "live",
         "live_synced_at": "2026-09-22T11:15:39.325Z",
         "offer_id": "G1750132707906OD",
-        "fallback_search_url": "https://www.g2g.com/categories/minecraft-account?q=HellenWong_TLauncher"
+        "fallback_search_url": "https://www.g2g.com/categories/minecraft-account?q=HellenWong"
       },
       {
         "seller_id": "g2g-custom-1789646938863",
@@ -94,12 +94,12 @@
         "stock": 6604,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1703129821471UK",
+        "profile_url": "https://www.g2g.com/categories/minecraft-account",
         "is_online": true,
         "live_status": "live",
         "live_synced_at": "2026-09-22T11:15:39.325Z",
         "offer_id": "G1703129821471UK",
-        "fallback_search_url": "https://www.g2g.com/categories/minecraft-account?q=Lowest"
+        "fallback_search_url": "https://www.g2g.com/categories/minecraft-account"
       }
     ],
     "metrics": {
@@ -116,11 +116,13 @@
         "stock": 45,
         "risk_score": 0,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/id/categories/minecraft-account/offer/G1703129821471UK",
+        "profile_url": "https://www.g2g.com/categories/minecraft-account?q=HellenWong",
         "qris_fee_idr": 1302,
         "cogs_net_idr": 187302,
         "net_profit_idr": 39606,
-        "net_margin_pct": 15.8
+        "net_margin_pct": 15.8,
+        "offer_id": "G1703129821471UK",
+        "fallback_search_url": "https://www.g2g.com/categories/minecraft-account?q=HellenWong"
       },
       "cogs_g2g_idr": 186000,
       "qris_fee_idr": 1302,
@@ -156,7 +158,7 @@
         "stock": 98901,
         "risk_score": 0,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/offer/G1703314890265KW",
+        "profile_url": "https://www.g2g.com/categories/terraria-account?q=HellenWong",
         "qris_fee_idr": 126,
         "cogs_net_idr": 18126,
         "net_profit_idr": 15582,
@@ -180,7 +182,7 @@
         "stock": 94,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1772365261655ZP",
+        "profile_url": "https://www.g2g.com/categories/terraria-account?q=LootKings",
         "qris_fee_idr": 118,
         "cogs_net_idr": 17018,
         "net_profit_idr": 16690,
@@ -204,7 +206,7 @@
         "stock": 919,
         "risk_score": 1,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1752722558769EU",
+        "profile_url": "https://www.g2g.com/categories/terraria-account?q=madangna",
         "qris_fee_idr": 126,
         "cogs_net_idr": 18126,
         "net_profit_idr": 15582,
@@ -230,11 +232,13 @@
         "stock": 98901,
         "risk_score": 0,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/id/categories/terraria-account/offer/G1703314890265KW",
+        "profile_url": "https://www.g2g.com/categories/terraria-account?q=HellenWong",
         "qris_fee_idr": 126,
         "cogs_net_idr": 18126,
         "net_profit_idr": 15582,
-        "net_margin_pct": 39.1
+        "net_margin_pct": 39.1,
+        "offer_id": "G1703314890265KW",
+        "fallback_search_url": "https://www.g2g.com/categories/terraria-account?q=HellenWong"
       },
       "cogs_g2g_idr": 18000,
       "qris_fee_idr": 118,
@@ -270,7 +274,7 @@
         "stock": 550,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1717828080220IT",
+        "profile_url": "https://www.g2g.com/categories/black-myth-wukong-accounts?q=HellenWong",
         "qris_fee_idr": 4652,
         "cogs_net_idr": 669252,
         "net_profit_idr": -314372,
@@ -294,7 +298,7 @@
         "stock": 74,
         "risk_score": 1,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/offer/G1735807277413VH",
+        "profile_url": "https://www.g2g.com/categories/black-myth-wukong-accounts?q=FinanceWZ",
         "qris_fee_idr": 2022,
         "cogs_net_idr": 290822,
         "net_profit_idr": 64058,
@@ -318,7 +322,7 @@
         "stock": 5197,
         "risk_score": 1,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1724212419124LE",
+        "profile_url": "https://www.g2g.com/categories/black-myth-wukong-accounts?q=HellenWong",
         "qris_fee_idr": 5055,
         "cogs_net_idr": 727255,
         "net_profit_idr": -372375,
@@ -327,7 +331,7 @@
         "live_status": "live",
         "live_synced_at": "2026-09-22T11:15:39.325Z",
         "offer_id": "G1724212419124LE",
-        "fallback_search_url": "https://www.g2g.com/categories/black-myth-wukong-accounts?q=HellenWong_SaveGame"
+        "fallback_search_url": "https://www.g2g.com/categories/black-myth-wukong-accounts?q=HellenWong"
       }
     ],
     "metrics": {
@@ -344,11 +348,13 @@
         "stock": 15,
         "risk_score": 1,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/id/categories/black-myth-wukong-accounts/offer/G1735807277413VH",
+        "profile_url": "https://www.g2g.com/categories/black-myth-wukong-accounts?q=FinanceWZ",
         "qris_fee_idr": 2022,
         "cogs_net_idr": 290822,
         "net_profit_idr": 64058,
-        "net_margin_pct": 16.5
+        "net_margin_pct": 16.5,
+        "offer_id": "G1735807277413VH",
+        "fallback_search_url": "https://www.g2g.com/categories/black-myth-wukong-accounts?q=FinanceWZ"
       },
       "cogs_g2g_idr": 288800,
       "qris_fee_idr": 2022,
@@ -384,7 +390,7 @@
         "stock": 169,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1724725195838IV",
+        "profile_url": "https://www.g2g.com/categories/steam-global-account?q=HellenWong",
         "qris_fee_idr": 1391,
         "cogs_net_idr": 200091,
         "net_profit_idr": 44389,
@@ -408,7 +414,7 @@
         "stock": 12287,
         "risk_score": 1,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/offer/G1752687998537NX",
+        "profile_url": "https://www.g2g.com/categories/steam-global-account?q=madangna",
         "qris_fee_idr": 1302,
         "cogs_net_idr": 187302,
         "net_profit_idr": 57178,
@@ -432,7 +438,7 @@
         "stock": 99179,
         "risk_score": 2,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1703491270148EB",
+        "profile_url": "https://www.g2g.com/categories/steam-global-account?q=madangna",
         "qris_fee_idr": 126,
         "cogs_net_idr": 18126,
         "net_profit_idr": 226354,
@@ -441,7 +447,7 @@
         "live_status": "live",
         "live_synced_at": "2026-09-22T11:15:39.325Z",
         "offer_id": "G1703491270148EB",
-        "fallback_search_url": "https://www.g2g.com/categories/steam-global-account?q=madangna_FiveM"
+        "fallback_search_url": "https://www.g2g.com/categories/steam-global-account?q=madangna"
       }
     ],
     "metrics": {
@@ -458,11 +464,13 @@
         "stock": 35,
         "risk_score": 1,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/id/categories/steam-global-account/offer/G1752687998537NX",
+        "profile_url": "https://www.g2g.com/categories/steam-global-account?q=madangna",
         "qris_fee_idr": 1302,
         "cogs_net_idr": 187302,
         "net_profit_idr": 57178,
-        "net_margin_pct": 21.3
+        "net_margin_pct": 21.3,
+        "offer_id": "G1752687998537NX",
+        "fallback_search_url": "https://www.g2g.com/categories/steam-global-account?q=madangna"
       },
       "cogs_g2g_idr": 186000,
       "qris_fee_idr": 1302,
@@ -498,7 +506,7 @@
         "stock": 4227,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1703654832675CG",
+        "profile_url": "https://www.g2g.com/categories/tf2-item?q=GauGau",
         "qris_fee_idr": 230,
         "cogs_net_idr": 33130,
         "net_profit_idr": 7018,
@@ -522,7 +530,7 @@
         "stock": 8767,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1729742255608SE",
+        "profile_url": "https://www.g2g.com/categories/tf2-item?q=HellenWong",
         "qris_fee_idr": 231,
         "cogs_net_idr": 33231,
         "net_profit_idr": 6917,
@@ -546,7 +554,7 @@
         "stock": 2000,
         "risk_score": 1,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/offer/G1703480907757CA",
+        "profile_url": "https://www.g2g.com/categories/tf2-item?q=Player",
         "qris_fee_idr": 234,
         "cogs_net_idr": 33634,
         "net_profit_idr": 6514,
@@ -572,11 +580,13 @@
         "stock": 2000,
         "risk_score": 0,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/id/categories/tf2-item/offer/G1703480907757CA",
+        "profile_url": "https://www.g2g.com/categories/tf2-item?q=Player",
         "qris_fee_idr": 212,
         "cogs_net_idr": 30462,
         "net_profit_idr": 9686,
-        "net_margin_pct": 20.6
+        "net_margin_pct": 20.6,
+        "offer_id": "G1703480907757CA",
+        "fallback_search_url": "https://www.g2g.com/categories/tf2-item?q=Player"
       },
       "cogs_g2g_idr": 30250,
       "qris_fee_idr": 230,
@@ -612,7 +622,7 @@
         "stock": 9994,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1758334661567LY",
+        "profile_url": "https://www.g2g.com/categories/fc-25-accounts?q=HellenWong",
         "qris_fee_idr": 2528,
         "cogs_net_idr": 363728,
         "net_profit_idr": -229648,
@@ -636,7 +646,7 @@
         "stock": 1232,
         "risk_score": 1,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/offer/G1740289240129LL",
+        "profile_url": "https://www.g2g.com/categories/fc-25-accounts?q=krovler",
         "qris_fee_idr": 613,
         "cogs_net_idr": 88213,
         "net_profit_idr": 45867,
@@ -660,7 +670,7 @@
         "stock": 97,
         "risk_score": 2,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1722612671951NJ",
+        "profile_url": "https://www.g2g.com/categories/fc-25-accounts?q=LootKings",
         "qris_fee_idr": 1378,
         "cogs_net_idr": 198278,
         "net_profit_idr": -64198,
@@ -684,12 +694,12 @@
         "stock": 1232,
         "risk_score": 0,
         "is_recommended": false,
-        "profile_url": "https://www.g2g.com/offer/G1740289240129LL",
+        "profile_url": "https://www.g2g.com/categories/fc-25-accounts",
         "is_online": true,
         "live_status": "live",
         "live_synced_at": "2026-09-22T11:15:39.325Z",
         "offer_id": "G1740289240129LL",
-        "fallback_search_url": "https://www.g2g.com/categories/fc-25-accounts?q=Lowest"
+        "fallback_search_url": "https://www.g2g.com/categories/fc-25-accounts"
       }
     ],
     "metrics": {
@@ -706,11 +716,13 @@
         "stock": 20,
         "risk_score": 1,
         "is_recommended": true,
-        "profile_url": "https://www.g2g.com/id/categories/fc-25-accounts/offer/G1740289240129LL",
+        "profile_url": "https://www.g2g.com/categories/fc-25-accounts?q=krovler",
         "qris_fee_idr": 613,
         "cogs_net_idr": 88213,
         "net_profit_idr": 45867,
-        "net_margin_pct": 30.8
+        "net_margin_pct": 30.8,
+        "offer_id": "G1740289240129LL",
+        "fallback_search_url": "https://www.g2g.com/categories/fc-25-accounts?q=krovler"
       },
       "cogs_g2g_idr": 87600,
       "qris_fee_idr": 613,
@@ -753,7 +765,8 @@
         "net_margin_pct": 19.9,
         "is_online": true,
         "live_status": "live",
-        "live_synced_at": "2026-10-06T12:00:00.000Z"
+        "live_synced_at": "2026-10-06T12:00:00.000Z",
+        "fallback_search_url": "https://www.eneba.com/store/all?text=project+zomboid"
       }
     ],
     "metrics": {
@@ -798,7 +811,8 @@
         "net_margin_pct": 21,
         "is_online": true,
         "live_status": "live",
-        "live_synced_at": "2026-10-06T12:00:00.000Z"
+        "live_synced_at": "2026-10-06T12:00:00.000Z",
+        "fallback_search_url": "https://www.eneba.com/store/all?text=stardew+valley"
       }
     ],
     "metrics": {
@@ -843,7 +857,8 @@
         "net_margin_pct": 22.6,
         "is_online": true,
         "live_status": "live",
-        "live_synced_at": "2026-10-06T12:00:00.000Z"
+        "live_synced_at": "2026-10-06T12:00:00.000Z",
+        "fallback_search_url": "https://www.eneba.com/store/all?text=hollow+knight"
       }
     ],
     "metrics": {
@@ -888,7 +903,8 @@
         "net_margin_pct": 23.3,
         "is_online": true,
         "live_status": "live",
-        "live_synced_at": "2026-10-06T12:00:00.000Z"
+        "live_synced_at": "2026-10-06T12:00:00.000Z",
+        "fallback_search_url": "https://www.eneba.com/store/all?text=don-t-starve-together"
       }
     ],
     "metrics": {
@@ -933,7 +949,8 @@
         "net_margin_pct": 9.2,
         "is_online": true,
         "live_status": "live",
-        "live_synced_at": "2026-10-06T12:00:00.000Z"
+        "live_synced_at": "2026-10-06T12:00:00.000Z",
+        "fallback_search_url": "https://www.eneba.com/store/all?text=cyberpunk+2077"
       }
     ],
     "metrics": {
@@ -978,7 +995,8 @@
         "net_margin_pct": 26.5,
         "is_online": true,
         "live_status": "live",
-        "live_synced_at": "2026-10-06T12:00:00.000Z"
+        "live_synced_at": "2026-10-06T12:00:00.000Z",
+        "fallback_search_url": "https://www.eneba.com/store/all?text=terraria"
       }
     ],
     "metrics": {
@@ -1023,7 +1041,8 @@
         "net_margin_pct": 9.7,
         "is_online": true,
         "live_status": "live",
-        "live_synced_at": "2026-10-06T12:00:00.000Z"
+        "live_synced_at": "2026-10-06T12:00:00.000Z",
+        "fallback_search_url": "https://www.eneba.com/store/all?text=minecraft+java+bedrock"
       }
     ],
     "metrics": {

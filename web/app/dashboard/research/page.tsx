@@ -328,7 +328,7 @@ export default function ResearchCenterPage() {
           platform: json.data.platform,
           category: json.data.category,
           g2g_category_slug: "steam-accounts",
-          g2g_direct_url: json.data.profile_url || "https://www.g2g.com/id/categories/steam-accounts",
+          g2g_direct_url: json.data.profile_url || "https://www.g2g.com/categories/steam-global-account",
           seller_name: json.data.best_supplier.name,
           seller_rating_pct: json.data.best_supplier.rating_pct,
           seller_reviews_count: json.data.best_supplier.reviews_count,

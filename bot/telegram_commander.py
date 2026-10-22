@@ -75,6 +75,96 @@ def save_claimed_credentials_all(claims: List[Dict[str, Any]]) -> None:
         except Exception:
             pass
 
+def pop_available_vault_item(game_title: str, order_id: str = "") -> Optional[Dict[str, Any]]:
+    """Mencari stok akun yang READY di Inventory Vault, menandainya DISPATCHED, dan mengembalikan kredensialnya."""
+    vault_files = [
+        os.path.join(BASE_DIR, "web", "data", "inventory_vault.json"),
+        os.path.join(BASE_DIR, "output", "inventory_vault.json"),
+    ]
+    gt_clean = (game_title or "").lower().strip()
+    for vf in vault_files:
+        if os.path.exists(vf):
+            try:
+                with open(vf, "r", encoding="utf-8") as f:
+                    items = json.load(f)
+                matched_item = None
+                for it in items:
+                    it_title = (it.get("game_title") or "").lower().strip()
+                    if it.get("status") == "AVAILABLE" and (gt_clean in it_title or it_title in gt_clean):
+                        it["status"] = "DISPATCHED"
+                        it["assigned_order_id"] = order_id
+                        it["dispatched_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                        matched_item = it
+                        break
+                if matched_item:
+                    for save_vf in vault_files:
+                        try:
+                            os.makedirs(os.path.dirname(save_vf), exist_ok=True)
+                            with open(save_vf, "w", encoding="utf-8") as fw:
+                                json.dump(items, fw, indent=2, ensure_ascii=False)
+                        except Exception:
+                            pass
+                    return matched_item
+            except Exception as e:
+                print(f"Error checking vault {vf}: {e}")
+    return None
+
+def get_supplier_evergreen_link(game_title: str) -> str:
+    """Mendapatkan link supplier Evergreen G2G/Eneba untuk kulakan JIT."""
+    cat_files = [
+        os.path.join(BASE_DIR, "web", "data", "active_catalog.json"),
+        os.path.join(BASE_DIR, "output", "active_catalog.json"),
+    ]
+    seller_name = ""
+    for cf in cat_files:
+        if os.path.exists(cf):
+            try:
+                with open(cf, "r", encoding="utf-8") as f:
+                    cat = json.load(f)
+                for g in cat:
+                    if (g.get("title") or "").lower().strip() == (game_title or "").lower().strip():
+                        sel_id = g.get("selected_seller_id")
+                        for s in g.get("sellers", []):
+                            if s.get("seller_id") == sel_id:
+                                seller_name = s.get("seller_name", "")
+                                break
+                        if not seller_name and g.get("sellers"):
+                            seller_name = g["sellers"][0].get("seller_name", "")
+                        break
+                if seller_name:
+                    break
+            except Exception:
+                pass
+    return resolve_g2g_product_url("", game_title, is_live=False, seller_name=seller_name)
+
+def record_sale_to_ledger(order_id: str, game_title: str, buyer_username: str, source: str = "JIT_SUPPLIER") -> None:
+    """Mencatat transaksi penjualan ke financial_ledger.json."""
+    ledger_files = [
+        os.path.join(BASE_DIR, "web", "data", "financial_ledger.json"),
+        os.path.join(BASE_DIR, "output", "financial_ledger.json"),
+    ]
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    tx_record = {
+        "id": f"tx-{int(datetime.datetime.now().timestamp())}",
+        "order_id": order_id,
+        "game_title": game_title,
+        "buyer_username": buyer_username,
+        "fulfillment_source": source,
+        "timestamp": now_str,
+    }
+    for lf in ledger_files:
+        if os.path.exists(lf):
+            try:
+                with open(lf, "r", encoding="utf-8") as f:
+                    ledger = json.load(f)
+                if not isinstance(ledger, list):
+                    ledger = []
+                ledger.insert(0, tx_record)
+                with open(lf, "w", encoding="utf-8") as fw:
+                    json.dump(ledger, fw, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+
 def generate_unique_passcode(existing_claims: List[Dict[str, Any]]) -> str:
     """Menghasilkan PIN 6-digit unik yang terjamin belum pernah digunakan di database (Anti-Tabrakan)."""
     used_pins = {str(c.get("passcode", "")).strip() for c in existing_claims if c.get("passcode")}
@@ -617,7 +707,7 @@ class TelegramCommander:
             price_idr = int(math.ceil(price_usd * 16350 / 100) * 100) if price_usd > 0 else 0
             price_str = f"Rp {price_idr:,}" if price_idr > 0 else "N/A"
 
-            offer_url = resolve_g2g_product_url(res['offer_id'], res.get('title') or '')
+            offer_url = resolve_g2g_product_url(res.get('offer_id', ''), res.get('title') or '', is_live=False, seller_name=res.get('seller_name', ''))
             msg = (
                 f"🎮 *[HASIL INSPEKSI OFFER G2G SLS]*\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -637,7 +727,7 @@ class TelegramCommander:
             msg = (
                 f"❌ Offer `{offer_id}` tidak ditemukan atau telah dihapus/sold-out oleh seller di G2G.\n\n"
                 f"💡 _Gunakan link kategori resmi untuk melihat semua seller dengan stok aktif:_\n"
-                f"https://www.g2g.com/id/categories/steam-global-account"
+                f"https://www.g2g.com/categories/steam-global-account"
             )
 
         await self.send_message(chat_id, msg)
@@ -772,13 +862,62 @@ class TelegramCommander:
 
             await self.finalize_new_claim(chat_id, game, buyer, credential)
 
+        elif step == "AWAIT_JIT_CREDENTIALS":
+            real_credential = text.strip()
+            order_id = session.get("data", {}).get("order_id", "Unknown")
+            game = session.get("data", {}).get("game", "Game")
+            buyer = session.get("data", {}).get("buyer", "Shopee Customer")
+
+            if chat_id in self.sessions:
+                del self.sessions[chat_id]
+
+            # 1. Update status di autonomous_orders.json ke COMPLETED
+            order_files = [
+                os.path.join(BASE_DIR, "web", "data", "autonomous_orders.json"),
+                os.path.join(BASE_DIR, "output", "autonomous_orders.json")
+            ]
+            for of in order_files:
+                if os.path.exists(of):
+                    try:
+                        with open(of, "r", encoding="utf-8") as f:
+                            orders = json.load(f)
+                        for ord_item in orders:
+                            if ord_item.get("id") == order_id or ord_item.get("order_id") == order_id:
+                                ord_item["status"] = "COMPLETED"
+                                ord_item["completed_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                                break
+                        with open(of, "w", encoding="utf-8") as f:
+                            json.dump(orders, f, indent=2, ensure_ascii=False)
+                    except Exception as e:
+                        print(f"Error updating order {of}: {e}")
+
+            # 2. Finalize new claim dengan kredensial riil
+            await self.finalize_new_claim(chat_id, game, buyer, real_credential, custom_order_id=order_id)
+
+            # 3. Catat transaksi di financial ledger
+            record_sale_to_ledger(order_id, game, buyer, source="JIT_SUPPLIER")
+
+            # 4. Kirim PnL Card Notifikasi
+            pnl_card = (
+                f"💰 *[LAPORAN TRANSAKSI & PNL REAL-TIME]*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📦 *Order:* `{order_id}`\n"
+                f"🎮 *Game:* `{game}`\n"
+                f"📈 *Status:* SUKSES DIPENUHI (COMPLETED)\n"
+                f"🛡️ *Garansi:* 30 Hari Aktif\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✨ _Kredensial asli tersimpan aman & laba bersih tercatat di Financial Ledger._"
+            )
+            await self.send_message(chat_id, pnl_card)
+
     async def finalize_new_claim(
         self,
         chat_id: str,
         game: str,
         buyer: str,
         credential: str,
-        custom_passcode: Optional[str] = None
+        custom_passcode: Optional[str] = None,
+        custom_order_id: Optional[str] = None
     ) -> None:
         """Membuat token klaim, menghasilkan passcode unik anti-tabrakan, dan mengirimkan format Shopee."""
         claims = load_claimed_credentials()
@@ -790,7 +929,7 @@ class TelegramCommander:
             passcode = generate_unique_passcode(claims)
 
         claim_code = generate_unique_claim_code(claims, game)
-        order_id = f"SHP-{datetime.datetime.now().strftime('%y%m%d')}{random.randint(1000, 9999)}"
+        order_id = custom_order_id or f"SHP-{datetime.datetime.now().strftime('%y%m%d')}{random.randint(1000, 9999)}"
         warranty_days = 30
         warranty_code = f"AKSHARA-{datetime.datetime.now().strftime('%y%m%d')}-{random.randint(1000, 9999)}"
         platform = "PC / Steam Key" if "key" in credential.lower() else "PC / Microsoft Account"
@@ -1101,7 +1240,7 @@ class TelegramCommander:
             order_id = parts[1] if len(parts) > 1 else "Unknown"
             listing_id = "_".join(parts[2:]) if len(parts) > 2 else ""
 
-            # 1. Update order status in autonomous_orders.json
+            # 1. Look up matched order in autonomous_orders.json
             order_files = [
                 os.path.join(BASE_DIR, "web", "data", "autonomous_orders.json"),
                 os.path.join(BASE_DIR, "output", "autonomous_orders.json")
@@ -1114,44 +1253,90 @@ class TelegramCommander:
                             orders = json.load(f)
                         for ord_item in orders:
                             if ord_item.get("id") == order_id or ord_item.get("order_id") == order_id:
-                                ord_item["status"] = "COMPLETED"
                                 matched_order = ord_item
                                 break
-                        with open(of, "w", encoding="utf-8") as f:
-                            json.dump(orders, f, indent=2, ensure_ascii=False)
+                        if matched_order:
+                            break
                     except Exception as e:
-                        print(f"Error updating order {of}: {e}")
+                        print(f"Error checking order {of}: {e}")
 
-            # 2. Trigger credential claim generation
             game_title = (matched_order.get("game_title") if matched_order else "") or "Minecraft: Java & Bedrock Edition"
             buyer_username = (matched_order.get("buyer_name") if matched_order else "") or "Shopee Customer"
-            credential_data = f"Account: {buyer_username.lower()}@akshara-vault.com | Password: AksharaPass{random.randint(1000, 9999)}!"
 
-            await self.send_message(
-                chat_id,
-                f"✅ *[PESANAN DISETUJUI & DIPROSES]*\n"
+            # Step A: Check inventory_vault first
+            vault_item = pop_available_vault_item(game_title, order_id)
+            if vault_item:
+                # Mark order COMPLETED
+                for of in order_files:
+                    if os.path.exists(of):
+                        try:
+                            with open(of, "r", encoding="utf-8") as f:
+                                orders = json.load(f)
+                            for ord_item in orders:
+                                if ord_item.get("id") == order_id or ord_item.get("order_id") == order_id:
+                                    ord_item["status"] = "COMPLETED"
+                                    ord_item["completed_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                                    break
+                            with open(of, "w", encoding="utf-8") as f:
+                                json.dump(orders, f, indent=2, ensure_ascii=False)
+                        except Exception:
+                            pass
+
+                cred_data = ""
+                if vault_item.get("username") and vault_item.get("password"):
+                    cred_data = f"Account: {vault_item['username']} | Password: {vault_item['password']}"
+                elif vault_item.get("password"):
+                    cred_data = f"Digital Key / Token: {vault_item['password']}"
+                else:
+                    cred_data = vault_item.get("notes") or f"Account: {vault_item.get('username')}"
+
+                record_sale_to_ledger(order_id, game_title, buyer_username, source="INVENTORY_VAULT")
+
+                await self.send_message(
+                    chat_id,
+                    f"✅ *[DIPENUHI DARI INVENTORY VAULT]*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📦 *No. Pesanan:* `{order_id}`\n"
+                    f"🎮 *Game:* `{game_title}`\n"
+                    f"👤 *Pembeli:* `{buyer_username}`\n"
+                    f"⚡ *Status:* Stok brankas dialokasikan & diterbitkan token klaimnya!"
+                )
+                await self.finalize_new_claim(chat_id, game_title, buyer_username, cred_data, custom_order_id=order_id)
+
+                pnl_card = (
+                    f"💰 *[LAPORAN TRANSAKSI & PNL REAL-TIME]*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📦 *Order:* `{order_id}`\n"
+                    f"🎮 *Game:* `{game_title}`\n"
+                    f"📈 *Status:* SUKSES DIPENUHI (COMPLETED)\n"
+                    f"🛡️ *Garansi:* 30 Hari Aktif\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"✨ _Laba bersih tercatat otomatis di Financial Ledger Akshara._"
+                )
+                await self.send_message(chat_id, pnl_card)
+                return
+
+            # Step B: Interactive JIT Credential Input (When Vault is Empty)
+            evergreen_supplier_url = get_supplier_evergreen_link(game_title)
+            self.sessions[chat_id] = {
+                "step": "AWAIT_JIT_CREDENTIALS",
+                "data": {
+                    "order_id": order_id,
+                    "game": game_title,
+                    "buyer": buyer_username
+                }
+            }
+            jit_prompt = (
+                f"✅ *[OTORISASI JIT DISETUJUI — MENUNGGU KREDENSIAL SUPPLIER]*\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"📦 *No. Pesanan:* `{order_id}`\n"
+                f"📦 *Order ID:* `{order_id}`\n"
                 f"🎮 *Game:* `{game_title}`\n"
                 f"👤 *Pembeli:* `{buyer_username}`\n"
-                f"⚡ *Status:* Otomatis disetujui & dialokasikan dari supplier.\n"
-                f"Menerbitkan token klaim brankas..."
+                f"🛒 *Beli Cepat di Supplier:* {evergreen_supplier_url}\n\n"
+                f"🔐 *INSTRUKSI:* Silakan beli akun/key dari link di atas, lalu *PASTE / KIRIMKAN kredensial asli* (Email:Pass atau CDKey) langsung ke chat ini untuk otomatis dienkripsi AES-256 dan diterbitkan Token Klaim-nya!"
             )
-
-            await self.finalize_new_claim(chat_id, game_title, buyer_username, credential_data)
-
-            # 3. Kirim PnL Card Notifikasi
-            pnl_card = (
-                f"💰 *[LAPORAN TRANSAKSI & PNL REAL-TIME]*\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"📦 *Order:* `{order_id}`\n"
-                f"🎮 *Game:* `{game_title}`\n"
-                f"📈 *Status:* SUKSES DIPENUHI (COMPLETED)\n"
-                f"🛡️ *Garansi:* 30 Hari Aktif\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"✨ _Laba bersih tercatat otomatis di Financial Ledger Akshara._"
-            )
-            await self.send_message(chat_id, pnl_card)
+            cancel_markup = {"inline_keyboard": [[{"text": "❌ Batal", "callback_data": "wizard_cancel"}]]}
+            await self.send_message(chat_id, jit_prompt, reply_markup=cancel_markup)
 
         elif data.startswith("reject_"):
             parts = data.split("_")

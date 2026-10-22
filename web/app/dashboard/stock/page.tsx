@@ -50,6 +50,7 @@ interface Seller {
   risk_score?: number;
   is_recommended?: boolean;
   profile_url: string;
+  fallback_search_url?: string;
   net_profit_idr?: number;
   net_margin_pct?: number;
   is_online?: boolean;
@@ -89,8 +90,9 @@ function extractOfferId(urlOrId?: string): string | null {
   return match ? match[1] : null;
 }
 
-function resolveDirectListingUrl(seller?: { profile_url?: string; offer_id?: string; seller_name?: string; stock?: number }, gameTitle?: string, isLive: boolean = true): string {
-  return resolveG2GProductUrl(seller?.profile_url || seller?.offer_id, seller?.seller_name, gameTitle, isLive);
+function resolveDirectListingUrl(seller?: { profile_url?: string; fallback_search_url?: string; offer_id?: string; seller_name?: string; stock?: number }, gameTitle?: string, isLive: boolean = false): string {
+  if (seller?.fallback_search_url) return seller.fallback_search_url;
+  return resolveG2GProductUrl(seller?.profile_url || seller?.offer_id, seller?.seller_name, gameTitle, false);
 }
 
 export default function StockSentryPage() {

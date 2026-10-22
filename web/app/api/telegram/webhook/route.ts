@@ -5,11 +5,150 @@ import { resolveG2GProductUrl, KNOWN_DEAD_OFFERS, getG2GGameCategoryUrl } from "
 import { readAuthoritativeCatalog } from "@/lib/catalog";
 import fs from "fs";
 import path from "path";
-import { getKV, setKV } from "@/lib/db";
+import os from "os";
+import { getKV, setKV, getDbVault, saveDbVaultItem } from "@/lib/db";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
 const TELEGRAM_API = BOT_TOKEN ? `https://api.telegram.org/bot${BOT_TOKEN}` : "";
+
+const VAULT_FILE = path.resolve(process.cwd(), "data", "inventory_vault.json");
+const OUTPUT_VAULT_FILE = path.resolve(process.cwd(), "..", "output", "inventory_vault.json");
+const TMP_VAULT_FILE = path.resolve(os.tmpdir(), "akshara_inventory_vault.json");
+
+const ORDERS_FILE = path.resolve(process.cwd(), "data", "autonomous_orders.json");
+const OUTPUT_ORDERS_FILE = path.resolve(process.cwd(), "..", "output", "autonomous_orders.json");
+const TMP_ORDERS_FILE = path.resolve(os.tmpdir(), "akshara_autonomous_orders.json");
+
+const LEDGER_FILE = path.resolve(process.cwd(), "data", "financial_ledger.json");
+const OUTPUT_LEDGER_FILE = path.resolve(process.cwd(), "..", "output", "financial_ledger.json");
+
+async function readVaultItems(): Promise<any[]> {
+  try {
+    const dbVault = await getDbVault();
+    if (dbVault && dbVault.length > 0) return dbVault;
+    const kvVault = await getKV("inventory_vault");
+    if (kvVault && Array.isArray(kvVault) && kvVault.length > 0) return kvVault;
+  } catch (e) {}
+  for (const fp of [TMP_VAULT_FILE, OUTPUT_VAULT_FILE, VAULT_FILE]) {
+    if (fs.existsSync(fp)) {
+      try {
+        const raw = fs.readFileSync(fp, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+  }
+  return [];
+}
+
+async function persistVaultItems(items: any[]): Promise<void> {
+  await setKV("inventory_vault", items).catch(() => {});
+  const str = JSON.stringify(items, null, 2);
+  for (const fp of [TMP_VAULT_FILE, OUTPUT_VAULT_FILE, VAULT_FILE]) {
+    try {
+      const d = path.dirname(fp);
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(fp, str, "utf-8");
+    } catch (e) {}
+  }
+}
+
+async function popVaultItem(gameTitle: string, orderId: string): Promise<any | null> {
+  const vault = await readVaultItems();
+  const cleanTitle = (gameTitle || "").toLowerCase().trim();
+  const idx = vault.findIndex((it: any) => {
+    if (it.status !== "AVAILABLE") return false;
+    const itTitle = (it.game_title || "").toLowerCase().trim();
+    return cleanTitle.includes(itTitle) || itTitle.includes(cleanTitle);
+  });
+  if (idx !== -1) {
+    const matched = vault[idx];
+    matched.status = "DISPATCHED";
+    matched.assigned_order_id = orderId;
+    matched.dispatched_at = new Date().toISOString();
+    vault[idx] = matched;
+    await saveDbVaultItem(matched).catch(() => {});
+    await persistVaultItems(vault);
+    return matched;
+  }
+  return null;
+}
+
+async function readAutonomousOrders(): Promise<any[]> {
+  try {
+    const kv = await getKV("autonomous_orders");
+    if (kv && Array.isArray(kv) && kv.length > 0) return kv;
+  } catch (e) {}
+  for (const fp of [TMP_ORDERS_FILE, OUTPUT_ORDERS_FILE, ORDERS_FILE]) {
+    if (fs.existsSync(fp)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(fp, "utf-8"));
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+  }
+  return [];
+}
+
+async function markOrderStatusCompleted(orderId: string): Promise<void> {
+  const orders = await readAutonomousOrders();
+  for (const o of orders) {
+    if (o.id === orderId || o.order_id === orderId) {
+      o.status = "COMPLETED";
+      o.completed_at = new Date().toISOString();
+      break;
+    }
+  }
+  await setKV("autonomous_orders", orders).catch(() => {});
+  const str = JSON.stringify(orders, null, 2);
+  for (const fp of [TMP_ORDERS_FILE, OUTPUT_ORDERS_FILE, ORDERS_FILE]) {
+    try {
+      const d = path.dirname(fp);
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(fp, str, "utf-8");
+    } catch (e) {}
+  }
+}
+
+async function recordLedgerSale(orderId: string, gameTitle: string, buyerUsername: string, source: string): Promise<void> {
+  let ledger: any[] = [];
+  try {
+    const dbLedger = await getKV("financial_ledger");
+    if (dbLedger && Array.isArray(dbLedger)) ledger = dbLedger;
+  } catch (e) {}
+  if (ledger.length === 0) {
+    for (const lp of [OUTPUT_LEDGER_FILE, LEDGER_FILE]) {
+      if (fs.existsSync(lp)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(lp, "utf-8"));
+          if (Array.isArray(parsed)) {
+            ledger = parsed;
+            break;
+          }
+        } catch (e) {}
+      }
+    }
+  }
+  const txRecord = {
+    id: `tx-${Date.now()}`,
+    order_id: orderId,
+    game_title: gameTitle,
+    buyer_username: buyerUsername,
+    fulfillment_source: source,
+    timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
+  };
+  ledger.unshift(txRecord);
+  await setKV("financial_ledger", ledger).catch(() => {});
+  const str = JSON.stringify(ledger, null, 2);
+  for (const lp of [OUTPUT_LEDGER_FILE, LEDGER_FILE]) {
+    try {
+      const d = path.dirname(lp);
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(lp, str, "utf-8");
+    } catch (e) {}
+  }
+}
 
 async function sendTelegramMessage(chatId: string | number, text: string, replyMarkup?: any) {
   if (!BOT_TOKEN || !TELEGRAM_API) {
@@ -173,6 +312,8 @@ export async function POST(req: NextRequest) {
         await handleShopeeCommand(chatId, "");
       } else if (data === "btn_briefing") {
         await handleBriefingCommand(chatId);
+      } else if (data.startsWith("approve_")) {
+        await handleApproveOrder(chatId, data);
       }
       return NextResponse.json({ ok: true });
     }
@@ -222,6 +363,7 @@ export async function POST(req: NextRequest) {
         + "• `/eneba <game>` — Cek modal checkout Eneba & rekomendasi Shopee\n"
         + "• `/quant <jual> <modal>` — Kalkulasi profit bersih, fee Shopee & BEP\n"
         + "• `/format <game> | <buyer> | <key>` — Format pengiriman anti-hackback\n"
+        + "• `/bulkvault <game> | <modal> \\n <akun_1>...` — Restock banyak akun ke brankas\n"
         + "• `/g2g <offer_id>` — Cek offer G2G langsung\n"
         + "• `/briefing` — Ringkasan eksekutif harian",
         getMainMenuMarkup()
@@ -246,6 +388,8 @@ export async function POST(req: NextRequest) {
       await handleShopeeCommand(chatId, argsText);
     } else if (cmd === "/briefing" || cmd === "/daily") {
       await handleBriefingCommand(chatId);
+    } else if (cmd === "/bulkvault" || cmd === "/bulkimport" || cmd === "/importvault") {
+      await handleBulkVaultCommand(chatId, argsText);
     } else if (cmd === "/help") {
       await sendTelegramMessage(
         chatId,
@@ -546,7 +690,7 @@ async function handleG2GCommand(chatId: string | number, query: string) {
       + `📊 *Status:* ${statusStr}\n`
       + `📦 *Stok Faktual:* *${(res.available_qty || 0).toLocaleString("id-ID")} UNIT*\n`
       + `💵 *Harga Modal Kulakan:* *${priceStr}*\n`
-      + `🔗 *URL Produk Faktual:* ${resolveG2GProductUrl(res.offer_id, res.seller_name)}\n`
+      + `🔗 *URL Produk Faktual:* ${resolveG2GProductUrl(res.offer_id, res.seller_name, undefined, false)}\n`
       + "━━━━━━━━━━━━━━━━━━━━━━\n"
       + "⚡ _Data langsung ditarik detik ini dari sls.g2g.com (dalam Rupiah)._";
 
@@ -556,7 +700,7 @@ async function handleG2GCommand(chatId: string | number, query: string) {
       chatId,
       `❌ Offer \`${offerId}\` tidak ditemukan atau telah dihapus/sold-out oleh seller di G2G.\n\n`
       + `💡 _Gunakan link kategori resmi untuk melihat semua seller dengan stok aktif:_\n`
-      + `https://www.g2g.com/id/categories/steam-global-account`
+      + `https://www.g2g.com/categories/steam-global-account`
     );
   }
 }
@@ -885,6 +1029,33 @@ async function handleWizardInput(chatId: string | number, text: string, session:
     const credential = text.trim();
     setTelegramSession(chatId, null);
     await finalizeClaim(chatId, game, buyer, credential);
+  } else if (step === "AWAIT_JIT_CREDENTIALS") {
+    const realCredential = text.trim();
+    const orderId = session.data?.order_id || "Unknown";
+    const game = session.data?.game || "Game";
+    const buyer = session.data?.buyer || "Shopee Customer";
+    setTelegramSession(chatId, null);
+
+    // 1. Update status di autonomous_orders
+    await markOrderStatusCompleted(orderId);
+
+    // 2. Finalize claim dengan kredensial asli
+    await finalizeClaim(chatId, game, buyer, realCredential, undefined, orderId);
+
+    // 3. Catat transaksi di financial_ledger
+    await recordLedgerSale(orderId, game, buyer, "JIT_SUPPLIER");
+
+    // 4. Kirim PnL Card Notifikasi
+    const pnlCard =
+      `💰 *[LAPORAN TRANSAKSI & PNL REAL-TIME]*\n`
+      + `━━━━━━━━━━━━━━━━━━━━━━\n`
+      + `📦 *Order:* \`${orderId}\`\n`
+      + `🎮 *Game:* \`${game}\`\n`
+      + `📈 *Status:* SUKSES DIPENUHI (COMPLETED)\n`
+      + `🛡️ *Garansi:* 30 Hari Aktif\n`
+      + `━━━━━━━━━━━━━━━━━━━━━━\n`
+      + `✨ _Kredensial asli tersimpan aman & laba bersih tercatat di Financial Ledger._`;
+    await sendTelegramMessage(chatId, pnlCard);
   }
 }
 
@@ -893,12 +1064,13 @@ async function finalizeClaim(
   game: string,
   buyer: string,
   credential: string,
-  customPin?: string
+  customPin?: string,
+  customOrderId?: string
 ) {
   const claims = await readClaimsData();
   const passcode = customPin && customPin.trim() ? customPin.trim() : generateUniquePasscode(claims);
   const claimCode = generateUniqueClaimCode(claims, game);
-  const orderId = `SHP-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}${Math.floor(1000 + Math.random() * 9000)}`;
+  const orderId = customOrderId || `SHP-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}${Math.floor(1000 + Math.random() * 9000)}`;
   const warrantyDays = 30;
   const warrantySerial = `AKSHARA-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
   const platform = credential.toLowerCase().includes("key") ? "PC / Steam Key" : "PC / Microsoft Account";
@@ -1050,4 +1222,163 @@ async function handleCheckClaimCommand(chatId: string | number, codeQuery: strin
     + "```\n" + (found.credential_data || "-") + "\n```";
 
   await sendTelegramMessage(chatId, detail);
+}
+
+async function handleApproveOrder(chatId: string | number, data: string) {
+  const parts = data.split("_");
+  const orderId = parts[1] || "Unknown";
+
+  // Look up matched order in autonomous_orders.json
+  const orders = await readAutonomousOrders();
+  const matchedOrder = orders.find((o: any) => o.id === orderId || o.order_id === orderId);
+  const gameTitle = matchedOrder?.game_title || "Minecraft: Java & Bedrock Edition";
+  const buyerUsername = matchedOrder?.buyer_name || "Shopee Customer";
+
+  // Step A: Check inventory_vault first
+  const vaultItem = await popVaultItem(gameTitle, orderId);
+  if (vaultItem) {
+    await markOrderStatusCompleted(orderId);
+
+    let credData = "";
+    if (vaultItem.username && vaultItem.password) {
+      credData = `Account: ${vaultItem.username} | Password: ${vaultItem.password}`;
+    } else if (vaultItem.password) {
+      credData = `Digital Key / Token: ${vaultItem.password}`;
+    } else {
+      credData = vaultItem.notes || `Account: ${vaultItem.username}`;
+    }
+
+    await recordLedgerSale(orderId, gameTitle, buyerUsername, "INVENTORY_VAULT");
+
+    await sendTelegramMessage(
+      chatId,
+      `✅ *[DIPENUHI DARI INVENTORY VAULT]*\n`
+      + `━━━━━━━━━━━━━━━━━━━━━━\n`
+      + `📦 *No. Pesanan:* \`${orderId}\`\n`
+      + `🎮 *Game:* \`${gameTitle}\`\n`
+      + `👤 *Pembeli:* \`${buyerUsername}\`\n`
+      + `⚡ *Status:* Stok brankas dialokasikan & diterbitkan token klaimnya!`
+    );
+
+    await finalizeClaim(chatId, gameTitle, buyerUsername, credData, undefined, orderId);
+
+    const pnlCard =
+      `💰 *[LAPORAN TRANSAKSI & PNL REAL-TIME]*\n`
+      + `━━━━━━━━━━━━━━━━━━━━━━\n`
+      + `📦 *Order:* \`${orderId}\`\n`
+      + `🎮 *Game:* \`${gameTitle}\`\n`
+      + `📈 *Status:* SUKSES DIPENUHI (COMPLETED)\n`
+      + `🛡️ *Garansi:* 30 Hari Aktif\n`
+      + `━━━━━━━━━━━━━━━━━━━━━━\n`
+      + `✨ _Laba bersih tercatat otomatis di Financial Ledger Akshara._`;
+    await sendTelegramMessage(chatId, pnlCard);
+    return;
+  }
+
+  // Step B: Interactive JIT Credential Input (When Vault is Empty)
+  const catalog = await readAuthoritativeCatalog();
+  const matchedGame = catalog.find((g: any) => (g.title || "").toLowerCase() === gameTitle.toLowerCase() || g.id === matchedOrder?.game_id);
+  const selectedSeller = matchedGame?.sellers?.find((s: any) => s.seller_id === matchedGame.selected_seller_id) || matchedGame?.sellers?.[0];
+  const evergreenSupplierUrl = resolveG2GProductUrl("", selectedSeller?.seller_name, gameTitle, false);
+
+  setTelegramSession(chatId, {
+    step: "AWAIT_JIT_CREDENTIALS",
+    data: {
+      order_id: orderId,
+      game: gameTitle,
+      buyer: buyerUsername,
+    },
+  });
+
+  const jitPrompt =
+    `✅ *[OTORISASI JIT DISETUJUI — MENUNGGU KREDENSIAL SUPPLIER]*\n`
+    + `━━━━━━━━━━━━━━━━━━━━━━\n`
+    + `📦 *Order ID:* \`${orderId}\`\n`
+    + `🎮 *Game:* \`${gameTitle}\`\n`
+    + `👤 *Pembeli:* \`${buyerUsername}\`\n`
+    + `🛒 *Beli Cepat di Supplier:* ${evergreenSupplierUrl}\n\n`
+    + `🔐 *INSTRUKSI:* Silakan beli akun/key dari link di atas, lalu *PASTE / KIRIMKAN kredensial asli* (Email:Pass atau CDKey) langsung ke chat ini untuk otomatis dienkripsi AES-256 dan diterbitkan Token Klaim-nya!`;
+
+  const cancelMarkup = { inline_keyboard: [[{ text: "❌ Batal", callback_data: "wizard_cancel" }]] };
+  await sendTelegramMessage(chatId, jitPrompt, cancelMarkup);
+}
+
+async function handleBulkVaultCommand(chatId: string | number, textPayload: string) {
+  if (!textPayload.trim()) {
+    const msg =
+      "📦 *[PANDUAN /bulkvault — RESTOCK BRANKAS MASSAL]*\n"
+      + "━━━━━━━━━━━━━━━━━━━━━━\n"
+      + "Gunakan perintah ini untuk memasukkan banyak akun/CD-key sekaligus ke brankas otonom!\n\n"
+      + "📝 *Format:*\n"
+      + "`/bulkvault <Nama Game> | <Harga Modal IDR> | [Platform]`\n"
+      + "`email1:pass1`\n"
+      + "`email2:pass2`\n"
+      + "`email3:pass3`\n\n"
+      + "💡 *Contoh:*\n"
+      + "`/bulkvault Minecraft: Java & Bedrock | 85000 | PC / Microsoft`\n"
+      + "`steve_craft@gmail.com:passWord123`\n"
+      + "`alex_miner@outlook.com:Diamond999`";
+    await sendTelegramMessage(chatId, msg);
+    return;
+  }
+
+  const lines = textPayload.trim().split("\n").map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) {
+    await sendTelegramMessage(chatId, "❌ Minimal masukkan judul di baris pertama dan 1 baris akun/kredensial di baris baru di bawahnya!");
+    return;
+  }
+
+  const headerLine = lines[0];
+  const accountLines = lines.slice(1);
+  const headerParts = headerLine.split("|").map(p => p.trim());
+  const gameTitle = headerParts[0];
+  const costIdr = Number(headerParts[1]?.replace(/\D/g, "") || 0);
+  const platform = headerParts[2] || "PC";
+
+  let vault = await readVaultItems();
+  let addedCount = 0;
+  const nowIso = new Date().toISOString();
+
+  for (const line of accountLines) {
+    let username = line;
+    let password = "";
+    if (line.includes(":")) {
+      const parts = line.split(":");
+      username = parts[0].trim();
+      password = parts.slice(1).join(":").trim();
+    } else if (line.includes("|")) {
+      const parts = line.split("|");
+      username = parts[0].trim();
+      password = parts.slice(1).join("|").trim();
+    }
+
+    const newItem = {
+      id: `vault-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      game_title: gameTitle,
+      platform,
+      category: "ACCOUNT",
+      username,
+      password,
+      cost_idr: costIdr,
+      supplier_name: "Direct Telegram Restock",
+      status: "AVAILABLE",
+      added_at: nowIso,
+      notes: "Restocked via Telegram /bulkvault",
+    };
+    vault.unshift(newItem);
+    await saveDbVaultItem(newItem).catch(() => {});
+    addedCount++;
+  }
+
+  await persistVaultItems(vault);
+
+  await sendTelegramMessage(
+    chatId,
+    `✅ *[RESTOCK BRANKAS BERHASIL]*\n`
+    + `━━━━━━━━━━━━━━━━━━━━━━\n`
+    + `🎮 *Game:* \`${gameTitle}\`\n`
+    + `📦 *Jumlah Akun Masuk:* *${addedCount} Unit*\n`
+    + `💵 *Modal Tercatat:* Rp ${costIdr.toLocaleString("id-ID")}/unit\n`
+    + `🛡️ *Status:* 🟢 AVAILABLE (Siap Auto-Fulfill Shopee)`
+  );
 }

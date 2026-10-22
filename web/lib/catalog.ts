@@ -33,6 +33,8 @@ export interface Seller {
   risk_score: number;
   is_recommended: boolean;
   profile_url?: string;
+  fallback_search_url?: string;
+  offer_id?: string;
   tier?: "ultra_safe" | "lowest_price" | "mid_level" | string;
   tier_label?: string;
   tier_desc?: string;

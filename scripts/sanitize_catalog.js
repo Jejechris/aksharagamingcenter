@@ -1,12 +1,13 @@
 /**
  * scripts/sanitize_catalog.js
- * Sanitizes active_catalog.json across web/data/ and output/
- * Fixes all 404 URL patterns:
- * - Eliminates invalid `/categories/.../offer/G...` paths
- * - Sets direct offer URL to `https://www.g2g.com/offer/{oid}`
- * - Sets fallback_search_url to `https://www.g2g.com/categories/{categorySlug}?q={sellerName}`
- * - Removes `/id/` prefix from Eneba URLs (`https://www.eneba.com/store/all?text=...`)
- * - Synchronizes with PostgreSQL / Supabase if configured
+ * Sanitizes active_catalog.json across web/data/, output/, and web/data/starter_catalog_backup.json
+ * Fixes all 404 and delisted G2G URL patterns:
+ * - Eliminates dead `/offer/G...` and `/categories/.../offer/G...` paths
+ * - Sets profile_url and fallback_search_url to EVERGREEN G2G Category + Seller Search URLs
+ * - Strips internal suffixes (_Hypixel, _TLauncher, _SaveGame, _FiveM) from seller names in ?q=
+ * - Removes `/id/` prefix from all G2G and Eneba URLs
+ * - Sanitizes game.metrics.selected_seller.profile_url
+ * - Synchronizes with Supabase app_kv under BOTH "active_catalog" AND "catalog_games", plus catalog_games SQL table
  */
 
 const fs = require('fs');
@@ -52,65 +53,104 @@ function resolveCategorySlug(title = "") {
   return "steam-global-account";
 }
 
+/**
+ * Membersihkan nama seller dari suffix internal (seperti _Hypixel, _TLauncher, _SaveGame, _FiveM)
+ * dan mengabaikan nama generik sehingga filter ?q= di G2G mencocokkan seller riil.
+ */
+function cleanSellerUsername(sellerName) {
+  if (!sellerName) return "";
+  let s = String(sellerName).trim();
+  s = s.replace(/_(?:hypixel|tlauncher|savegame|fivem|vip|store|indo|acc|global|key)$/i, "");
+  s = s.replace(/^g2g[-_]/i, "");
+  s = s.trim();
+
+  const lower = s.toLowerCase();
+  if (
+    lower.includes("lowest") ||
+    lower.includes("default") ||
+    lower.includes("unknown") ||
+    lower === "seller" ||
+    lower === "g2g seller" ||
+    lower === "verified seller" ||
+    lower === "verified merchant"
+  ) {
+    return "";
+  }
+  return s;
+}
+
+/**
+ * Menghasilkan URL Evergreen G2G (Category + Seller Search)
+ */
+function getEvergreenUrl(catSlug, sellerName) {
+  const clean = cleanSellerUsername(sellerName);
+  if (clean) {
+    return `https://www.g2g.com/categories/${catSlug}?q=${encodeURIComponent(clean)}`;
+  }
+  return `https://www.g2g.com/categories/${catSlug}`;
+}
+
 function sanitizeUrl(rawUrl, gameTitle, sellerName) {
   if (!rawUrl) return "";
   let url = String(rawUrl).trim();
 
   // 1. Eneba clean
   if (url.includes("eneba.com")) {
-    return url.replace("eneba.com/id/store", "eneba.com/store");
+    const cleanEneba = url.replace("eneba.com/id/store", "eneba.com/store");
+    return {
+      profile_url: cleanEneba,
+      offer_id: null,
+      fallback_search_url: cleanEneba,
+    };
   }
 
-  // 2. Extract Offer ID
+  // 2. Extract Offer ID if present for inventory tracking, but NEVER as user-facing link
   const offerMatch = url.match(/(?:offer\/|item\/|^)?(G\d{10,}[A-Za-z0-9]*)/i);
   const oid = offerMatch ? offerMatch[1] : null;
 
   const catSlug = resolveCategorySlug(gameTitle);
-  const cleanSeller = (sellerName || "").trim();
-  const safeSearchUrl = cleanSeller && !cleanSeller.toLowerCase().includes("default")
-    ? `https://www.g2g.com/categories/${catSlug}?q=${encodeURIComponent(cleanSeller)}`
-    : `https://www.g2g.com/categories/${catSlug}`;
-
-  // If G2G invalid combo /categories/.../offer/
-  if (url.includes("/categories/") && url.includes("/offer/")) {
-    if (oid) {
-      return {
-        profile_url: `https://www.g2g.com/offer/${oid}`,
-        offer_id: oid,
-        fallback_search_url: safeSearchUrl,
-      };
-    }
-    return {
-      profile_url: safeSearchUrl,
-      offer_id: null,
-      fallback_search_url: safeSearchUrl,
-    };
-  }
-
-  // If already /offer/{oid} or /id/offer/{oid}
-  if (oid) {
-    return {
-      profile_url: `https://www.g2g.com/offer/${oid}`,
-      offer_id: oid,
-      fallback_search_url: safeSearchUrl,
-    };
-  }
-
-  // If /id/categories/
-  if (url.includes("g2g.com/id/categories/")) {
-    const cleanCatUrl = url.replace("g2g.com/id/categories/", "g2g.com/categories/");
-    return {
-      profile_url: cleanCatUrl,
-      offer_id: null,
-      fallback_search_url: cleanCatUrl,
-    };
-  }
+  const evergreenUrl = getEvergreenUrl(catSlug, sellerName);
 
   return {
-    profile_url: url,
-    offer_id: null,
-    fallback_search_url: safeSearchUrl,
+    profile_url: evergreenUrl,
+    offer_id: oid,
+    fallback_search_url: evergreenUrl,
   };
+}
+
+function sanitizeSeller(seller, gameTitle) {
+  let changed = false;
+  const orig = seller.profile_url || "";
+  const result = sanitizeUrl(orig, gameTitle, seller.seller_name);
+
+  if (result.profile_url !== orig) {
+    seller.profile_url = result.profile_url;
+    changed = true;
+  }
+  if (result.offer_id && !seller.offer_id) {
+    seller.offer_id = result.offer_id;
+  }
+  if (seller.fallback_search_url !== result.fallback_search_url) {
+    seller.fallback_search_url = result.fallback_search_url;
+    changed = true;
+  }
+
+  // Clean /id/ in profile_url or fallback_search_url
+  if (seller.profile_url && seller.profile_url.includes("g2g.com/id/")) {
+    seller.profile_url = seller.profile_url.replace("g2g.com/id/", "g2g.com/");
+    changed = true;
+  }
+  if (seller.fallback_search_url && seller.fallback_search_url.includes("g2g.com/id/")) {
+    seller.fallback_search_url = seller.fallback_search_url.replace("g2g.com/id/", "g2g.com/");
+    changed = true;
+  }
+
+  // Clean /id/ in Eneba
+  if (seller.profile_url && seller.profile_url.includes("eneba.com/id/store")) {
+    seller.profile_url = seller.profile_url.replace("eneba.com/id/store", "eneba.com/store");
+    changed = true;
+  }
+  return changed;
 }
 
 function sanitizeCatalog(catalog) {
@@ -118,31 +158,17 @@ function sanitizeCatalog(catalog) {
   catalog.forEach((game) => {
     const title = game.title || "";
     (game.sellers || []).forEach((seller) => {
-      const orig = seller.profile_url || "";
-      const result = sanitizeUrl(orig, title, seller.seller_name);
-
-      if (typeof result === "object") {
-        if (result.profile_url !== orig) {
-          seller.profile_url = result.profile_url;
-          count++;
-        }
-        if (result.offer_id && !seller.offer_id) {
-          seller.offer_id = result.offer_id;
-        }
-        if (!seller.fallback_search_url) {
-          seller.fallback_search_url = result.fallback_search_url;
-        }
-      } else if (result !== orig) {
-        seller.profile_url = result;
-        count++;
-      }
-
-      // Check for /id/ in Eneba
-      if (seller.profile_url && seller.profile_url.includes("eneba.com/id/store")) {
-        seller.profile_url = seller.profile_url.replace("eneba.com/id/store", "eneba.com/store");
+      if (sanitizeSeller(seller, title)) {
         count++;
       }
     });
+
+    // Sanitize nested metrics.selected_seller if exists
+    if (game.metrics && game.metrics.selected_seller) {
+      if (sanitizeSeller(game.metrics.selected_seller, title)) {
+        count++;
+      }
+    }
   });
   return count;
 }
@@ -164,9 +190,9 @@ async function run() {
     // Also sync starter if exists
     if (fs.existsSync(starterCatalogPath)) {
       const starterData = JSON.parse(fs.readFileSync(starterCatalogPath, 'utf8'));
-      sanitizeCatalog(starterData);
+      const starterFixed = sanitizeCatalog(starterData);
       fs.writeFileSync(starterCatalogPath, JSON.stringify(starterData, null, 2), 'utf8');
-      console.log(`✅ Sanitized ${starterCatalogPath}`);
+      console.log(`✅ Sanitized ${starterFixed} URLs in ${starterCatalogPath}`);
     }
 
     // Sync to PostgreSQL / Supabase if configured
@@ -193,11 +219,17 @@ async function run() {
         }
         const client = new Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
         await client.connect();
+
+        // Write to app_kv under BOTH "active_catalog" AND "catalog_games"
+        await client.query(
+          "INSERT INTO app_kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP",
+          ["active_catalog", JSON.stringify(data)]
+        );
         await client.query(
           "INSERT INTO app_kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP",
           ["catalog_games", JSON.stringify(data)]
         );
-        console.log("✅ Synchronized sanitized catalog to Supabase app_kv (catalog_games).");
+        console.log("✅ Synchronized sanitized catalog to Supabase app_kv under BOTH 'active_catalog' and 'catalog_games'.");
 
         // If table catalog_games exists, update each row
         const tableCheck = await client.query("SELECT to_regclass('public.catalog_games') as exists");
@@ -240,4 +272,5 @@ async function run() {
 }
 
 run().catch(console.error);
+
 
