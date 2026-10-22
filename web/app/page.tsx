@@ -22,6 +22,10 @@ import {
   ShieldCheck,
   Flame,
   Award,
+  Radio,
+  Copy,
+  Lock,
+  Cpu
 } from "lucide-react";
 
 interface CatalogSeller {
@@ -77,8 +81,7 @@ export default function AksharaDirectStorefront() {
   const [buyerName, setBuyerName] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
   const [buyerNotes, setBuyerNotes] = useState("");
-  const [showQrisView, setShowQrisView] = useState(false);
-  const [copiedPayText, setCopiedPayText] = useState(false);
+  const [copiedPrice, setCopiedPrice] = useState(false);
 
   // Warranty Verification State
   const [searchSerial, setSearchSerial] = useState("AKSHARA-99211A-0818");
@@ -107,7 +110,6 @@ export default function AksharaDirectStorefront() {
           if (json.status === "success" && Array.isArray(json.data) && json.data.length > 0) {
             setCatalog(json.data);
           } else {
-            // Fallback default games
             setCatalog(getDefaultCatalog());
           }
         } else {
@@ -160,7 +162,7 @@ export default function AksharaDirectStorefront() {
       id: "game-terraria-05",
       title: "Terraria",
       platform: "Steam",
-      category: "Steam CD-Key",
+      category: "Steam CD-Key Global",
       selling_price_shopee_idr: 95000,
       warranty_days: 30,
     },
@@ -168,7 +170,7 @@ export default function AksharaDirectStorefront() {
       id: "game-fc25-06",
       title: "EA SPORTS FC 25",
       platform: "EA App / PC",
-      category: "Standard Account",
+      category: "Standard Account Global",
       selling_price_shopee_idr: 549000,
       warranty_days: 30,
     },
@@ -200,7 +202,7 @@ export default function AksharaDirectStorefront() {
   const calculatePrices = (shopeePrice: number) => {
     // 10% direct saving from 0% marketplace fees
     const directPrice = Math.round((shopeePrice * 0.9) / 1000) * 1000;
-    // Extra VIP discount: Rp 15.000 or 10% whichever gives better deal
+    // Extra VIP discount: Rp 15.000
     const vipDiscount = appliedVipCode ? 15000 : 0;
     const finalPrice = Math.max(10000, directPrice - vipDiscount);
     const totalSaving = shopeePrice - finalPrice;
@@ -216,14 +218,13 @@ export default function AksharaDirectStorefront() {
 
   const openCheckout = (game: GameCatalogItem) => {
     setSelectedGame(game);
-    setShowQrisView(false);
     setCheckoutModalOpen(true);
   };
 
   const handleWhatsAppCheckout = () => {
     if (!selectedGame) return;
     const { shopeePrice, finalPrice, vipDiscount } = calculatePrices(selectedGame.selling_price_shopee_idr);
-    const targetWa = "6282299887766"; // Admin Official WhatsApp Fast-Lane
+    const targetWa = "6282299887766";
     
     let text = `🎮 *PESANAN DIRECT FAST-LANE — AKSHARA GAMING CENTER*\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -259,7 +260,7 @@ export default function AksharaDirectStorefront() {
       if (data.status === "success") {
         setVerificationResult(data.data);
       } else {
-        setVerifyError(data.message || "Serial ID tidak ditemukan.");
+        setVerifyError(data.message || "Serial ID tidak ditemukan dalam database klaim.");
       }
     } catch {
       setVerifyError("Gagal menghubungi server verifikasi.");
@@ -268,7 +269,6 @@ export default function AksharaDirectStorefront() {
     }
   };
 
-  // Filter Catalog
   const filteredCatalog = catalog.filter((item) => {
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -280,33 +280,34 @@ export default function AksharaDirectStorefront() {
   });
 
   return (
-    <div className="min-h-screen text-slate-100 pb-20">
+    <div className="min-h-screen text-slate-100 pb-24">
       {/* ── TOP UTILITY NAVIGATION BAR ──────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-[#08090e]/90 backdrop-blur-xl border-b border-white/[0.08] px-4 sm:px-8 py-3.5">
+      <header className="sticky top-0 z-40 bg-[#06070a]/90 backdrop-blur-2xl border-b border-white/[0.08] px-4 sm:px-8 py-3.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500/20 via-indigo-500/30 to-purple-500/20 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+            <div className="relative w-9 h-9 rounded-2xl bg-gradient-to-tr from-emerald-500/20 via-indigo-500/30 to-purple-500/20 border border-emerald-500/40 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.3)] shrink-0">
               <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-black text-sm sm:text-base tracking-tight text-white font-sans">
+                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-sans">
                   AKSHARA GAMING CENTER
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">
                   Direct Store
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-mono hidden sm:block">
-                Toko Resmi Bergaransi &bull; Bebas Biaya Marketplace 10%
+                Lisensi Game Resmi &bull; Hemat 10% Bebas Biaya Marketplace &bull; Garansi 30 Hari
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <a
               href="#warranty"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-all hover:border-sky-400/30"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
               Cek Garansi
@@ -315,70 +316,72 @@ export default function AksharaDirectStorefront() {
             {/* Discrete Admin Command Deck Button */}
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.10] hover:border-indigo-500/40 transition-all shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-mono font-semibold text-white bg-white/[0.07] hover:bg-white/[0.14] border border-white/[0.12] hover:border-indigo-400/40 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.4)] group"
               title="Akses Admin Dashboard & Control Deck"
             >
-              <Shield className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="hidden sm:inline">Admin</span> Deck
-              <ArrowRight className="w-3 h-3 text-slate-500" />
+              <Shield className="w-3.5 h-3.5 text-indigo-400 group-hover:text-indigo-300" />
+              <span>Command Deck</span>
+              <ArrowRight className="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-8 space-y-10 pt-6">
-        {/* ── HERO BANNER ─────────────────────────────────────────── */}
-        <section className="relative overflow-hidden rounded-3xl p-6 sm:p-10 border border-white/[0.09] bg-gradient-to-b from-white/[0.05] via-transparent to-transparent shadow-2xl">
-          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 space-y-10 pt-8">
+        {/* ── HERO BANNER (MACHINED DOUBLE-BEZEL) ───────────────────── */}
+        <section className="machined-card">
+          <div className="machined-card-inner p-6 sm:p-10 relative overflow-hidden">
+            <div className="absolute top-0 right-0 -mr-24 -mt-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 -ml-24 -mb-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="relative z-10 max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-semibold mb-5 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              0% MARKETPLACE ADMIN FEE &bull; 5-SEC VAULT DELIVERY
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-[1.1] mb-4">
-              Beli Lisensi Game Original Lebih Hemat Langsung dari Sumbernya.
-            </h1>
-
-            <p className="text-sm sm:text-base text-slate-400 leading-relaxed mb-6 max-w-2xl">
-              Dapatkan game PC & Console favorit Anda langsung tanpa markup biaya marketplace Shopee.
-              Akun resmi, garansi 30 hari anti-hackback, dan serah terima instan 5 detik melalui Brankas Kriptografi Akshara.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-300">
-              <div className="flex items-center gap-1.5 bg-black/40 px-3 py-1.5 rounded-lg border border-white/[0.06]">
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                Auto-Fulfill 5 Detik
+            <div className="relative z-10 max-w-3xl">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-mono font-semibold mb-5 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
+                <span>0% MARKETPLACE ADMIN FEE &bull; 5-SEC VAULT DISPATCH</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-black/40 px-3 py-1.5 rounded-lg border border-white/[0.06]">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                Garansi Resmi 30 Hari
-              </div>
-              <div className="flex items-center gap-1.5 bg-black/40 px-3 py-1.5 rounded-lg border border-white/[0.06]">
-                <Award className="w-3.5 h-3.5 text-indigo-400" />
-                100% Original & Legal
+
+              <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-[1.12] mb-4 text-gradient-silver">
+                Beli Lisensi Game Original Lebih Hemat Langsung dari Sumbernya.
+              </h1>
+
+              <p className="text-sm sm:text-base text-slate-400 leading-relaxed mb-7 max-w-2xl">
+                Nikmati game PC & Console favorit Anda tanpa markup biaya marketplace Shopee.
+                Akun resmi bergaransi 30 hari anti-hackback, dengan serah terima kredensial terenkripsi AES-256 instan 5 detik.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-300">
+                <div className="flex items-center gap-2 bg-black/50 px-3.5 py-2 rounded-xl border border-white/[0.08] shadow-inner">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <span>Auto-Fulfill 5 Detik</span>
+                </div>
+                <div className="flex items-center gap-2 bg-black/50 px-3.5 py-2 rounded-xl border border-white/[0.08] shadow-inner">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Garansi Resmi 30 Hari</span>
+                </div>
+                <div className="flex items-center gap-2 bg-black/50 px-3.5 py-2 rounded-xl border border-white/[0.08] shadow-inner">
+                  <Award className="w-4 h-4 text-indigo-400" />
+                  <span>100% Original & Legal</span>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         {/* ── VIP MEMBER COUPON INTERACTIVE BOX ─────────────────────── */}
-        <section className="relative overflow-hidden rounded-2xl p-5 sm:p-6 bg-gradient-to-r from-amber-500/[0.08] via-indigo-500/[0.05] to-emerald-500/[0.08] border border-amber-500/30 shadow-[0_0_30px_rgba(245,158,11,0.06)]">
+        <section className="relative overflow-hidden rounded-2xl p-5 sm:p-6 bg-gradient-to-r from-amber-500/[0.09] via-indigo-500/[0.05] to-emerald-500/[0.09] border border-amber-500/30 shadow-[0_4px_30px_rgba(245,158,11,0.08)]">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="space-y-1 max-w-xl">
+            <div className="space-y-1.5 max-w-xl">
               <div className="flex items-center gap-2">
                 <Gift className="w-5 h-5 text-amber-400 shrink-0" />
                 <h3 className="text-base font-bold text-white tracking-tight">
                   Punya Kode Voucher Member VIP?
                 </h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 uppercase">
-                  Cashback / Diskon Langsung
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 uppercase">
+                  Diskon Langsung
                 </span>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Pelanggan setia yang pernah membeli via Shopee dapat memasukkan kode kupon dari kartu serah terima Anda (contoh: <code className="text-amber-300 font-mono">VIP-9921-MC</code>) untuk potongan ekstra <strong className="text-white">Rp 15.000</strong> di semua game!
+                Pelanggan setia yang pernah membeli via Shopee dapat memasukkan kode kupon dari kartu serah terima Anda (contoh: <code className="text-amber-300 font-mono font-bold bg-black/40 px-1.5 py-0.5 rounded border border-amber-500/30">VIP-9921-MC</code>) untuk potongan ekstra <strong className="text-emerald-300">Rp 15.000</strong> di semua game!
               </p>
             </div>
 
@@ -387,28 +390,28 @@ export default function AksharaDirectStorefront() {
               {!appliedVipCode ? (
                 <form onSubmit={handleApplyCoupon} className="flex flex-col sm:flex-row gap-2">
                   <div className="relative">
-                    <Tag className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Tag className="w-4 h-4 text-amber-400/70 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value)}
                       placeholder="Contoh: VIP-9921-MC"
-                      className="bg-black/60 border border-amber-500/30 rounded-xl pl-9 pr-4 py-2.5 text-xs font-mono uppercase text-amber-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/50 w-full sm:w-60"
+                      className="bg-black/70 border border-amber-500/30 rounded-xl pl-10 pr-4 py-2.5 text-xs font-mono uppercase text-amber-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/40 w-full sm:w-64 transition-all"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-xs font-bold font-mono tracking-wider uppercase transition-all shadow-md active:scale-95"
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black text-xs font-bold font-mono tracking-wider uppercase transition-all shadow-md active:scale-95"
                   >
                     Klaim Diskon
                   </button>
                 </form>
               ) : (
-                <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-2.5">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-2.5 shadow-inner">
+                  <div className="flex items-center gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                     <div>
-                      <span className="text-[10px] font-mono text-emerald-400 block uppercase font-bold">
+                      <span className="text-[10px] font-mono text-emerald-400 block uppercase font-bold tracking-wider">
                         Voucher VIP Aktif
                       </span>
                       <span className="text-xs font-mono font-bold text-white">
@@ -418,7 +421,7 @@ export default function AksharaDirectStorefront() {
                   </div>
                   <button
                     onClick={handleRemoveCoupon}
-                    className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all ml-2"
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all ml-2"
                     title="Hapus voucher"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -427,7 +430,10 @@ export default function AksharaDirectStorefront() {
               )}
 
               {couponError && (
-                <p className="text-[11px] font-mono text-rose-400 mt-1.5">{couponError}</p>
+                <p className="text-[11px] font-mono text-rose-400 mt-1.5 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  {couponError}
+                </p>
               )}
             </div>
           </div>
@@ -441,10 +447,10 @@ export default function AksharaDirectStorefront() {
               <button
                 key={plat}
                 onClick={() => setSelectedPlatform(plat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all shrink-0 border ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-semibold transition-all shrink-0 border ${
                   selectedPlatform === plat
-                    ? "bg-white text-black border-white shadow-sm"
-                    : "bg-white/[0.03] text-slate-400 border-white/[0.06] hover:bg-white/[0.07] hover:text-white"
+                    ? "bg-white text-black border-white shadow-[0_2px_12px_rgba(255,255,255,0.2)]"
+                    : "bg-white/[0.03] text-slate-400 border-white/[0.08] hover:bg-white/[0.07] hover:text-white"
                 }`}
               >
                 {plat === "ALL" ? "Semua Platform" : plat}
@@ -453,14 +459,14 @@ export default function AksharaDirectStorefront() {
           </div>
 
           {/* Search box */}
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari judul game..."
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-white/[0.20]"
+              placeholder="Cari judul game (Minecraft, Wukong...)"
+              className="w-full bg-white/[0.03] border border-white/[0.10] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
             />
           </div>
         </div>
@@ -471,13 +477,13 @@ export default function AksharaDirectStorefront() {
             <div>
               <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5 text-emerald-400" />
-                Katalog Game Pilihan
+                <span>Katalog Game Pilihan</span>
               </h2>
               <p className="text-xs text-slate-400 font-mono mt-0.5">
                 Harga langsung hemat 10% dibanding marketplace tanpa potongan biaya admin
               </p>
             </div>
-            <span className="text-xs font-mono text-slate-500">
+            <span className="text-xs font-mono text-slate-400 bg-white/[0.04] px-2.5 py-1 rounded-lg border border-white/[0.06]">
               {filteredCatalog.length} Produk Tersedia
             </span>
           </div>
@@ -487,12 +493,12 @@ export default function AksharaDirectStorefront() {
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div
                   key={i}
-                  className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 h-64 animate-pulse"
+                  className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 h-64 skeleton-shimmer"
                 />
               ))}
             </div>
           ) : filteredCatalog.length === 0 ? (
-            <div className="text-center py-16 bg-white/[0.02] border border-white/[0.06] rounded-2xl">
+            <div className="text-center py-16 bg-white/[0.02] border border-white/[0.08] rounded-2xl">
               <ShoppingBag className="w-10 h-10 text-slate-600 mx-auto mb-3" />
               <p className="text-sm text-slate-400">Tidak ada game yang sesuai pencarian.</p>
               <button
@@ -500,7 +506,7 @@ export default function AksharaDirectStorefront() {
                   setSearchQuery("");
                   setSelectedPlatform("ALL");
                 }}
-                className="mt-3 text-xs font-mono text-emerald-400 underline"
+                className="mt-3 text-xs font-mono text-emerald-400 hover:underline"
               >
                 Reset Filter
               </button>
@@ -514,12 +520,12 @@ export default function AksharaDirectStorefront() {
                 return (
                   <div
                     key={game.id}
-                    className="group relative rounded-2xl p-5 border border-white/[0.08] bg-white/[0.03] hover:border-emerald-500/40 hover:bg-white/[0.04] transition-all duration-200 flex flex-col justify-between shadow-lg hover:shadow-[0_0_25px_rgba(16,185,129,0.08)]"
+                    className="v0-card rounded-2xl p-5 border border-white/[0.08] hover:border-emerald-500/40 transition-all duration-200 flex flex-col justify-between shadow-lg group hover:-translate-y-1"
                   >
                     <div>
                       {/* Card Badges */}
                       <div className="flex items-center justify-between gap-2 mb-3">
-                        <span className="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-white/[0.06] border border-white/[0.08] text-slate-300">
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-white/[0.06] border border-white/[0.10] text-slate-300">
                           {game.platform}
                         </span>
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -538,23 +544,23 @@ export default function AksharaDirectStorefront() {
 
                       {/* Warranty & Feature Pills */}
                       <div className="flex items-center gap-2 mb-5">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-400 bg-black/40 px-2 py-0.5 rounded border border-white/[0.04]">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-300 bg-black/50 px-2.5 py-1 rounded-lg border border-white/[0.06]">
                           <ShieldCheck className="w-3 h-3 text-emerald-400" />
                           Garansi {game.warranty_days || 30} Hari
                         </span>
-                        <span className="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
-                          0% Admin Fee
+                        <span className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20 font-semibold">
+                          0% Fee
                         </span>
                       </div>
                     </div>
 
                     {/* Price & Action Box */}
                     <div className="pt-4 border-t border-white/[0.06]">
-                      <div className="flex items-baseline justify-between mb-1">
+                      <div className="flex items-baseline justify-between mb-1.5">
                         <span className="text-[11px] font-mono text-slate-500 line-through">
                           Shopee: {formatRp(shopeePrice)}
                         </span>
-                        <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-400/20">
                           Hemat {formatRp(totalSaving)}
                         </span>
                       </div>
@@ -571,7 +577,7 @@ export default function AksharaDirectStorefront() {
                           </span>
                         </div>
                         {appliedVipCode && (
-                          <span className="text-[10px] font-mono text-amber-300 bg-amber-400/10 px-2 py-1 rounded border border-amber-400/20">
+                          <span className="text-[10px] font-mono text-amber-300 bg-amber-400/10 px-2 py-1 rounded-lg border border-amber-400/20 font-bold">
                             VIP Applied
                           </span>
                         )}
@@ -579,7 +585,7 @@ export default function AksharaDirectStorefront() {
 
                       <button
                         onClick={() => openCheckout(game)}
-                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
+                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-[0_4px_16px_rgba(16,185,129,0.3)] active:scale-98"
                       >
                         <Zap className="w-3.5 h-3.5" />
                         Beli Langsung (Fast-Lane)
@@ -594,12 +600,12 @@ export default function AksharaDirectStorefront() {
 
         {/* ── 1-CLICK CHECKOUT MODAL ──────────────────────────────── */}
         {checkoutModalOpen && selectedGame && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <div className="relative w-full max-w-lg rounded-2xl bg-[#0c0e14] border border-white/[0.12] p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <div className="relative w-full max-w-lg rounded-2xl bg-[#0b0e17] border border-white/[0.14] p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
               {/* Close Button */}
               <button
                 onClick={() => setCheckoutModalOpen(false)}
-                className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all"
+                className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -623,7 +629,7 @@ export default function AksharaDirectStorefront() {
                   calculatePrices(selectedGame.selling_price_shopee_idr);
 
                 return (
-                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2 text-xs font-mono">
+                  <div className="p-4 rounded-xl bg-black/50 border border-white/[0.08] space-y-2 text-xs font-mono">
                     <div className="flex justify-between text-slate-400">
                       <span>Harga Marketplace Shopee:</span>
                       <span className="line-through">{formatRp(shopeePrice)}</span>
@@ -638,9 +644,9 @@ export default function AksharaDirectStorefront() {
                         <span>-{formatRp(vipDiscount)}</span>
                       </div>
                     )}
-                    <div className="pt-2 border-t border-white/[0.08] flex justify-between items-baseline font-bold text-sm text-white">
+                    <div className="pt-2 border-t border-white/[0.10] flex justify-between items-baseline font-bold text-sm text-white">
                       <span>Total Tagihan Bersih:</span>
-                      <span className="text-xl text-emerald-400">{formatRp(finalPrice)}</span>
+                      <span className="text-2xl text-emerald-400 font-mono">{formatRp(finalPrice)}</span>
                     </div>
                   </div>
                 );
@@ -657,7 +663,7 @@ export default function AksharaDirectStorefront() {
                     value={buyerName}
                     onChange={(e) => setBuyerName(e.target.value)}
                     placeholder="Contoh: Senna Gamers"
-                    className="w-full bg-black/60 border border-white/[0.10] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/60"
+                    className="w-full bg-black/60 border border-white/[0.10] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/60"
                   />
                 </div>
                 <div>
@@ -669,7 +675,7 @@ export default function AksharaDirectStorefront() {
                     value={buyerPhone}
                     onChange={(e) => setBuyerPhone(e.target.value)}
                     placeholder="Contoh: 081234567890"
-                    className="w-full bg-black/60 border border-white/[0.10] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/60"
+                    className="w-full bg-black/60 border border-white/[0.10] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500/60"
                   />
                 </div>
               </div>
@@ -678,7 +684,7 @@ export default function AksharaDirectStorefront() {
               <div className="space-y-2 pt-2">
                 <button
                   onClick={handleWhatsAppCheckout}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-bold text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg active:scale-98"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-[0_4px_20px_rgba(16,185,129,0.35)] active:scale-98"
                 >
                   <MessageCircle className="w-4 h-4" />
                   Beli via WhatsApp Fast-Lane (Instan 5 Detik)
@@ -695,27 +701,27 @@ export default function AksharaDirectStorefront() {
         )}
 
         {/* ── WARRANTY VERIFICATION PORTAL ────────────────────────── */}
-        <section id="warranty" className="scroll-mt-12 pt-6">
+        <section id="warranty" className="scroll-mt-16 pt-8">
           <div className="flex items-center gap-4 mb-6">
             <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">
               Verifikasi Garansi & Sertifikat
             </h2>
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-            <span className="text-[10px] font-mono px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-500 shrink-0">
-              PORTAL
+            <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.10] to-transparent" />
+            <span className="text-[10px] font-mono px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.08] text-slate-400 shrink-0">
+              PORTAL FORENSIK
             </span>
           </div>
 
           <div className="v0-card rounded-2xl p-6 sm:p-8">
             <div className="text-center mb-7">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-zinc-500 mb-4">
-                <Shield className="w-3 h-3" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-mono text-slate-400 mb-4">
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
                 Digital Certificate Verification
               </div>
-              <h3 className="text-xl sm:text-2xl font-semibold text-white tracking-tight mb-2">
+              <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight mb-2">
                 Cek Keabsahan Garansi & Sertifikat Digital
               </h3>
-              <p className="text-sm text-zinc-500 max-w-sm mx-auto">
+              <p className="text-sm text-slate-400 max-w-sm mx-auto">
                 Validasi Serial ID unik dari garansi digital pesanan Anda secara online & real-time.
               </p>
             </div>
@@ -723,59 +729,59 @@ export default function AksharaDirectStorefront() {
             {/* Form */}
             <form onSubmit={handleVerifyWarranty} className="max-w-xl mx-auto flex flex-col sm:flex-row gap-2.5 mb-5">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-zinc-600 absolute left-3.5 top-1/2 -translate-y-1/2 shrink-0" />
+                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 shrink-0" />
                 <input
                   type="text"
                   value={searchSerial}
                   onChange={(e) => setSearchSerial(e.target.value)}
                   placeholder="Contoh: AKSHARA-99211A-0818"
-                  className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-sm font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all"
+                  className="w-full bg-black/60 border border-white/[0.10] rounded-xl pl-10 pr-4 py-3 text-sm font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                 />
               </div>
               <button
                 type="submit"
                 disabled={isVerifying}
-                className="v0-btn-secondary px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap disabled:opacity-40"
+                className="v0-btn-secondary px-6 py-3 rounded-xl text-sm font-semibold whitespace-nowrap disabled:opacity-40"
               >
-                {isVerifying ? "Checking..." : "Verifikasi"}
+                {isVerifying ? "Memvalidasi..." : "Verifikasi"}
               </button>
             </form>
 
             {/* Error */}
             {verifyError && (
-              <div className="max-w-xl mx-auto p-4 rounded-xl bg-rose-950/20 border border-rose-900/30 text-sm text-rose-300 font-mono flex items-center gap-3 mb-4">
+              <div className="max-w-xl mx-auto p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-sm text-rose-300 font-mono flex items-center gap-3 mb-4">
                 <AlertCircle className="w-4 h-4 shrink-0" />
-                {verifyError}
+                <span>{verifyError}</span>
               </div>
             )}
 
             {/* Result */}
             {verificationResult && (
-              <div className="max-w-2xl mx-auto p-5 sm:p-6 rounded-xl bg-zinc-950/80 border border-zinc-800">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-zinc-800">
+              <div className="max-w-2xl mx-auto p-5 sm:p-6 rounded-2xl bg-black/60 border border-white/[0.12] shadow-2xl animate-in fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-white/[0.08]">
                   <div>
-                    <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest block mb-1">
-                      Sertifikat Digital Sah &bull; Akshara
+                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest block mb-1 font-bold">
+                      Sertifikat Digital Sah &bull; Akshara Vault
                     </span>
-                    <h4 className="font-semibold text-white text-[15px]">
+                    <h4 className="font-bold text-white text-[16px]">
                       {verificationResult.product_name}
                     </h4>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-semibold border border-emerald-500/20 shrink-0">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-mono font-bold border border-emerald-500/30 shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                     {verificationResult.warranty_status}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                   {[
-                    { label: "SERIAL NUMBER", value: verificationResult.serial_number, cls: "text-zinc-200" },
-                    { label: "NO. PESANAN", value: verificationResult.order_id, cls: "text-zinc-200" },
-                    { label: "PEMBELI", value: verificationResult.buyer_username, cls: "text-zinc-200" },
+                    { label: "SERIAL NUMBER", value: verificationResult.serial_number, cls: "text-white" },
+                    { label: "NO. PESANAN", value: verificationResult.order_id, cls: "text-slate-300" },
+                    { label: "PEMBELI", value: verificationResult.buyer_username, cls: "text-slate-300" },
                     { label: "MASA GARANSI", value: verificationResult.warranty_expires, cls: "text-emerald-400" },
                   ].map((f, i) => (
-                    <div key={i} className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/80">
-                      <span className="text-[9px] font-mono text-zinc-600 block mb-1.5 uppercase tracking-wider">
+                    <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                      <span className="text-[9px] font-mono text-slate-500 block mb-1.5 uppercase tracking-wider font-semibold">
                         {f.label}
                       </span>
                       <span className={`text-[12px] font-bold font-mono ${f.cls} break-all leading-snug`}>
@@ -785,10 +791,10 @@ export default function AksharaDirectStorefront() {
                   ))}
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-zinc-900/40 border border-zinc-800 text-xs text-zinc-400 flex items-start gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-slate-300 flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                   <span>
-                    <span className="text-zinc-200 font-semibold">SOP Klaim Garansi: </span>
+                    <strong className="text-white">SOP Klaim Garansi: </strong>
                     {verificationResult.sop_summary}
                   </span>
                 </div>
