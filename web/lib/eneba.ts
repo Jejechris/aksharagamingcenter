@@ -28,7 +28,7 @@ export const VERIFIED_ENEBA_CATALOG: Record<string, EnebaProductMapping> = {
     keyType: "Steam Key (Global)",
     defaultUrl: "https://www.eneba.com/store/all?text=stardew+valley",
     searchSlug: "stardew-valley",
-    estimatedPriceIdr: 395000,
+    estimatedPriceIdr: 95000,
   },
   "hollow knight": {
     title: "Hollow Knight",

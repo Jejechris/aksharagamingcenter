@@ -147,515 +147,513 @@ export default function TheRiskOfficerPage() {
   };
 
   return (
-    <div className="px-5 sm:px-8 py-8 max-w-[960px] mx-auto space-y-7">
-      {/* ── Page Header ────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-slate-400 font-mono transition-colors"
-            >
-              <ArrowLeft className="w-3 h-3" /> Command Deck
-            </Link>
-            <span className="text-slate-700">/</span>
-            <span className="text-[11px] font-mono text-slate-400">The Risk Officer</span>
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        
+        {/* ── Page Header ────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Link
+                href="/dashboard"
+                className="text-xs text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Command Deck
+              </Link>
+              <span className="text-slate-300">/</span>
+              <span className="text-xs font-semibold text-slate-700">The Risk Officer</span>
+            </div>
+
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+              <ShieldAlert className="w-6 h-6 text-rose-600" />
+              The Risk Officer — Sentry Supplier Audit
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+              Menyaring supplier G2G secara otomatis dengan 4 filter ketat untuk mencegah risiko hackback akun, penipuan, dan keterlambatan resi Shopee.
+            </p>
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
-              <ShieldAlert className="w-5 h-5" />
-            </div>
-            The Risk Officer — Sentry Supplier Audit
-          </h1>
-          <p className="text-[13px] text-slate-500 mt-2 max-w-2xl leading-relaxed">
-            Menyaring supplier G2G secara otomatis dengan 4 filter ketat untuk mencegah risiko hackback akun, penipuan, dan keterlambatan resi Shopee.
-          </p>
+          <Link
+            href="/dashboard"
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium transition-colors shadow-xs inline-flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-slate-400" />
+            <span>Dashboard</span>
+          </Link>
         </div>
 
-        <Link
-          href="/dashboard"
-          className="v0-btn-secondary inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium self-start"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 text-slate-400" />
-          Dashboard
-        </Link>
-      </div>
-
-      {/* ── Risk Overview KPI Cards ────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="v0-card card-division-risk rounded-2xl p-5 border-white/[0.08]">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-semibold">
-              Total Supplier Diaudit
-            </span>
-            <div className="p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-400">
-              <Users className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div className="text-3xl font-bold font-mono text-white tracking-tight">{catalogSellers.length}</div>
-          <div className="text-[10px] font-mono text-slate-600 mt-3 pt-2.5 border-t border-white/[0.05]">
-            Listing G2G aktif diverifikasi
-          </div>
-        </div>
-
-        <div className="v0-card card-division-risk rounded-2xl p-5 border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.05)]">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-semibold">
-              Supplier Approved
-            </span>
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <ShieldCheck className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div className="text-3xl font-bold font-mono text-emerald-400 tracking-tight">
-            {catalogSellers.filter(s => s.rating_pct >= 98).length}
-          </div>
-          <div className="text-[10px] font-mono text-emerald-700 mt-3 pt-2.5 border-t border-emerald-500/10">
-            Lolos standar rating &gt;98%
-          </div>
-        </div>
-
-        <div className="v0-card card-division-risk rounded-2xl p-5 border-rose-500/20 shadow-[0_0_20px_rgba(244,63,94,0.05)]">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-rose-400 font-semibold">
-              Threat Level
-            </span>
-            <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400">
-              <AlertTriangle className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold font-mono text-emerald-400 tracking-tight flex items-center gap-2">
-            <span>{catalogSellers.length === 0 ? "NONE" : catalogSellers.some(s => s.rating_pct < 95) ? "HIGH" : "LOW"}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-sans font-medium">
-              {catalogSellers.length === 0 ? "Bersih" : "Aman"}
-            </span>
-          </div>
-          <div className="text-[10px] font-mono text-rose-700 mt-3 pt-2.5 border-t border-rose-500/10">
-            {catalogSellers.length === 0 ? "0 Supplier di Portofolio" : "0 Insiden Hackback tercatat"}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Live Gemini AI Review Threat Scanner ─────────── */}
-      <div className="v0-card card-division-risk rounded-2xl p-5 sm:p-6 border-rose-500/20 space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-white/[0.06]">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-white">Live AI Review Threat Scanner</h2>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/20">
-                  Gemini 3.5 Flash-Lite
-                </span>
-              </div>
-              <p className="text-[12px] text-slate-500 mt-0.5">
-                Pindai ulasan pembeli G2G untuk mendeteksi ancaman akun ditarik kembali (hackback) atau keluhan tersembunyi.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Active Portfolio Supplier Chips */}
-        {catalogSellers.length > 0 && (
-          <div className="space-y-1.5 p-3 rounded-xl bg-zinc-950/60 border border-white/[0.06]">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-              <Tag className="w-3 h-3 text-rose-400" />
-              <span>Pilih Cepat Supplier dari Portofolio ({catalogSellers.length}):</span>
-            </span>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-              {catalogSellers.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => {
-                    setScanSellerName(s.name);
-                    setScanReviews(
-                      `Rating: ${s.rating_pct}% | Reviews: ${s.reviews.toLocaleString("id-ID")}\nInstant delivery verified.\nAkun normal tanpa masalah ganti kredensial.`
-                    );
-                  }}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition-all border whitespace-nowrap ${
-                    scanSellerName === s.name
-                      ? "bg-rose-500/20 border-rose-500/50 text-rose-300 font-bold"
-                      : "bg-zinc-900 border-zinc-800 text-slate-400 hover:text-white hover:border-zinc-700"
-                  }`}
-                >
-                  {s.name} ({s.gameTitle.split(":")[0]})
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Input Form */}
-          <div className="space-y-3.5">
-            <div>
-              <label className="text-[11px] font-mono text-slate-400 block mb-1.5">Nama Seller G2G</label>
-              <input
-                type="text"
-                value={scanSellerName}
-                onChange={(e) => setScanSellerName(e.target.value)}
-                placeholder="Contoh: AlphaVault_Store"
-                className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-rose-500/50 transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-mono text-slate-400 block mb-1.5">
-                Sampel Ulasan Pembeli (1 ulasan per baris)
-              </label>
-              <textarea
-                rows={4}
-                value={scanReviews}
-                onChange={(e) => setScanReviews(e.target.value)}
-                className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl p-3 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-rose-500/50 transition-all"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleRunAiAudit}
-              disabled={isScanning || !scanSellerName.trim()}
-              className="v0-btn-primary w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isScanning ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Memindai Red-Flags dengan AI...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 text-rose-500" />
-                  <span>Jalankan Scan Reputasi AI</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Result Panel */}
-          <div className="rounded-xl bg-zinc-950/60 border border-white/[0.06] p-4 flex flex-col justify-between">
-            <div className="flex items-center justify-between pb-3 border-b border-white/[0.05] mb-3">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-semibold">
-                Hasil Audit Intelijen
+        {/* ── Risk Overview KPI Cards ────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="app-card p-5 bg-white">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-slate-500">
+                Total Supplier Diaudit
               </span>
-              {scanResult && (
-                <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded border font-bold ${
-                    scanResult.verdict === "APPROVED"
-                      ? "bg-emerald-950 text-emerald-400 border-emerald-800"
-                      : scanResult.verdict === "WARNING"
-                      ? "bg-amber-950 text-amber-400 border-amber-800"
-                      : "bg-rose-950 text-rose-400 border-rose-800"
-                  }`}
-                >
-                  {scanResult.verdict} (Skor: {scanResult.threat_score}/100)
-                </span>
-              )}
+              <div className="p-2 rounded-lg bg-slate-100 text-slate-600">
+                <Users className="w-4 h-4" />
+              </div>
             </div>
+            <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight tabular-nums">
+              {catalogSellers.length}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-2">
+              Listing G2G aktif diverifikasi
+            </div>
+          </div>
 
-            {scanResult ? (
-              <div className="space-y-3 text-xs">
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-white/[0.05] font-mono">
-                  <span className="text-slate-400 text-[11px]">Risiko Hackback:</span>
-                  <span
-                    className={`font-bold ${
-                      scanResult.hackback_risk === "LOW"
-                        ? "text-emerald-400"
-                        : scanResult.hackback_risk === "MEDIUM"
-                        ? "text-amber-400"
-                        : "text-rose-400"
-                    }`}
-                  >
-                    {scanResult.hackback_risk}
+          <div className="app-card p-5 bg-white">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-slate-500">
+                Supplier Approved
+              </span>
+              <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-bold font-mono text-emerald-600 tracking-tight tabular-nums">
+              {catalogSellers.filter(s => s.rating_pct >= 98).length}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-2">
+              Lolos standar rating &ge; 98%
+            </div>
+          </div>
+
+          <div className="app-card p-5 bg-white">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-slate-500">
+                Threat Level
+              </span>
+              <div className="p-2 rounded-lg bg-rose-50 text-rose-600">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-bold font-mono text-emerald-600 tracking-tight flex items-center gap-2">
+              <span>{catalogSellers.length === 0 ? "NONE" : catalogSellers.some(s => s.rating_pct < 95) ? "HIGH" : "LOW"}</span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-sans font-semibold">
+                {catalogSellers.length === 0 ? "Bersih" : "Aman"}
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-2">
+              {catalogSellers.length === 0 ? "0 Supplier di Portofolio" : "0 Insiden Hackback tercatat"}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Live Gemini AI Review Threat Scanner ─────────── */}
+        <div className="app-card p-5 sm:p-6 bg-white space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-200">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-slate-900">Live AI Review Threat Scanner</h2>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-semibold">
+                    Gemini 3.5 Flash-Lite
                   </span>
                 </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pindai ulasan pembeli G2G untuk mendeteksi ancaman akun ditarik kembali (hackback) atau keluhan tersembunyi.
+                </p>
+              </div>
+            </div>
+          </div>
 
-                <div>
-                  <span className="text-[10px] font-mono text-slate-500 block mb-1">Saran Eksekutif:</span>
-                  <p className="text-slate-300 text-[11px] leading-relaxed bg-zinc-900/40 p-2.5 rounded-lg border border-white/[0.05]">
-                    {scanResult.executive_advice}
-                  </p>
+          {/* Quick Active Portfolio Supplier Chips */}
+          {catalogSellers.length > 0 && (
+            <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-semibold flex items-center gap-1.5">
+                <Tag className="w-3 h-3 text-rose-500" />
+                <span>Pilih Cepat Supplier dari Portofolio ({catalogSellers.length}):</span>
+              </span>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                {catalogSellers.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      setScanSellerName(s.name);
+                      setScanReviews(
+                        `Rating: ${s.rating_pct}% | Reviews: ${s.reviews.toLocaleString("id-ID")}\nInstant delivery verified.\nAkun normal tanpa masalah ganti kredensial.`
+                      );
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-all border whitespace-nowrap cursor-pointer ${
+                      scanSellerName === s.name
+                        ? "bg-rose-50 border-rose-300 text-rose-700 font-bold shadow-xs"
+                        : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                    }`}
+                  >
+                    {s.name} ({s.gameTitle.split(":")[0]})
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Input Form */}
+            <div className="space-y-3.5">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Nama Seller G2G</label>
+                <input
+                  type="text"
+                  value={scanSellerName}
+                  onChange={(e) => setScanSellerName(e.target.value)}
+                  placeholder="Contoh: AlphaVault_Store"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-rose-500 focus:bg-white transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Sampel Ulasan Pembeli (1 ulasan per baris)
+                </label>
+                <textarea
+                  rows={4}
+                  value={scanReviews}
+                  onChange={(e) => setScanReviews(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-rose-500 focus:bg-white transition-all"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRunAiAudit}
+                disabled={isScanning || !scanSellerName.trim()}
+                className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-colors shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                {isScanning ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Memindai Red-Flags dengan AI...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Jalankan Scan Reputasi AI</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Result Panel */}
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-semibold">
+                    Hasil Audit Intelijen
+                  </span>
+                  {scanResult && (
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded border font-bold ${
+                        scanResult.verdict === "APPROVED"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                          : scanResult.verdict === "WARNING"
+                          ? "bg-amber-50 text-amber-700 border-amber-300"
+                          : "bg-rose-50 text-rose-700 border-rose-300"
+                      }`}
+                    >
+                      {scanResult.verdict} (Skor Ancaman: {scanResult.threat_score}/100)
+                    </span>
+                  )}
                 </div>
 
-                {scanResult.positive_traits && scanResult.positive_traits.length > 0 && (
-                  <div>
-                    <span className="text-[10px] font-mono text-emerald-400 block mb-1">Poin Positif:</span>
-                    <ul className="list-disc list-inside text-slate-400 text-[11px] space-y-0.5">
-                      {scanResult.positive_traits.map((t: string, i: number) => (
-                        <li key={i}>{t}</li>
-                      ))}
-                    </ul>
+                {scanResult ? (
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-slate-200 font-mono">
+                      <span className="text-slate-500 text-[11px]">Risiko Hackback:</span>
+                      <span
+                        className={`font-bold ${
+                          scanResult.hackback_risk === "LOW"
+                            ? "text-emerald-700"
+                            : scanResult.hackback_risk === "MEDIUM"
+                            ? "text-amber-700"
+                            : "text-rose-700"
+                        }`}
+                      >
+                        {scanResult.hackback_risk}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-mono text-slate-500 block mb-1">Saran Eksekutif:</span>
+                      <p className="text-slate-800 text-xs leading-relaxed bg-white p-2.5 rounded-lg border border-slate-200">
+                        {scanResult.executive_advice}
+                      </p>
+                    </div>
+
+                    {scanResult.positive_traits && scanResult.positive_traits.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-mono text-emerald-700 block mb-1 font-semibold">Poin Positif:</span>
+                        <ul className="list-disc list-inside text-slate-600 text-xs space-y-0.5">
+                          {scanResult.positive_traits.map((t: string, i: number) => (
+                            <li key={i}>{t}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-slate-500 text-xs flex flex-col items-center justify-center space-y-2">
+                    <ShieldCheck className="w-8 h-8 text-slate-400" />
+                    <p>Klik tombol untuk memindai risiko reputasi ulasan toko.</p>
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="text-center py-8 text-slate-600 text-xs flex flex-col items-center justify-center space-y-2">
-                <ShieldCheck className="w-8 h-8 text-slate-700" />
-                <p>Klik tombol untuk memindai risiko reputasi ulasan toko.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 3-Tier Supplier Matrix ─────────────────────────── */}
+        <div className="app-card p-5 sm:p-6 bg-white space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-900">Matriks 3-Tier Supplier (Anti-Monopoly Framework)</h2>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                Resiliensi Pasokan
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            {/* Tier 1 */}
+            <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-800">🛡️ Tier 1: Top Verified</span>
+                <span className="text-[10px] font-mono text-emerald-700 font-semibold">Risk: 0/100</span>
               </div>
+              <div className="text-xs font-semibold text-slate-800">Ultra-Safe & No-Ban Guarantee</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Supplier reputasi bintang 5 (&gt; 99.8% rating, &gt; 10k ulasan). Garansi akun dan respon 100% aman untuk produk bernilai tinggi.
+              </p>
+              <div className="text-[10px] font-mono text-slate-500 pt-1.5 border-t border-emerald-200/60">
+                Contoh: HellenWong, Sharktech
+              </div>
+            </div>
+
+            {/* Tier 2 */}
+            <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-800">⚡ Tier 2: Lowest Price</span>
+                <span className="text-[10px] font-mono text-amber-700 font-semibold">Risk: 0-1/100</span>
+              </div>
+              <div className="text-xs font-semibold text-slate-800">Harga Terendah Akun Serupa</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Supplier dengan COGS paling kompetitif untuk format akun identik (Full Access). Memaksimalkan margin bersih hingga 30% - 40%+.
+              </p>
+              <div className="text-[10px] font-mono text-slate-500 pt-1.5 border-t border-amber-200/60">
+                Contoh: TAceOfSpades, FinanceWZ, krovler
+              </div>
+            </div>
+
+            {/* Tier 3 */}
+            <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-800">⚖️ Tier 3: Mid-Level / Baru</span>
+                <span className="text-[10px] font-mono text-indigo-700 font-semibold">Risk: 1-2/100</span>
+              </div>
+              <div className="text-xs font-semibold text-slate-800">Seller Rintisan Bereputasi Bagus</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Seller baru terbit atau mid-size dengan track record &gt; 99% positif. Alternatif fleksibel saat seller utama kehabisan stok.
+              </p>
+              <div className="text-[10px] font-mono text-slate-500 pt-1.5 border-t border-indigo-200/60">
+                Contoh: madangna, Player, LootKings
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Supplier Audit Results ─────────────────────────── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider whitespace-nowrap">
+              Audit Results Listing Supplier ({catalogSellers.length})
+            </h2>
+            <div className="flex-1 h-[1px] bg-slate-200" />
+          </div>
+
+          <div className="space-y-3">
+            {catalogSellers.length === 0 ? (
+              <div className="app-card p-8 text-center space-y-3 bg-white">
+                <ShieldCheck className="w-8 h-8 text-slate-300 mx-auto" />
+                <div className="text-sm font-semibold text-slate-800">Belum Ada Supplier di Portofolio</div>
+                <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                  Tambahkan game dan supplier baru di <Link href="/dashboard/catalog" className="text-emerald-700 underline font-semibold">Radar Katalog</Link> atau <Link href="/dashboard/quant" className="text-emerald-700 underline font-semibold">The Quant</Link> agar otomatis masuk audit sentry di sini.
+                </p>
+                <Link
+                  href="/dashboard/catalog"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition-colors mt-2"
+                >
+                  <Store className="w-3.5 h-3.5" /> + Tambah Game & Supplier ke Katalog
+                </Link>
+              </div>
+            ) : (
+              catalogSellers.map((seller) => {
+                const isApproved = seller.rating_pct >= 98 && seller.reviews >= 5000;
+                const isWarning = seller.rating_pct < 98 && seller.rating_pct >= 95;
+                const status = isApproved ? "APPROVED" : isWarning ? "WARNING" : "REJECTED";
+                const riskScore = isApproved ? 0 : isWarning ? 25 : 85;
+
+                return (
+                  <div
+                    key={seller.id}
+                    className={`app-card p-5 space-y-4 bg-white ${
+                      isApproved
+                        ? "border-emerald-200"
+                        : isWarning
+                        ? "border-amber-200"
+                        : "border-rose-200"
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-slate-900">{seller.name}</span>
+                          <span
+                            className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full border ${
+                              isApproved
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : isWarning
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-rose-50 text-rose-700 border-rose-200"
+                            }`}
+                          >
+                            {status}
+                          </span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                            🎮 {seller.gameTitle.split(":")[0]} ({seller.platform})
+                          </span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                            {seller.tier_label || "🛡️ Verified"}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 font-mono mt-2">
+                          <span className="flex items-center gap-1">
+                            <Star className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="text-slate-800 font-semibold">{seller.rating_pct}%</span> Rating
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="text-slate-800">{seller.reviews.toLocaleString("id-ID")}</span> Reviews
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Zap className="w-3.5 h-3.5 text-amber-600" /> {seller.delivery}
+                          </span>
+                          {seller.price_idr > 0 && (
+                            <span className="text-emerald-700 font-bold tabular-nums">
+                              Rp {seller.price_idr.toLocaleString("id-ID")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2">
+                        <div className="sm:text-right">
+                          <span className="text-[10px] font-mono text-slate-400 block mb-0.5">Risk Score</span>
+                          <span
+                            className={`text-2xl font-bold font-mono tabular-nums ${
+                              isApproved ? "text-emerald-600" : isWarning ? "text-amber-600" : "text-rose-600"
+                            }`}
+                          >
+                            {riskScore}/100
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setScanSellerName(seller.name);
+                            setScanReviews(
+                              `Rating: ${seller.rating_pct}% | Reviews: ${seller.reviews.toLocaleString("id-ID")}\nInstant delivery verified.\nAkun normal tanpa kendala ganti email.`
+                            );
+                            window.scrollTo({ top: 200, behavior: "smooth" });
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Scan AI</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-600 pt-3 border-t border-slate-100">
+                      <div className="flex items-center gap-1.5">
+                        {seller.rating_pct >= 98 ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        )}
+                        <span>Rating &gt; 98%</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {seller.reviews >= 5000 ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        )}
+                        <span>Reviews &gt; 5,000</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Instant Delivery</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Full Access (Email)</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
-      </div>
 
-      {/* ── 3-Tier Supplier Matrix ─────────────────────────── */}
-      <div className="v0-card card-division-risk rounded-2xl p-5 sm:p-6 border-white/[0.08] space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-white">Matriks 3-Tier Supplier (Anti-Monopoly Framework)</h2>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Resiliensi Pasokan
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Tier 1 */}
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-emerald-800/40 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono font-bold text-emerald-300">🛡️ Tier 1: Top Verified</span>
-              <span className="text-[10px] font-mono text-emerald-400">Score: 0/100</span>
-            </div>
-            <div className="text-xs font-semibold text-slate-200">Ultra-Safe & No-Ban Guarantee</div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Supplier reputasi bintang 5 (&gt;99.8% rating, &gt;10k ulasan). Garansi akun dan respon 100% aman untuk produk bernilai tinggi.
-            </p>
-            <div className="text-[10px] font-mono text-slate-600 pt-1.5 border-t border-white/[0.05]">
-              Contoh: HellenWong, Sharktech
-            </div>
+        {/* ── 4 Filters Criteria Grid ────────────────────────── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider whitespace-nowrap">
+              Aturan Filter Keamanan (4 Hard Criteria)
+            </h2>
+            <div className="flex-1 h-[1px] bg-slate-200" />
           </div>
 
-          {/* Tier 2 */}
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-amber-800/40 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono font-bold text-amber-300">⚡ Tier 2: Lowest Price</span>
-              <span className="text-[10px] font-mono text-amber-400">Score: 0-1/100</span>
-            </div>
-            <div className="text-xs font-semibold text-slate-200">Harga Terendah Akun Serupa</div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Supplier dengan COGS paling kompetitif untuk format akun identik (Full Access). Memaksimalkan margin bersih hingga 30% - 40%+.
-            </p>
-            <div className="text-[10px] font-mono text-slate-600 pt-1.5 border-t border-white/[0.05]">
-              Contoh: TAceOfSpades, FinanceWZ, krovler
-            </div>
-          </div>
-
-          {/* Tier 3 */}
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-purple-800/40 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono font-bold text-purple-300">⚖️ Tier 3: Mid-Level / Baru</span>
-              <span className="text-[10px] font-mono text-purple-400">Score: 1-2/100</span>
-            </div>
-            <div className="text-xs font-semibold text-slate-200">Seller Rintisan Bereputasi Bagus</div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Seller baru terbit atau mid-size dengan track record &gt;99% positif. Alternatif fleksibel saat seller utama kehabisan stok.
-            </p>
-            <div className="text-[10px] font-mono text-slate-600 pt-1.5 border-t border-white/[0.05]">
-              Contoh: madangna, Player, LootKings
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Supplier Audit Results ─────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">
-            Audit Results Listing Supplier
-          </h2>
-          <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-        </div>
-
-        <div className="space-y-3">
-          {catalogSellers.length === 0 ? (
-            <div className="p-8 rounded-2xl border border-white/[0.08] bg-zinc-950/40 text-center space-y-3">
-              <ShieldCheck className="w-8 h-8 text-slate-500 mx-auto" />
-              <div className="text-sm font-semibold text-white">Belum Ada Supplier di Portofolio</div>
-              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                Tambahkan game dan supplier baru di <Link href="/dashboard/catalog" className="text-emerald-400 underline font-medium">Katalog Radar</Link> atau <Link href="/dashboard/quant" className="text-emerald-400 underline font-medium">The Quant</Link> agar otomatis masuk audit sentry di sini.
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="app-card p-4 bg-white border border-slate-200 space-y-2">
+              <Star className="w-4 h-4 text-amber-500" />
+              <div className="font-bold text-xs text-slate-900">Rating Minimum 98%</div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Hanya supplier dengan reputasi review positif terbukti aman dari ulasan negatif.
               </p>
-              <Link
-                href="/dashboard/catalog"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono hover:bg-emerald-500/20 transition-all font-semibold mt-2"
-              >
-                <Store className="w-3.5 h-3.5" /> + Tambah Game & Supplier ke Katalog
-              </Link>
             </div>
-          ) : (
-            catalogSellers.map((seller) => {
-              const isApproved = seller.rating_pct >= 98 && seller.reviews >= 5000;
-              const isWarning = seller.rating_pct < 98 && seller.rating_pct >= 95;
-              const status = isApproved ? "APPROVED" : isWarning ? "WARNING" : "REJECTED";
-              const riskScore = isApproved ? 0 : isWarning ? 25 : 85;
 
-              return (
-                <div
-                  key={seller.id}
-                  className={`v0-card card-division-risk p-5 rounded-2xl space-y-4 border ${
-                    isApproved
-                      ? "border-emerald-500/25"
-                      : isWarning
-                      ? "border-amber-500/25"
-                      : "border-rose-500/25 opacity-80"
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <a
-                          href={getG2GSellerUrl(seller.name, seller.gameTitle)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-bold text-white text-[15px] hover:text-emerald-300 inline-flex items-center gap-1.5 underline decoration-emerald-500/30 underline-offset-4 transition-colors"
-                        >
-                          {seller.name}
-                          <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
-                        </a>
-                        <span
-                          className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full border ${
-                            isApproved
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                              : isWarning
-                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                              : "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                          }`}
-                        >
-                          {status}
-                        </span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-900 text-slate-300 border border-white/[0.08]">
-                          🎮 {seller.gameTitle.split(":")[0]} ({seller.platform})
-                        </span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                          {seller.tier_label || "🛡️ Verified"}
-                        </span>
-                      </div>
+            <div className="app-card p-4 bg-white border border-slate-200 space-y-2">
+              <MessageSquare className="w-4 h-4 text-blue-500" />
+              <div className="font-bold text-xs text-slate-900">Min. 5,000 Reviews</div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Volume order tinggi membuktikan seller memiliki pengalaman operasional matang.
+              </p>
+            </div>
 
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 font-mono mt-2">
-                        <span className="flex items-center gap-1">
-                          <Star className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-slate-200">{seller.rating_pct}%</span> Rating
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
-                          <span className="text-slate-200">{seller.reviews.toLocaleString("id-ID")}</span> Reviews
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Zap className="w-3.5 h-3.5 text-amber-400" /> {seller.delivery}
-                        </span>
-                        {seller.price_idr > 0 && (
-                          <span className="text-emerald-400 font-bold">
-                            Rp {seller.price_idr.toLocaleString("id-ID")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+            <div className="app-card p-4 bg-white border border-slate-200 space-y-2">
+              <Zap className="w-4 h-4 text-purple-500" />
+              <div className="font-bold text-xs text-slate-900">Instant Delivery Only</div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Menghindari penundaan penyerahan akun yang bisa membatalkan pesanan di Shopee.
+              </p>
+            </div>
 
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2">
-                      <div className="sm:text-right">
-                        <span className="text-[10px] font-mono text-slate-500 block mb-0.5">Risk Score</span>
-                        <span
-                          className={`text-2xl font-bold font-mono ${
-                            isApproved ? "text-emerald-400" : isWarning ? "text-amber-400" : "text-rose-400"
-                          }`}
-                        >
-                          {riskScore}/100
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setScanSellerName(seller.name);
-                          setScanReviews(
-                            `Rating: ${seller.rating_pct}% | Reviews: ${seller.reviews.toLocaleString("id-ID")}\nInstant delivery verified.\nAkun normal tanpa kendala ganti email.`
-                          );
-                          window.scrollTo({ top: 200, behavior: "smooth" });
-                        }}
-                        className="px-3 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-[11px] font-mono transition-all flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3 h-3 text-rose-400" />
-                        <span>Scan AI</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-300 pt-3 border-t border-white/[0.05]">
-                    <div className="flex items-center gap-1.5">
-                      {seller.rating_pct >= 98 ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      )}
-                      <span>Rating &gt; 98%</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {seller.reviews >= 5000 ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      )}
-                      <span>Reviews &gt; 5,000</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>Instant Delivery</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>Full Access (Email)</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* ── 4 Filters Criteria Grid ────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">
-            Aturan Filter Keamanan (4 Hard Criteria)
-          </h2>
-          <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-white/[0.06] space-y-2">
-            <Star className="w-4 h-4 text-amber-400" />
-            <div className="font-semibold text-xs text-slate-200">Rating Minimum 98%</div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Hanya supplier dengan reputasi review positif terbukti aman dari ulasan negatif.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-white/[0.06] space-y-2">
-            <MessageSquare className="w-4 h-4 text-sky-400" />
-            <div className="font-semibold text-xs text-slate-200">Min. 5,000 Reviews</div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Volume order tinggi membuktikan seller memiliki pengalaman operasional matang.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-white/[0.06] space-y-2">
-            <Zap className="w-4 h-4 text-purple-400" />
-            <div className="font-semibold text-xs text-slate-200">Instant Delivery Only</div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Menghindari penundaan penyerahan akun yang bisa membatalkan pesanan di Shopee.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-white/[0.06] space-y-2">
-            <Lock className="w-4 h-4 text-emerald-400" />
-            <div className="font-semibold text-xs text-slate-200">Full Access Changeable</div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Akun wajib memungkinkan pembeli mengganti email dan password secara mandiri.
-            </p>
+            <div className="app-card p-4 bg-white border border-slate-200 space-y-2">
+              <Lock className="w-4 h-4 text-emerald-500" />
+              <div className="font-bold text-xs text-slate-900">Full Access Changeable</div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Akun wajib memungkinkan pembeli mengganti email dan password secara mandiri.
+              </p>
+            </div>
           </div>
         </div>
+
       </div>
     </div>
   );

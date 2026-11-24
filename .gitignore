@@ -49,3 +49,5 @@ out/
 Thumbs.db
 *.log
 graphify-out/
+repomix-exports/
+

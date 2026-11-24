@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { getDbVault, saveDbVaultItem, getDbOrders, saveDbOrder, getKV, setKV } from "@/lib/db";
+import { getDbVault, saveDbVaultItem, getDbOrders, saveDbOrder, getKV, setKV, getDbClaims, upsertDbClaim } from "@/lib/db";
 import { encryptCredential } from "@/lib/cryptoVault";
 import { readAuthoritativeCatalog } from "@/lib/catalog";
 
@@ -179,22 +179,43 @@ export async function processAutoFulfillment(req: AutoFulfillRequest): Promise<a
       }).catch(() => {});
     }
 
-    // 2. Generate claim code & passcode PIN
+    // 2. Generate claim code & passcode PIN (Anti-Collision Guard)
+    let claims: any[] = [];
+    try {
+      const dbClaims = await getDbClaims();
+      if (dbClaims && Array.isArray(dbClaims)) {
+        claims = dbClaims;
+      } else {
+        const kvClaims = await getKV("claimed_credentials");
+        if (kvClaims && Array.isArray(kvClaims)) claims = kvClaims;
+      }
+    } catch (e) {
+      try {
+        const kvClaims = await getKV("claimed_credentials");
+        if (kvClaims && Array.isArray(kvClaims)) claims = kvClaims;
+      } catch (err) {}
+    }
+
+    const existingCodes = new Set(claims.map((c: any) => (c.claim_code || "").toUpperCase()));
+    const existingPins = new Set(claims.map((c: any) => String(c.passcode || "").trim()));
+
     const cleanTag = game_title.slice(0, 2).replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || "MC";
-    const claimCode = `AKSH-${Math.floor(1000 + Math.random() * 9000)}-${cleanTag}`;
-    const passcodePin = String(Math.floor(100000 + Math.random() * 900000));
+    let claimCode = "";
+    let passcodePin = "";
+
+    do {
+      claimCode = `AKSH-${Math.floor(1000 + Math.random() * 9000)}-${cleanTag}`;
+    } while (existingCodes.has(claimCode.toUpperCase()));
+
+    do {
+      passcodePin = String(Math.floor(100000 + Math.random() * 900000));
+    } while (existingPins.has(passcodePin));
+
     const warrantySerial = `AKSHARA-${nowIso.slice(2, 10).replace(/-/g, "")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     // Format & encrypt credential data
     const plainCred = `Username / ID: ${matchedItem.username}\nPassword: ${matchedItem.password}${matchedItem.notes ? `\nCatatan: ${matchedItem.notes}` : ""}`;
     const encryptedCred = encryptCredential(plainCred, passcodePin);
-
-    // Save to claimed_credentials
-    let claims: any[] = [];
-    try {
-      const dbClaims = await getKV("claimed_credentials");
-      if (dbClaims && Array.isArray(dbClaims)) claims = dbClaims;
-    } catch (e) {}
 
     const newClaim = {
       claim_code: claimCode,
@@ -215,6 +236,12 @@ export async function processAutoFulfillment(req: AutoFulfillRequest): Promise<a
       reveal_count: 0,
       reveal_history: [],
     };
+
+    // Sinkronisasi PostgreSQL claims_vault langsung SEBELUM setKV untuk portal claim-web
+    await upsertDbClaim(newClaim).catch((err) => {
+      console.warn("[AutoFulfill] Notice: upsertDbClaim failed:", err);
+    });
+
     claims.unshift(newClaim);
     await setKV("claimed_credentials", claims).catch(() => {});
 

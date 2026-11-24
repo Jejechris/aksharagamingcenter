@@ -29,6 +29,7 @@ import {
   QrCode,
   Zap,
   Plus,
+  AlertCircle,
   Image as ImageIcon
 } from "lucide-react";
 import ThumbnailStudio from "./components/ThumbnailStudio";
@@ -36,6 +37,12 @@ import ThumbnailStudio from "./components/ThumbnailStudio";
 export default function MarketerPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<"formatter" | "cs_batch" | "thumbnail_studio" | "warranty_card" | "vouchers">("thumbnail_studio");
+  const [toastMsg, setToastMsg] = useState("");
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 3000);
+  };
 
   // ==========================================
   // TAB 1: AI ACCOUNT DELIVERY FORMATTER STATE
@@ -99,9 +106,11 @@ export default function MarketerPage() {
       const json = await res.json();
       if (json.status === "success" && json.data) {
         setFormattedData(json.data);
+        showToast("Pesan serah terima berhasil digenerate!");
       }
     } catch (err) {
       console.error("Format error:", err);
+      showToast("Gagal menyusun format pesan.");
     } finally {
       setIsFormatting(false);
     }
@@ -114,6 +123,7 @@ export default function MarketerPage() {
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [batchRawInput, setBatchRawInput] = useState("");
   const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
+  const [batchError, setBatchError] = useState("");
   const [batchData, setBatchData] = useState<{
     total_orders_batched: number;
     cs_batch_message: string;
@@ -122,7 +132,6 @@ export default function MarketerPage() {
   } | null>(null);
   const [copiedBatch, setCopiedBatch] = useState(false);
   const [copiedFollowupIdx, setCopiedFollowupIdx] = useState<number | null>(null);
-  const [showUnlockGuide, setShowUnlockGuide] = useState(false);
 
   const fetchLedger = async () => {
     try {
@@ -153,6 +162,7 @@ export default function MarketerPage() {
   };
 
   const handleGenerateBatch = async () => {
+    setBatchError("");
     setIsGeneratingBatch(true);
     try {
       let ordersToBatch: Array<{ order_id: string; buyer_username?: string; product_name?: string; status_chat?: string }> = [];
@@ -194,7 +204,7 @@ export default function MarketerPage() {
       }
 
       if (ordersToBatch.length === 0) {
-        alert("Pilih pesanan dari tabel atau ketik Nomor Pesanan di kolom input.");
+        setBatchError("Pilih pesanan dari tabel atau ketik Nomor Pesanan di kolom input.");
         setIsGeneratingBatch(false);
         return;
       }
@@ -208,9 +218,11 @@ export default function MarketerPage() {
       const json = await res.json();
       if (json.status === "success" && json.data) {
         setBatchData(json.data);
+        showToast("Rekap batch CS Shopee siap digunakan!");
       }
     } catch (err) {
       console.error("Batch CS generation failed:", err);
+      showToast("Gagal menghasilkan rekap CS.");
     } finally {
       setIsGeneratingBatch(false);
     }
@@ -246,6 +258,7 @@ export default function MarketerPage() {
       ...vouchers
     ]);
     setNewCode("");
+    showToast("Voucher baru berhasil diterbitkan!");
   };
 
   useEffect(() => {
@@ -257,6 +270,7 @@ export default function MarketerPage() {
     if (!text) return;
     navigator.clipboard.writeText(text);
     cb();
+    showToast("Tersalin ke clipboard!");
   };
 
   if (!mounted) return null;
@@ -270,693 +284,702 @@ export default function MarketerPage() {
   ] as const;
 
   return (
-    <div className="px-5 sm:px-8 py-8 max-w-[960px] mx-auto space-y-7">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Link href="/dashboard" className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-slate-400 font-mono transition-colors">
-              <ArrowLeft className="w-3 h-3" /> Command Deck
-            </Link>
-            <span className="text-slate-700">/</span>
-            <span className="text-[11px] font-mono text-slate-400">The Marketer</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/20">
-              <FileText className="w-5 h-5 text-fuchsia-400" />
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        {/* Header & Breadcrumb */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-slate-200">
+          <div>
+            <div className="flex items-center gap-2 mb-2 text-xs text-slate-500 font-medium">
+              <Link href="/dashboard" className="flex items-center gap-1 hover:text-slate-900 transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" /> Command Deck
+              </Link>
+              <span className="text-slate-300">/</span>
+              <span className="text-slate-900 font-semibold">The Marketer</span>
             </div>
-            Marketer Hub
-          </h1>
-          <p className="text-[13px] text-slate-500 mt-2 max-w-2xl leading-relaxed">
-            Fulfillment & Brand Engine. Hub komando serah terima pesanan: AI Account Formatter, Shopee CS Batch Expediter, Digital Certificate, dan Engine Voucher VIP.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1 p-1 rounded-2xl bg-zinc-950/60 border border-white/[0.06] overflow-x-auto hide-scrollbar">
-        {tabs.map(tab => (
-          <button 
-            key={tab.id} 
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono font-semibold transition-all whitespace-nowrap min-w-[120px] ${
-              activeTab === tab.id 
-                ? 'bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 shadow-lg shadow-fuchsia-500/5' 
-                : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === "formatter" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex items-center gap-4 mb-5">
-            <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">AI Formatter</h2>
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 shadow-sm">
+                <FileText className="w-5 h-5" />
+              </div>
+              Marketer Hub
+            </h1>
+            <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
+              Fulfillment & Brand Engine. Hub komando serah terima pesanan: AI Account Formatter, Shopee CS Batch Expediter, Digital Certificate, dan Engine Voucher VIP.
+            </p>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className={`v0-card card-division-marketer rounded-2xl p-4 border transition-all ${
-              channel === "Shopee" ? "border-fuchsia-500/50 bg-fuchsia-500/5" : "border-white/[0.08]"
-            }`}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-fuchsia-500/15 border border-fuchsia-500/30 flex items-center justify-center text-fuchsia-400">
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200 overflow-x-auto scrollbar-thin">
+          {tabs.map(tab => (
+            <button 
+              key={tab.id} 
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap min-w-[120px] ${
+                activeTab === tab.id 
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80 font-bold' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-purple-600' : 'text-slate-500'}`} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* TAB: THUMBNAIL STUDIO */}
+        {activeTab === "thumbnail_studio" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="app-card p-5 sm:p-6">
+              <ThumbnailStudio />
+            </div>
+          </div>
+        )}
+
+        {/* TAB: FORMATTER */}
+        {activeTab === "formatter" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`app-card p-4 transition-all ${
+                channel === "Shopee" ? "border-purple-300 ring-1 ring-purple-400/20 bg-purple-50/30" : ""
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-600">
                     <ShoppingBag className="w-4 h-4" />
                   </div>
-                  <h2 className="text-xs font-bold text-white uppercase tracking-wider">Format Shopee Chat</h2>
+                  <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Format Shopee Chat</h2>
                 </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Bebas sensor nomor HP / link luar. Pembatas bergaris ascii bersih dan ajakan klik "Pesanan Diterima".
+                </p>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Bebas sensor nomor HP / link luar. Pembatas bergaris ascii bersih dan ajakan klik "Pesanan Diterima".
-              </p>
-            </div>
 
-            <div className={`v0-card card-division-marketer rounded-2xl p-4 border transition-all ${
-              channel === "WhatsApp" ? "border-fuchsia-500/50 bg-fuchsia-500/5" : "border-white/[0.08]"
-            }`}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-fuchsia-500/15 border border-fuchsia-500/30 flex items-center justify-center text-fuchsia-400">
+              <div className={`app-card p-4 transition-all ${
+                channel === "WhatsApp" ? "border-purple-300 ring-1 ring-purple-400/20 bg-purple-50/30" : ""
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
                     <Smartphone className="w-4 h-4" />
                   </div>
-                  <h2 className="text-xs font-bold text-white uppercase tracking-wider">Format WhatsApp Chat</h2>
+                  <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Format WhatsApp Chat</h2>
                 </div>
-              </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Kredensial dibungkus monospace sehingga di HP pembeli tinggal ketuk 1x langsung tersalin.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-5 space-y-4">
-              <form onSubmit={handleGenerateFormat} className="v0-card card-division-marketer rounded-2xl p-5 space-y-4">
-                <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-                  <Key className="w-4 h-4 text-fuchsia-400" />
-                  Input Kredensial
-                </h2>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono text-slate-400 block">Pilih Channel:</label>
-                  <div className="grid grid-cols-2 gap-2 bg-zinc-950/60 p-1 rounded-xl border border-white/[0.08]">
-                    <button
-                      type="button"
-                      onClick={() => setChannel("Shopee")}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-                        channel === "Shopee"
-                          ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40"
-                          : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      Shopee
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setChannel("WhatsApp")}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-                        channel === "WhatsApp"
-                          ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40"
-                          : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      WhatsApp
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono text-slate-400 block">Mode Pengiriman:</label>
-                  <div className="grid grid-cols-2 gap-2 bg-zinc-950/60 p-1 rounded-xl border border-white/[0.08]">
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryMode("digital")}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                        deliveryMode === "digital"
-                          ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40"
-                          : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      Digital
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryMode("physical_envelope")}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                        deliveryMode === "physical_envelope"
-                          ? "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40"
-                          : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      Sertifikat Digital
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-mono text-slate-400 block">Format Bebas:</label>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => handleLoadSample("terraria")} className="text-[10px] text-fuchsia-400 hover:text-fuchsia-300">Terraria</button>
-                      <button type="button" onClick={() => handleLoadSample("minecraft")} className="text-[10px] text-fuchsia-400 hover:text-fuchsia-300">MC</button>
-                    </div>
-                  </div>
-                  <textarea
-                    rows={3}
-                    value={rawCredentials}
-                    onChange={(e) => setRawCredentials(e.target.value)}
-                    placeholder="email:pass"
-                    className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all resize-none"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-mono text-slate-400 block mb-1">Game</label>
-                    <input
-                      type="text"
-                      value={gameTitle}
-                      onChange={(e) => setGameTitle(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-mono text-slate-400 block mb-1">Platform</label>
-                    <select
-                      value={platform}
-                      onChange={(e) => setPlatform(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="Steam">Steam</option>
-                      <option value="PC / Microsoft">PC / Microsoft</option>
-                      <option value="Rockstar / Steam">Rockstar / Steam</option>
-                      <option value="EA App">EA App</option>
-                      <option value="PlayStation 5">PlayStation 5</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-mono text-slate-400 block mb-1">Pembeli</label>
-                    <input
-                      type="text"
-                      value={buyerName}
-                      onChange={(e) => setBuyerName(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-mono text-slate-400 block mb-1">Tone</label>
-                    <select
-                      value={tone}
-                      onChange={(e) => setTone(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="Ramah, Hangat & Profesional">Ramah & Hangat</option>
-                      <option value="Singkat & Padat">Singkat & Padat</option>
-                      <option value="Eksklusif VIP Member">Eksklusif VIP</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isFormatting || !rawCredentials.trim()}
-                  className="w-full py-2.5 px-4 rounded-xl bg-white text-black font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 hover:bg-zinc-200 mt-2"
-                >
-                  {isFormatting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  {isFormatting ? "Merangkai Format..." : `Generate Pesan (${channel})`}
-                </button>
-              </form>
-            </div>
-
-            <div className="lg:col-span-7 space-y-4">
-              <div className="v0-card card-division-marketer rounded-2xl p-5 h-full flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-fuchsia-400" />
-                    <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-                      Hasil Pesan ({channel})
-                    </h2>
-                  </div>
-
-                  {formattedData && (
-                    <button
-                      type="button"
-                      onClick={() => copyText(formattedData.formatted_message, () => {
-                        setCopiedFormatted(true);
-                        setTimeout(() => setCopiedFormatted(false), 2000);
-                      })}
-                      className="text-xs font-mono text-fuchsia-400 hover:text-fuchsia-300 inline-flex items-center gap-1 font-bold bg-fuchsia-500/10 px-3 py-1.5 rounded-xl border border-fuchsia-500/30 transition-all"
-                    >
-                      {copiedFormatted ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      {copiedFormatted ? "Tersalin!" : "Salin Pesan"}
-                    </button>
-                  )}
-                </div>
-
-                <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 text-sm font-mono text-slate-200 leading-relaxed whitespace-pre-wrap overflow-y-auto flex-1 shadow-inner min-h-[250px]">
-                  {formattedData?.formatted_message || (
-                    <span className="text-slate-500 italic">
-                      Generate pesan serah terima...
-                    </span>
-                  )}
-                </div>
-                
-                {formattedData && (
-                  <div className="grid grid-cols-2 gap-3 pt-4 mt-4 border-t border-white/[0.06]">
-                    <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                      <span className="text-[10px] font-mono text-slate-500 block">User / Email</span>
-                      <span className="text-xs font-mono font-bold text-white truncate block">{formattedData.parsed_user || "-"}</span>
-                    </div>
-                    <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                      <span className="text-[10px] font-mono text-slate-500 block">Password</span>
-                      <span className="text-xs font-mono font-bold text-emerald-400 truncate block">{formattedData.parsed_password || "-"}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "cs_batch" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex items-center gap-4 mb-5">
-            <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Shopee CS Batch</h2>
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-5 space-y-4">
-              <div className="v0-card card-division-marketer rounded-2xl p-5 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                    Daftar Pesanan
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={selectAllOrders}
-                    className="text-[10px] text-fuchsia-400 hover:text-fuchsia-300 font-mono bg-fuchsia-500/10 px-2 py-1 rounded-md"
-                  >
-                    {selectedOrderIds.length === transactions.length && transactions.length > 0 ? "Batal Semua" : "Pilih Semua"}
-                  </button>
-                </div>
-
-                <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3 min-h-[160px] max-h-[240px] overflow-y-auto space-y-1.5 text-xs">
-                  {transactions.length > 0 ? (
-                    transactions.map((trx) => {
-                      const isChecked = selectedOrderIds.includes(trx.order_id);
-                      return (
-                        <label
-                          key={trx.order_id}
-                          className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
-                            isChecked ? "bg-fuchsia-500/10 border border-fuchsia-500/20" : "hover:bg-zinc-900 border border-transparent"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleSelectOrder(trx.order_id)}
-                              className="rounded border-zinc-700 text-fuchsia-500 focus:ring-fuchsia-500 bg-zinc-950 cursor-pointer"
-                            />
-                            <span className="font-mono font-bold text-white">{trx.order_id}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 truncate max-w-[120px]">{trx.product_name}</span>
-                        </label>
-                      );
-                    })
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-slate-500 text-xs py-8">
-                      Belum ada data transaksi.
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono text-slate-400 block">Tambah Manual (Opsional):</label>
-                  <textarea
-                    rows={2}
-                    value={batchRawInput}
-                    onChange={(e) => setBatchRawInput(e.target.value)}
-                    placeholder="NomorPesanan: Pembeli | Produk"
-                    className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all resize-none"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleGenerateBatch}
-                  disabled={isGeneratingBatch}
-                  className="w-full py-2.5 px-4 rounded-xl bg-white text-black hover:bg-zinc-200 font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 mt-2"
-                >
-                  {isGeneratingBatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  {isGeneratingBatch ? "Menyusun Rekap..." : "Buat Rekap Batch CS"}
-                </button>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Kredensial dibungkus monospace sehingga di HP pembeli tinggal ketuk 1x langsung tersalin.
+                </p>
               </div>
             </div>
 
-            <div className="lg:col-span-7 space-y-4">
-              <div className="v0-card card-division-marketer rounded-2xl p-5 sm:p-6 h-full flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Headphones className="w-4 h-4 text-fuchsia-400" />
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                      Pesan Tempel Live Chat
-                    </h3>
-                  </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-5 space-y-4">
+                <form onSubmit={handleGenerateFormat} className="app-card p-5 space-y-4">
+                  <h2 className="text-xs font-bold text-slate-900 flex items-center gap-2 mb-2 uppercase tracking-wider">
+                    <Key className="w-4 h-4 text-purple-600" />
+                    Input Kredensial
+                  </h2>
 
-                  {batchData && (
-                    <button
-                      type="button"
-                      onClick={() => copyText(batchData.cs_batch_message, () => {
-                        setCopiedBatch(true);
-                        setTimeout(() => setCopiedBatch(false), 2000);
-                      })}
-                      className="text-xs font-mono text-fuchsia-400 hover:text-fuchsia-300 inline-flex items-center gap-1 font-bold bg-fuchsia-500/10 px-3 py-1.5 rounded-xl border border-fuchsia-500/30 transition-all"
-                    >
-                      {copiedBatch ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      {copiedBatch ? "Tersalin!" : "Salin CS Batch"}
-                    </button>
-                  )}
-                </div>
-
-                <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 text-sm font-mono text-slate-200 leading-relaxed whitespace-pre-wrap overflow-y-auto flex-1 shadow-inner min-h-[250px]">
-                  {batchData?.cs_batch_message || (
-                    <span className="text-slate-500 italic font-sans">
-                      Pilih pesanan lalu klik "Buat Rekap Batch CS".
-                    </span>
-                  )}
-                </div>
-
-                {batchData && batchData.quick_followups && (
-                  <div className="space-y-2 mt-4 pt-4 border-t border-white/[0.06]">
-                    <span className="text-[10px] font-mono text-slate-400 block">Jawaban Kilat:</span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {batchData.quick_followups.map((item, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => copyText(item.reply, () => {
-                            setCopiedFollowupIdx(idx);
-                            setTimeout(() => setCopiedFollowupIdx(null), 2000);
-                          })}
-                          className="text-left p-3 rounded-xl bg-zinc-950/60 hover:bg-zinc-900 border border-zinc-800 hover:border-fuchsia-500/40 transition-all group"
-                        >
-                          <div className="flex items-center justify-between text-[10px] font-mono text-fuchsia-400 mb-1">
-                            <span className="truncate">{item.trigger.slice(0, 25)}...</span>
-                            {copiedFollowupIdx === idx ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-500 group-hover:text-white" />}
-                          </div>
-                          <p className="text-[11px] text-slate-300 font-sans line-clamp-1">"{item.reply}"</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "thumbnail_studio" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex items-center gap-4 mb-5">
-            <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Thumbnail Studio</h2>
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-          </div>
-          <div className="v0-card card-division-marketer rounded-2xl p-5">
-            <ThumbnailStudio />
-          </div>
-        </div>
-      )}
-
-      {activeTab === "warranty_card" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex items-center gap-4 mb-5">
-            <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Warranty Card</h2>
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <div className="lg:col-span-6 space-y-4">
-              <div className="v0-card card-division-marketer rounded-2xl p-6 flex flex-col items-center justify-center min-h-[480px] [perspective:1000px]">
-                <div className="flex items-center justify-between w-full mb-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Preview Sertifikat</h3>
-                    <p className="text-[10px] text-slate-400 font-mono mt-1">Interactive 3D view</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setCardSide(cardSide === "front" ? "back" : "front")}
-                    className="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-700 text-slate-300 hover:text-white hover:bg-zinc-800 text-xs font-mono transition-all flex items-center gap-1.5"
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    {cardSide === "front" ? "Sisi Belakang" : "Sisi Depan"}
-                  </button>
-                </div>
-
-                <div className="relative w-full max-w-sm aspect-[1/1.414] transition-all duration-500 ease-out hover:[transform:rotateX(6deg)_rotateY(-8deg)] [transform-style:preserve-3d] shadow-2xl shadow-fuchsia-950/20 group cursor-pointer" onClick={() => setCardSide(cardSide === "front" ? "back" : "front")}>
-                  <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black rounded-2xl border border-fuchsia-500/20 p-6 flex flex-col justify-between overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-2xl pointer-events-none" />
-
-                    {cardSide === "front" ? (
-                      <div className="relative z-10 flex flex-col justify-between h-full [transform:translateZ(20px)]">
-                        <div className="flex justify-between items-start border-b border-white/10 pb-3">
-                          <div>
-                            <div className="text-lg font-black tracking-widest text-white">AKSHARA</div>
-                            <div className="text-[9px] uppercase tracking-wider text-fuchsia-400 font-mono">Gaming Center</div>
-                          </div>
-                          <Award className="w-6 h-6 text-fuchsia-400" />
-                        </div>
-
-                        <div className="space-y-2 py-4">
-                          <div className="w-8 h-1 bg-fuchsia-500 rounded-full mb-3" />
-                          <h4 className="text-lg font-serif text-slate-100 font-bold">Sertifikat Keaslian</h4>
-                          <p className="text-[10px] text-slate-400 leading-relaxed">
-                            Lisensi game ini dijamin 100% legal dan dilindungi oleh garansi resmi.
-                          </p>
-                          <div className="pt-3 space-y-1.5 font-mono text-[10px]">
-                            <div className="flex justify-between text-slate-500">
-                              <span>Pemilik:</span>
-                              <span className="text-white">{cardBuyer}</span>
-                            </div>
-                            <div className="flex justify-between text-slate-500">
-                              <span>Item:</span>
-                              <span className="text-fuchsia-300">{cardGame}</span>
-                            </div>
-                            <div className="flex justify-between text-slate-500">
-                              <span>Aktivasi:</span>
-                              <span className="text-slate-300">{cardDate}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="pt-3 border-t border-white/10 flex justify-between items-end">
-                          <div>
-                            <span className="text-[9px] font-mono text-slate-500 block uppercase">No. Seri</span>
-                            <span className="text-xs font-mono font-bold text-slate-200">{cardSerial}</span>
-                          </div>
-                          <QrCode className="w-8 h-8 text-fuchsia-400" />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="relative z-10 flex flex-col h-full [transform:translateZ(20px)] text-xs font-sans">
-                        <div className="border-b border-white/10 pb-3 mb-4">
-                          <span className="text-xs font-bold text-white font-mono uppercase tracking-wider flex items-center gap-1.5">
-                            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                            SOP Klaim Garansi
-                          </span>
-                        </div>
-                        <div className="space-y-3 text-[10px] text-slate-300 flex-1">
-                          <div className="p-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800">
-                            <strong className="text-white block mb-0.5">1. Garansi Digital:</strong>
-                            Klaim garansi dapat dilakukan secara digital melalui CS kami.
-                          </div>
-                          <div className="p-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800">
-                            <strong className="text-white block mb-0.5">2. Amankan Kredensial:</strong>
-                            Ganti password dan email max 24 jam setelah serah terima.
-                          </div>
-                          <div className="p-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800">
-                            <strong className="text-white block mb-0.5">3. Support:</strong>
-                            Scan QR untuk verifikasi keaslian via Akshara Concierge.
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="lg:col-span-6 space-y-4">
-              <div className="v0-card card-division-marketer rounded-2xl p-5 space-y-4">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-fuchsia-400" />
-                  Kustomisasi Kartu
-                </h3>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-slate-400">Nama Pembeli</label>
-                    <input
-                      type="text"
-                      value={cardBuyer}
-                      onChange={(e) => setCardBuyer(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-slate-400">Nama Game</label>
-                    <input
-                      type="text"
-                      value={cardGame}
-                      onChange={(e) => setCardGame(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-slate-400">No. Seri</label>
-                    <input
-                      type="text"
-                      value={cardSerial}
-                      onChange={(e) => setCardSerial(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-slate-400">Tanggal</label>
-                    <input
-                      type="text"
-                      value={cardDate}
-                      onChange={(e) => setCardDate(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="w-full py-2.5 px-4 rounded-xl bg-white text-black font-bold text-xs flex items-center justify-center gap-2 transition-all hover:bg-zinc-200 mt-2"
-                >
-                  <Printer className="w-4 h-4" />
-                  Download Sertifikat
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "vouchers" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex items-center gap-4 mb-5">
-            <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">VIP Vouchers</h2>
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-7 space-y-4">
-              <div className="v0-card card-division-marketer rounded-2xl overflow-hidden">
-                <div className="p-4 border-b border-white/[0.06] flex justify-between items-center bg-zinc-950/40">
-                  <h3 className="text-xs font-bold text-white flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-fuchsia-400" />
-                    Daftar Voucher Loyalitas
-                  </h3>
-                  <span className="text-[10px] font-mono text-slate-400 bg-zinc-900 px-2 py-0.5 rounded-md">{vouchers.length} Kode Aktif</span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs font-mono min-w-[320px]">
-                    <thead className="border-b border-white/[0.06] bg-zinc-950/60">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Kode</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Diskon</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Min. Belanja</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.04]">
-                      {vouchers.map((v) => (
-                        <tr key={v.code} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="px-4 py-3 font-bold text-white flex items-center gap-2">
-                            {v.code}
-                            <button
-                              type="button"
-                              onClick={() => copyText(v.code, () => {
-                                setCopiedCode(v.code);
-                                setTimeout(() => setCopiedCode(null), 2000);
-                              })}
-                              className="text-slate-500 hover:text-white transition-colors"
-                            >
-                              {copiedCode === v.code ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                            </button>
-                          </td>
-                          <td className="px-4 py-3 text-fuchsia-300 font-bold">{v.discount}</td>
-                          <td className="px-4 py-3 text-slate-400">{v.minOrder}</td>
-                          <td className="px-4 py-3">
-                            {v.status === "ACTIVE" ? (
-                              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">AKTIF</span>
-                            ) : (
-                              <span className="text-[10px] text-slate-500 bg-zinc-900 px-2 py-0.5 rounded-md">EXPIRED</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div className="lg:col-span-5 space-y-4">
-              <div className="v0-card card-division-marketer rounded-2xl p-5 space-y-4">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-                  <Plus className="w-4 h-4 text-fuchsia-400" />
-                  Buat Voucher Baru
-                </h3>
-
-                <form onSubmit={handleAddVoucher} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-mono text-slate-400 block">Kode Voucher</label>
-                    <input
-                      type="text"
-                      value={newCode}
-                      onChange={(e) => setNewCode(e.target.value)}
-                      placeholder="AKSHARA-NEW"
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all uppercase"
+                    <label className="text-xs font-medium text-slate-600 block">Pilih Channel:</label>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setChannel("Shopee")}
+                        className={`py-1.5 px-3 rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                          channel === "Shopee"
+                            ? "bg-white text-slate-900 shadow-sm font-bold"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Shopee
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChannel("WhatsApp")}
+                        className={`py-1.5 px-3 rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                          channel === "WhatsApp"
+                            ? "bg-white text-slate-900 shadow-sm font-bold"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        WhatsApp
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600 block">Mode Pengiriman:</label>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryMode("digital")}
+                        className={`py-1.5 px-2 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                          deliveryMode === "digital"
+                            ? "bg-white text-slate-900 shadow-sm font-bold"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Digital Instant
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryMode("physical_envelope")}
+                        className={`py-1.5 px-2 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                          deliveryMode === "physical_envelope"
+                            ? "bg-white text-slate-900 shadow-sm font-bold"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Sertifikat Fisik/Resi
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-slate-600 block">Format Bebas (User:Pass):</label>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => handleLoadSample("terraria")} className="text-[10px] text-purple-600 hover:underline font-medium">Terraria</button>
+                        <button type="button" onClick={() => handleLoadSample("minecraft")} className="text-[10px] text-purple-600 hover:underline font-medium">Minecraft</button>
+                        <button type="button" onClick={() => handleLoadSample("gtav")} className="text-[10px] text-purple-600 hover:underline font-medium">GTA V</button>
+                      </div>
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={rawCredentials}
+                      onChange={(e) => setRawCredentials(e.target.value)}
+                      placeholder="email@example.com:Password123! | steam_guard: off"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all resize-none"
                       required
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-mono text-slate-400 block">Besaran Diskon</label>
-                    <select
-                      value={newDiscount}
-                      onChange={(e) => setNewDiscount(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="5%">5%</option>
-                      <option value="10%">10%</option>
-                      <option value="15%">15%</option>
-                      <option value="20%">20%</option>
-                    </select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-600 block mb-1">Game</label>
+                      <input
+                        type="text"
+                        value={gameTitle}
+                        onChange={(e) => setGameTitle(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-600 block mb-1">Platform</label>
+                      <select
+                        value={platform}
+                        onChange={(e) => setPlatform(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors cursor-pointer"
+                      >
+                        <option value="Steam">Steam</option>
+                        <option value="PC / Microsoft">PC / Microsoft</option>
+                        <option value="Rockstar / Steam">Rockstar / Steam</option>
+                        <option value="EA App">EA App</option>
+                        <option value="PlayStation 5">PlayStation 5</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-600 block mb-1">Nama Pembeli</label>
+                      <input
+                        type="text"
+                        value={buyerName}
+                        onChange={(e) => setBuyerName(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-600 block mb-1">Tone Suara</label>
+                      <select
+                        value={tone}
+                        onChange={(e) => setTone(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors cursor-pointer"
+                      >
+                        <option value="Ramah, Hangat & Profesional">Ramah & Hangat</option>
+                        <option value="Singkat & Padat">Singkat & Padat</option>
+                        <option value="Eksklusif VIP Member">Eksklusif VIP</option>
+                      </select>
+                    </div>
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 px-4 rounded-xl bg-white text-black font-bold text-xs flex items-center justify-center gap-2 transition-all hover:bg-zinc-200 mt-2"
+                    disabled={isFormatting || !rawCredentials.trim()}
+                    className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50 mt-2 shadow-sm"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    Terbitkan Voucher
+                    {isFormatting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {isFormatting ? "Merangkai Format..." : `Generate Pesan (${channel})`}
                   </button>
                 </form>
               </div>
+
+              <div className="lg:col-span-7 space-y-4">
+                <div className="app-card p-5 h-full flex flex-col">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-purple-600" />
+                      <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Hasil Pesan Serah Terima ({channel})
+                      </h2>
+                    </div>
+
+                    {formattedData && (
+                      <button
+                        type="button"
+                        onClick={() => copyText(formattedData.formatted_message, () => {
+                          setCopiedFormatted(true);
+                          setTimeout(() => setCopiedFormatted(false), 2000);
+                        })}
+                        className="text-xs font-medium text-purple-700 hover:text-purple-900 inline-flex items-center gap-1 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 transition-colors"
+                      >
+                        {copiedFormatted ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedFormatted ? "Tersalin!" : "Salin Pesan"}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono text-slate-900 leading-relaxed whitespace-pre-wrap overflow-y-auto flex-1 min-h-[250px]">
+                    {formattedData?.formatted_message || (
+                      <span className="text-slate-400 italic font-sans">
+                        Kredensial dan format serah terima akan muncul di sini setelah Anda mengklik tombol generate...
+                      </span>
+                    )}
+                  </div>
+                  
+                  {formattedData && (
+                    <div className="grid grid-cols-2 gap-3 pt-3 mt-3 border-t border-slate-200">
+                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] text-slate-500 block uppercase font-medium">User / Email</span>
+                        <span className="text-xs font-mono font-bold text-slate-900 truncate block">{formattedData.parsed_user || "-"}</span>
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Password</span>
+                        <span className="text-xs font-mono font-bold text-emerald-700 truncate block">{formattedData.parsed_password || "-"}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
+        )}
+
+        {/* TAB: CS BATCH */}
+        {activeTab === "cs_batch" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {batchError && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>{batchError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-5 space-y-4">
+                <div className="app-card p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Daftar Pesanan Belum Selesai
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={selectAllOrders}
+                      className="text-[11px] text-purple-700 hover:text-purple-900 font-semibold bg-purple-50 px-2 py-1 rounded-md border border-purple-200"
+                    >
+                      {selectedOrderIds.length === transactions.length && transactions.length > 0 ? "Batal Semua" : "Pilih Semua"}
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 min-h-[160px] max-h-[240px] overflow-y-auto space-y-1.5 text-xs">
+                    {transactions.length > 0 ? (
+                      transactions.map((trx) => {
+                        const isChecked = selectedOrderIds.includes(trx.order_id);
+                        return (
+                          <label
+                            key={trx.order_id}
+                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+                              isChecked ? "bg-purple-50 border border-purple-200 text-purple-950 font-medium" : "hover:bg-slate-100 border border-transparent text-slate-700"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleSelectOrder(trx.order_id)}
+                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                              />
+                              <span className="font-mono font-bold">{trx.order_id}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 truncate max-w-[140px]">{trx.product_name}</span>
+                          </label>
+                        );
+                      })
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-slate-400 text-xs py-8">
+                        Belum ada data transaksi di ledger lokal.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-slate-600 block">Tambah Manual (Opsional):</label>
+                    <textarea
+                      rows={2}
+                      value={batchRawInput}
+                      onChange={(e) => setBatchRawInput(e.target.value)}
+                      placeholder="NomorPesanan: Pembeli | Produk (per baris)"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-purple-500 transition-all resize-none"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateBatch}
+                    disabled={isGeneratingBatch}
+                    className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-sm"
+                  >
+                    {isGeneratingBatch ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {isGeneratingBatch ? "Menyusun Rekap..." : "Buat Rekap Batch CS"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="lg:col-span-7 space-y-4">
+                <div className="app-card p-5 h-full flex flex-col">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Headphones className="w-4 h-4 text-purple-600" />
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Pesan Tempel Live Chat Shopee
+                      </h3>
+                    </div>
+
+                    {batchData && (
+                      <button
+                        type="button"
+                        onClick={() => copyText(batchData.cs_batch_message, () => {
+                          setCopiedBatch(true);
+                          setTimeout(() => setCopiedBatch(false), 2000);
+                        })}
+                        className="text-xs font-medium text-purple-700 hover:text-purple-900 inline-flex items-center gap-1 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 transition-colors"
+                      >
+                        {copiedBatch ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedBatch ? "Tersalin!" : "Salin CS Batch"}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono text-slate-900 leading-relaxed whitespace-pre-wrap overflow-y-auto flex-1 min-h-[250px]">
+                    {batchData?.cs_batch_message || (
+                      <span className="text-slate-400 italic font-sans">
+                        Pilih pesanan lalu klik "Buat Rekap Batch CS" untuk menghasilkan teks follow-up massal.
+                      </span>
+                    )}
+                  </div>
+
+                  {batchData && batchData.quick_followups && (
+                    <div className="space-y-2 mt-3 pt-3 border-t border-slate-200">
+                      <span className="text-[11px] font-semibold text-slate-700 block">Jawaban Kilat Konsumen:</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {batchData.quick_followups.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => copyText(item.reply, () => {
+                              setCopiedFollowupIdx(idx);
+                              setTimeout(() => setCopiedFollowupIdx(null), 2000);
+                            })}
+                            className="text-left p-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-purple-300 transition-colors group"
+                          >
+                            <div className="flex items-center justify-between text-[10px] font-semibold text-purple-700 mb-0.5">
+                              <span className="truncate">{item.trigger.slice(0, 25)}...</span>
+                              {copiedFollowupIdx === idx ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-slate-400 group-hover:text-slate-700" />}
+                            </div>
+                            <p className="text-[11px] text-slate-600 font-sans line-clamp-1">"{item.reply}"</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: WARRANTY CARD */}
+        {activeTab === "warranty_card" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              
+              {/* Preview 3D Container (Light Mode wrapper around premium card) */}
+              <div className="lg:col-span-6 space-y-4">
+                <div className="app-card p-6 flex flex-col items-center justify-center min-h-[480px] bg-slate-50 border border-slate-200 [perspective:1000px]">
+                  <div className="flex items-center justify-between w-full mb-4">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Preview Sertifikat Digital</h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Interactive 3D preview</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCardSide(cardSide === "front" ? "back" : "front")}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-purple-600" />
+                      {cardSide === "front" ? "Sisi Belakang" : "Sisi Depan"}
+                    </button>
+                  </div>
+
+                  {/* The dark/gold card itself */}
+                  <div className="relative w-full max-w-sm aspect-[1/1.414] transition-all duration-500 ease-out hover:[transform:rotateX(6deg)_rotateY(-8deg)] [transform-style:preserve-3d] shadow-xl group cursor-pointer" onClick={() => setCardSide(cardSide === "front" ? "back" : "front")}>
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-zinc-900 to-black rounded-2xl border border-amber-500/30 p-6 flex flex-col justify-between overflow-hidden shadow-2xl">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                      {cardSide === "front" ? (
+                        <div className="relative z-10 flex flex-col justify-between h-full [transform:translateZ(20px)]">
+                          <div className="flex justify-between items-start border-b border-white/10 pb-3">
+                            <div>
+                              <div className="text-lg font-black tracking-widest text-white">AKSHARA</div>
+                              <div className="text-[9px] uppercase tracking-wider text-amber-400 font-mono">Gaming Center</div>
+                            </div>
+                            <Award className="w-6 h-6 text-amber-400" />
+                          </div>
+
+                          <div className="space-y-2 py-4">
+                            <div className="w-8 h-1 bg-amber-500 rounded-full mb-3" />
+                            <h4 className="text-lg font-serif text-slate-100 font-bold">Sertifikat Keaslian</h4>
+                            <p className="text-[10px] text-slate-400 leading-relaxed">
+                              Lisensi game ini dijamin 100% legal dan dilindungi oleh garansi resmi Akshara Gaming Center.
+                            </p>
+                            <div className="pt-3 space-y-1.5 font-mono text-[10px]">
+                              <div className="flex justify-between text-slate-400">
+                                <span>Pemilik:</span>
+                                <span className="text-white font-semibold">{cardBuyer}</span>
+                              </div>
+                              <div className="flex justify-between text-slate-400">
+                                <span>Item:</span>
+                                <span className="text-amber-300 font-semibold">{cardGame}</span>
+                              </div>
+                              <div className="flex justify-between text-slate-400">
+                                <span>Aktivasi:</span>
+                                <span className="text-slate-200">{cardDate}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-white/10 flex justify-between items-end">
+                            <div>
+                              <span className="text-[9px] font-mono text-slate-400 block uppercase">No. Seri</span>
+                              <span className="text-xs font-mono font-bold text-slate-200">{cardSerial}</span>
+                            </div>
+                            <QrCode className="w-8 h-8 text-amber-400" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative z-10 flex flex-col h-full [transform:translateZ(20px)] text-xs font-sans">
+                          <div className="border-b border-white/10 pb-3 mb-4">
+                            <span className="text-xs font-bold text-white font-mono uppercase tracking-wider flex items-center gap-1.5">
+                              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                              SOP Klaim Garansi
+                            </span>
+                          </div>
+                          <div className="space-y-3 text-[10px] text-slate-300 flex-1">
+                            <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800">
+                              <strong className="text-white block mb-0.5">1. Garansi Digital:</strong>
+                              Klaim garansi dapat dilakukan secara digital melalui CS kami kapan saja.
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800">
+                              <strong className="text-white block mb-0.5">2. Amankan Kredensial:</strong>
+                              Ganti password dan email max 24 jam setelah serah terima akun.
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800">
+                              <strong className="text-white block mb-0.5">3. Support 24/7:</strong>
+                              Scan QR untuk verifikasi keaslian via Akshara Concierge.
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Controls */}
+              <div className="lg:col-span-6 space-y-4">
+                <div className="app-card p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-purple-600" />
+                    Kustomisasi Kartu Sertifikat
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">Nama Pembeli</label>
+                      <input
+                        type="text"
+                        value={cardBuyer}
+                        onChange={(e) => setCardBuyer(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">Nama Game</label>
+                      <input
+                        type="text"
+                        value={cardGame}
+                        onChange={(e) => setCardGame(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">No. Seri</label>
+                      <input
+                        type="text"
+                        value={cardSerial}
+                        onChange={(e) => setCardSerial(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">Tanggal Terbit</label>
+                      <input
+                        type="text"
+                        value={cardDate}
+                        onChange={(e) => setCardDate(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors mt-2 shadow-sm"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Cetak / Download Sertifikat
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: VOUCHERS */}
+        {activeTab === "vouchers" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Table */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="app-card overflow-hidden">
+                  <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-purple-600" />
+                      Daftar Voucher Loyalitas
+                    </h3>
+                    <span className="text-[10px] font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-xs">
+                      {vouchers.length} Kode Aktif
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs min-w-[320px]">
+                      <thead className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left text-[11px] uppercase tracking-wider">Kode</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] uppercase tracking-wider">Diskon</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] uppercase tracking-wider">Min. Belanja</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {vouchers.map((v) => (
+                          <tr key={v.code} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-3 font-mono font-bold text-slate-900 flex items-center gap-2">
+                              {v.code}
+                              <button
+                                type="button"
+                                onClick={() => copyText(v.code, () => {
+                                  setCopiedCode(v.code);
+                                  setTimeout(() => setCopiedCode(null), 2000);
+                                })}
+                                className="text-slate-400 hover:text-slate-700 transition-colors"
+                              >
+                                {copiedCode === v.code ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </td>
+                            <td className="px-4 py-3 text-purple-700 font-bold tabular-nums">{v.discount}</td>
+                            <td className="px-4 py-3 text-slate-600 tabular-nums">{v.minOrder}</td>
+                            <td className="px-4 py-3">
+                              {v.status === "ACTIVE" ? (
+                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">AKTIF</span>
+                              ) : (
+                                <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">EXPIRED</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form New Voucher */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="app-card p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-purple-600" />
+                    Terbitkan Voucher Baru
+                  </h3>
+
+                  <form onSubmit={handleAddVoucher} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-600 block">Kode Voucher</label>
+                      <input
+                        type="text"
+                        value={newCode}
+                        onChange={(e) => setNewCode(e.target.value)}
+                        placeholder="Contoh: AKSHARA-VIP25"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-purple-500 uppercase transition-all"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-600 block">Besaran Diskon</label>
+                      <select
+                        value={newDiscount}
+                        onChange={(e) => setNewDiscount(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-all cursor-pointer"
+                      >
+                        <option value="5%">5%</option>
+                        <option value="10%">10%</option>
+                        <option value="15%">15%</option>
+                        <option value="20%">20%</option>
+                        <option value="25%">25%</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors mt-2 shadow-sm"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Terbitkan Voucher
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* Floating Toast Notification */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-white border border-emerald-300 text-xs text-slate-900 flex items-center gap-3 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="font-medium">{toastMsg}</span>
         </div>
       )}
     </div>

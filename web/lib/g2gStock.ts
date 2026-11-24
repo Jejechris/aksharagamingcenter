@@ -209,7 +209,7 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
 
   updatedCatalog.forEach((game: any, gIdx: number) => {
     (game.sellers || []).forEach((seller: any, sIdx: number) => {
-      const offerId = extractG2GOfferId(seller.profile_url);
+      const offerId = extractG2GOfferId(seller.offer_id || seller.profile_url);
       if (offerId) {
         tasks.push({
           gameIndex: gIdx,
@@ -241,6 +241,7 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
         const resolvedUrl = resolveG2GProductUrl(task.offerId, task.sellerName, task.gameTitle, false);
 
         // Perbarui data real live
+        seller.offer_id = task.offerId;
         seller.stock = liveData.available_qty;
         seller.is_sold_out = liveData.is_sold_out;
         seller.is_online = liveData.is_online;
@@ -279,6 +280,7 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
         // Pertahankan stok tercatat dan gunakan URL Evergreen yang 100% aktif.
         const evergreenUrl = resolveG2GProductUrl("", task.sellerName, task.gameTitle, false);
         const fallbackStock = task.previousStock > 0 ? task.previousStock : 25;
+        seller.offer_id = task.offerId;
         seller.live_status = "EVERGREEN_ACTIVE";
         seller.is_sold_out = false;
         seller.is_online = true;

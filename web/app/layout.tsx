@@ -1,16 +1,31 @@
 ﻿import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import SidebarLayout from "./components/SidebarLayout";
 
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
 export const viewport: Viewport = {
-  themeColor: "#08090e",
+  themeColor: "#F8FAFC",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
 };
 
 export const metadata: Metadata = {
-  title: "Akshara Command Center | Operations Dashboard",
+  title: "Akshara Ops | Operations Dashboard",
   description:
     "Pusat komando operasional otonom Akshara Gaming Center — monitoring multi-seller G2G, kalkulasi margin, dan manajemen garansi.",
 };
@@ -21,24 +36,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className="dark">
-      <body className="bg-[#08090e] text-slate-100 min-h-screen antialiased selection:bg-indigo-500/30 selection:text-white overflow-x-hidden">
-        {/* Ambient Mesh Background */}
-        <div className="akshara-ambient-mesh" />
-
-        {/* App Shell with Sidebar */}
+    <html lang="id" className={`${plusJakartaSans.variable} ${jetbrainsMono.variable}`}>
+      <body className="bg-[#F8FAFC] text-slate-900 min-h-screen font-sans antialiased selection:bg-emerald-100 selection:text-emerald-900">
         <SidebarLayout>
-          <main className="flex-1 relative z-10 v0-grid-pattern">
-            {children}
-          </main>
-          <footer className="relative z-10 border-t border-white/[0.05] py-5">
-            <div className="max-w-5xl mx-auto px-6 flex items-center justify-between text-[11px] text-slate-700 font-mono">
-              <span>Akshara Autonomous Engine &copy; 2026</span>
-              <span className="hidden sm:inline">
-                Autonomous Ops &bull; Real-Time Analytics &bull; Digital Warranty
-              </span>
-            </div>
-          </footer>
+          {children}
         </SidebarLayout>
       </body>
     </html>

@@ -5,6 +5,7 @@ import { verifyAdminSession, verifyAdminSecretHeader } from "@/lib/auth";
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get("host") || "";
   const { pathname } = request.nextUrl;
+  const isDev = process.env.NODE_ENV !== "production";
 
   // 1. Deteksi domain klaim khusus (claim.aksharagaming.com)
   const isClaimDomain =
@@ -40,25 +41,29 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Localhost bypass HANYA untuk development (anti IP spoofing di production)
+  const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "";
+  const isLocalhost =
+    isDev &&
+    (clientIp === "127.0.0.1" ||
+      clientIp === "::1" ||
+      clientIp === "localhost" ||
+      hostname.startsWith("localhost") ||
+      hostname.startsWith("127.0.0.1"));
+
   // 4. Lindungi API mutasi & pembacaan data sensitif
   const sensitiveApiPrefixes = [
     "/api/claim/manage",
     "/api/inventory/vault",
+    "/api/inventory/live-sync",
     "/api/orders/autonomous",
+    "/api/orders/auto-fulfill",
   ];
 
   const isSensitiveApi = sensitiveApiPrefixes.some((p) => pathname.startsWith(p));
   if (isSensitiveApi) {
     const adminSecretHeader = request.headers.get("x-admin-secret");
     const isSecretValid = verifyAdminSecretHeader(adminSecretHeader);
-
-    const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "";
-    const isLocalhost =
-      clientIp === "127.0.0.1" ||
-      clientIp === "::1" ||
-      clientIp === "localhost" ||
-      hostname.startsWith("localhost") ||
-      hostname.startsWith("127.0.0.1");
 
     if (!isSessionValid && !isSecretValid && !isLocalhost) {
       return NextResponse.json(
@@ -68,7 +73,21 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 5. Rute publik (Storefront /, /login, /claim/*, /api/auth/*, /api/claim/reveal, webhook Telegram, cron) berjalan bebas
+  // 5. Proteksi khusus untuk mutasi katalog (/api/catalog dengan POST/PUT/DELETE)
+  // GET /api/catalog tetap terbuka untuk publik (Storefront /)
+  if (pathname.startsWith("/api/catalog") && request.method !== "GET") {
+    const adminSecretHeader = request.headers.get("x-admin-secret");
+    const isSecretValid = verifyAdminSecretHeader(adminSecretHeader);
+
+    if (!isSessionValid && !isSecretValid && !isLocalhost) {
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized: Admin session or x-admin-secret required for catalog mutations." },
+        { status: 401 }
+      );
+    }
+  }
+
+  // 6. Rute publik (Storefront /, /login, /claim/*, /api/auth/*, /api/claim/reveal, webhook Telegram, cron) berjalan bebas
   return NextResponse.next();
 }
 

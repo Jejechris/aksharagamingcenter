@@ -3,10 +3,19 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ShieldCheck, Lock, KeyRound, ArrowRight, AlertTriangle, Terminal, Sparkles, Shield, Cpu } from "lucide-react";
+import {
+  Shield,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  AlertCircle,
+  ShieldCheck,
+} from "lucide-react";
 
 export default function AdminLoginPage() {
   const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const router = useRouter();
@@ -37,105 +46,102 @@ export default function AdminLoginPage() {
       router.push("/dashboard");
       router.refresh();
     } catch (err: any) {
-      setErrorMsg(err.message || "Gagal melakukan otorisasi.");
+      setErrorMsg(err.message || "Gagal melakukan otorisasi login.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#06070a] text-slate-100 flex flex-col justify-center items-center px-4 relative overflow-hidden font-sans selection:bg-emerald-500 selection:text-black">
-      {/* Background Tech Glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/[0.08] rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-[400px] h-[400px] bg-cyan-500/[0.06] rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Grid Pattern overlay */}
-      <div className="absolute inset-0 v0-grid-pattern opacity-60 pointer-events-none" />
-
-      <div className="relative w-full max-w-md z-10">
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-slate-900/80 to-indigo-500/20 border border-emerald-500/30 text-emerald-400 mb-4 shadow-[0_0_24px_rgba(16,185,129,0.25)]">
-            <Lock className="w-7 h-7" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#06070a] shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
+    <div className="min-h-screen bg-gradient-to-b from-slate-100/70 to-[#F8FAFC] text-slate-900 flex flex-col justify-center items-center px-4 py-12 selection:bg-emerald-100 selection:text-emerald-900 font-sans">
+      <div className="w-full max-w-md">
+        {/* Card Putih Bersih */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-7 sm:p-9 space-y-6">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 mb-1">
+              <Shield className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Masuk ke Akshara Ops
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-xs mx-auto">
+              Masukkan Master Access PIN untuk mengelola operasional toko.
+            </p>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-            AKSHARA <span className="text-emerald-400 font-mono text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-800">OPS CORE v4.0</span>
-          </h1>
-          <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest font-mono">
-            Command Center Security Gate
-          </p>
-        </div>
 
-        {/* Machined Card Box */}
-        <div className="machined-card">
-          <div className="machined-card-inner p-6 sm:p-8 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/[0.08]">
-              <span className="flex items-center gap-2 text-xs font-mono text-slate-300">
-                <Terminal className="w-4 h-4 text-emerald-400" />
-                AUTH_LEVEL_0: SENNA_ONLY
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                ARMED
-              </span>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div>
-                <label className="block text-xs font-mono text-slate-300 mb-2 uppercase tracking-wider flex items-center justify-between">
-                  <span>Master Access PIN</span>
-                  <span className="text-slate-500 text-[10px]">Security Key</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <KeyRound className="w-4 h-4 text-emerald-400/80" />
-                  </div>
-                  <input
-                    type="password"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder="••••••••"
-                    autoFocus
-                    required
-                    className="w-full bg-black/60 border border-white/[0.10] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40 rounded-xl pl-10 pr-4 py-3 text-sm font-mono text-white placeholder-slate-600 transition-all outline-none"
-                  />
-                </div>
-              </div>
-
-              {errorMsg && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 font-mono">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-3.5 px-4 rounded-xl text-xs font-mono uppercase tracking-wider transition-all shadow-[0_4px_20px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="pin-input"
+                className="block text-xs font-semibold text-slate-700"
               >
-                {isLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                    <span>Memverifikasi Otorisasi...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Buka Akses Command Deck</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Security Notice */}
-            <div className="mt-6 pt-4 border-t border-white/[0.08] text-center">
-              <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5 font-mono">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                Sesi terenkripsi HTTP-Only Cookie (Lax, 7-Hari Sesi).
-              </p>
+                Master Access PIN
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <input
+                  id="pin-input"
+                  type={showPin ? "text" : "password"}
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  placeholder="Masukkan PIN keamanan"
+                  autoFocus
+                  required
+                  className="w-full bg-white border border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 rounded-lg pl-9 pr-10 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-all outline-none font-mono tracking-wider"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPin(!showPin)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  aria-label={showPin ? "Sembunyikan PIN" : "Tampilkan PIN"}
+                >
+                  {showPin ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
+
+            {/* Error Message Inline */}
+            {errorMsg && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg p-3 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer active:scale-[0.99]"
+            >
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Memverifikasi...</span>
+                </>
+              ) : (
+                <>
+                  <span>Buka Akses Dashboard</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Security Notice */}
+          <div className="pt-2 border-t border-slate-100 text-center">
+            <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              Sesi terenkripsi HTTP-Only Cookie (Lax, 7-Hari Sesi).
+            </p>
           </div>
         </div>
 
@@ -143,9 +149,9 @@ export default function AdminLoginPage() {
         <div className="text-center mt-6">
           <Link
             href="/"
-            className="text-xs font-mono text-slate-500 hover:text-emerald-400 transition-colors inline-flex items-center gap-1.5"
+            className="text-xs text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1 font-medium"
           >
-            ← Kembali ke Akshara Direct Official Store
+            &larr; Kembali ke Storefront
           </Link>
         </div>
       </div>

@@ -9,19 +9,19 @@ import {
   Check,
   Key,
   ShieldCheck,
-  ArrowLeft,
   RefreshCw,
   MessageSquare,
   Eye,
   EyeOff,
-  FileCheck2,
-  Smartphone,
   ShoppingBag,
   CheckCircle2,
   HelpCircle,
-  Info,
   Tag,
-  Store,
+  ArrowRight,
+  ExternalLink,
+  Smartphone,
+  Send,
+  Lock,
 } from "lucide-react";
 
 interface CatalogItem {
@@ -56,21 +56,29 @@ export default function FormatterPage() {
   const [copiedPass, setCopiedPass] = useState(false);
   const [showPassword, setShowPassword] = useState(true);
 
-  // Fetch active catalog games from DB
+  // Toast Banner
+  const [toastMsg, setToastMsg] = useState("");
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 3500);
+  };
+
+  // Fetch active catalog games using fetchSmartCatalog
   useEffect(() => {
     async function loadCatalog() {
       try {
-        const res = await fetch("/api/catalog");
-        const json = await res.json();
-        if (json.status === "success" && Array.isArray(json.data) && json.data.length > 0) {
-          setCatalogGames(json.data);
-          const first = json.data[0];
+        const mergedData = await fetchSmartCatalog();
+        if (mergedData && Array.isArray(mergedData) && mergedData.length > 0) {
+          setCatalogGames(mergedData);
+          const first = mergedData[0];
           setGameTitle(first.title);
           setPlatform(first.platform);
-          setRawCredentials(`${first.title.toLowerCase().replace(/[^a-z0-9]/g, '')}_user@domain.com:AksharaPass123! | access: full`);
+          setRawCredentials(
+            `${first.title.toLowerCase().replace(/[^a-z0-9]/g, "")}_user@domain.com:AksharaPass123! | access: full`
+          );
         }
       } catch (e) {
-        console.error("Failed to fetch catalog:", e);
+        console.error("Gagal memuat katalog pintar:", e);
       }
     }
     loadCatalog();
@@ -103,12 +111,17 @@ export default function FormatterPage() {
   const handleLoadCatalogGame = (g: CatalogItem) => {
     setGameTitle(g.title);
     setPlatform(g.platform);
-    setRawCredentials(`${g.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}_ready:AksharaPass2025! | platform: ${g.platform}`);
+    setRawCredentials(
+      `${g.title.toLowerCase().replace(/[^a-z0-9]/g, "_")}_ready:AksharaPass2025! | platform: ${g.platform}`
+    );
   };
 
   const handleGenerate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!rawCredentials.trim()) return;
+    if (!rawCredentials.trim()) {
+      showToast("Kredensial mentah wajib diisi.");
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -129,9 +142,13 @@ export default function FormatterPage() {
       const json = await res.json();
       if (json.status === "success" && json.data) {
         setParsedData(json.data);
+        showToast("Pesan pengiriman berhasil diformat oleh AI!");
+      } else {
+        showToast(json.error || "Gagal memformat kredensial.");
       }
     } catch (err) {
       console.error("Format error:", err);
+      showToast("Terjadi kesalahan koneksi AI.");
     } finally {
       setIsLoading(false);
     }
@@ -143,93 +160,81 @@ export default function FormatterPage() {
     if (type === "all") {
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 2500);
+      showToast("Pesan lengkap disalin ke clipboard!");
     } else if (type === "user") {
       setCopiedUser(true);
       setTimeout(() => setCopiedUser(false), 2000);
+      showToast("Username / CDKey disalin!");
     } else if (type === "pass") {
       setCopiedPass(true);
       setTimeout(() => setCopiedPass(false), 2000);
+      showToast("Password disalin!");
     }
   };
 
   const channelOptions: {
     id: "Shopee" | "WhatsApp" | "Tokopedia";
     label: string;
-    color: string;
     icon: React.ReactNode;
   }[] = [
-    { id: "Shopee", label: "Shopee", color: "text-orange-400", icon: <ShoppingBag className="w-3.5 h-3.5" /> },
-    { id: "WhatsApp", label: "WhatsApp", color: "text-emerald-400", icon: <Smartphone className="w-3.5 h-3.5" /> },
-    { id: "Tokopedia", label: "Tokopedia", color: "text-green-400", icon: <ShoppingBag className="w-3.5 h-3.5" /> },
+    { id: "Shopee", label: "Shopee Chat", icon: <ShoppingBag className="w-3.5 h-3.5 text-orange-500" /> },
+    { id: "WhatsApp", label: "WhatsApp Direct", icon: <Smartphone className="w-3.5 h-3.5 text-emerald-600" /> },
+    { id: "Tokopedia", label: "Tokopedia Chat", icon: <ShoppingBag className="w-3.5 h-3.5 text-green-600" /> },
   ];
 
   return (
-    <div className="px-5 sm:px-8 py-8 max-w-[960px] mx-auto space-y-7">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-medium px-4 py-3 rounded-xl shadow-lg border border-slate-800 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
 
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
+      {/* ─── 1. Header Halaman ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
         <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-slate-400 font-mono transition-colors"
-            >
-              <ArrowLeft className="w-3 h-3" /> Command Deck
-            </Link>
-            <span className="text-slate-700">/</span>
-            <span className="text-[11px] font-mono text-slate-400">AI Formatter</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
-              <Sparkles className="w-5 h-5 text-purple-400" />
-            </div>
-            AI Account Formatter
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-              Gemini Flash
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              AI Account Delivery Formatter
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <Sparkles className="w-3 h-3 text-indigo-600" />
+              Gemini Flash AI
             </span>
-          </h1>
-          <p className="text-[13px] text-slate-500 mt-2 max-w-2xl leading-relaxed">
-            Ubah data mentah akun game dari supplier G2G menjadi pesan serah terima yang rapi, profesional, dan siap kirim ke {channel}.
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Ubah kredensial raw supplier G2G/Eneba menjadi template pesan serah terima yang sopan, terstruktur, anti-banned, dan siap kirim ke {channel}.
           </p>
         </div>
 
-        <div className="flex sm:self-center shrink-0">
-          <Link
-            href={`/dashboard/description?game=${encodeURIComponent(gameTitle)}`}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-300 text-xs font-medium transition-all shadow-sm group"
-          >
-            <span>📝 Buat Judul, Deskripsi &amp; Cover Shopee</span>
-            <span className="group-hover:translate-x-0.5 transition-transform text-orange-400">↗</span>
-          </Link>
-        </div>
+        <Link
+          href={`/dashboard/description?game=${encodeURIComponent(gameTitle)}`}
+          className="btn-secondary text-xs font-medium px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 shadow-sm shrink-0"
+        >
+          <span>Buat Listing &amp; Copy Shopee</span>
+          <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+        </Link>
       </div>
 
-      {/* Quick Presets & Portfolio Games */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5">
-          {catalogGames.length > 0 ? (
-            <>
-              <Tag className="w-3.5 h-3.5 text-purple-400" />
-              <span>Portofolio Aktif:</span>
-            </>
-          ) : (
-            <>
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span>Contoh cepat:</span>
-            </>
-          )}
+      {/* Quick Presets & Portfolio Integration Bar */}
+      <div className="app-card p-3 sm:p-4 bg-white flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mr-1">
+          <Tag className="w-3.5 h-3.5 text-indigo-600" />
+          <span>Preset Cepat:</span>
         </span>
+
         {catalogGames.length > 0 ? (
-          catalogGames.map((g) => (
+          catalogGames.slice(0, 5).map((g) => (
             <button
               key={g.id}
               type="button"
               onClick={() => handleLoadCatalogGame(g)}
-              className={`px-3 py-1 rounded-xl text-[11px] font-mono transition-all border ${
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors border ${
                 gameTitle.toLowerCase() === g.title.toLowerCase()
-                  ? "bg-purple-500/20 border-purple-500/50 text-purple-300 font-bold"
-                  : "bg-zinc-950/80 border-zinc-800 hover:border-purple-500/40 text-slate-400 hover:text-purple-300"
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-800 font-semibold"
+                  : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
               }`}
             >
               🎮 {g.title.split(":")[0]} ({g.platform})
@@ -240,12 +245,13 @@ export default function FormatterPage() {
             { key: "terraria" as const, label: "🎮 Terraria (Steam)" },
             { key: "minecraft" as const, label: "⛏️ Minecraft (Microsoft)" },
             { key: "gtav" as const, label: "🚗 GTA V (Rockstar)" },
+            { key: "eneba_cdkey" as const, label: "🔑 Eneba CDKey" },
           ].map((s) => (
             <button
               key={s.key}
               type="button"
               onClick={() => handleLoadSample(s.key)}
-              className="px-3 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800 hover:border-purple-500/40 text-[11px] font-mono text-slate-400 hover:text-purple-300 transition-all"
+              className="px-3 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-xs font-medium text-slate-700 transition-colors"
             >
               {s.label}
             </button>
@@ -253,468 +259,274 @@ export default function FormatterPage() {
         )}
       </div>
 
-      {/* Main 2-column grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* ─── 2. Main Workspace 2 Kolom ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Kolom Kiri: Input Form (col-span-6) */}
+        <div className="lg:col-span-6 space-y-5">
+          <form onSubmit={handleGenerate} className="app-card p-5 sm:p-6 space-y-4 bg-white">
+            <h3 className="text-sm font-semibold text-slate-900 border-b border-slate-100 pb-2">
+              Parameter Pengiriman Akun
+            </h3>
 
-        {/* LEFT: Input Form */}
-        <form onSubmit={handleGenerate} className="v0-card rounded-2xl p-5 sm:p-6 space-y-5 card-division-formatter">
-
-          {/* Channel Selector */}
-          <div>
-            <div className="flex items-center gap-4 mb-4">
-              <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Channel Tujuan</h2>
-              <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
+            {/* Saluran Penjualan */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Saluran Penjualan (Channel Target)
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {channelOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setChannel(opt.id)}
+                    className={`p-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                      channel === opt.id
+                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {opt.icon}
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-950/60 border border-white/[0.06]">
-              {channelOptions.map((ch) => (
+
+            {/* Mode Pengiriman (Label Rapi Sesuai Spesifikasi) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Mode Pengiriman
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
-                  key={ch.id}
                   type="button"
-                  onClick={() => setChannel(ch.id)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-mono font-semibold transition-all ${
-                    channel === ch.id
-                      ? "bg-white/10 text-white border border-white/[0.1]"
-                      : "text-slate-500 hover:text-slate-300"
+                  onClick={() => setDeliveryMode("digital")}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    deliveryMode === "digital"
+                      ? "bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300"
+                      : "bg-white border-slate-200 hover:bg-slate-50"
                   }`}
                 >
-                  <span className={channel === ch.id ? ch.color : ""}>{ch.icon}</span>
-                  {ch.label}
+                  <div className="text-xs font-semibold text-slate-900">Full Digital (Instant)</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Pengiriman langsung via Chat / Portal Klaim
+                  </div>
                 </button>
-              ))}
-            </div>
-          </div>
 
-          {/* Delivery Mode */}
-          <div>
-            <div className="flex items-center gap-4 mb-3">
-              <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Mode Pengiriman</h2>
-              <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDeliveryMode("digital")}
-                className={`flex flex-col items-start gap-1 px-3 py-2.5 rounded-xl border text-left transition-all ${
-                  deliveryMode === "digital"
-                    ? "bg-purple-500/10 border-purple-500/40 text-purple-200"
-                    : "bg-zinc-950/60 border-zinc-800 text-slate-500 hover:text-slate-300 hover:border-zinc-700"
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="text-[11px] font-mono font-semibold">Digital</span>
-                </div>
-                <span className="text-[10px] font-mono text-slate-600">⚡ Non-Fisik / Instant</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeliveryMode("physical_envelope")}
-                className={`flex flex-col items-start gap-1 px-3 py-2.5 rounded-xl border text-left transition-all ${
-                  deliveryMode === "physical_envelope"
-                    ? "bg-purple-500/10 border-purple-500/40 text-purple-200"
-                    : "bg-zinc-950/60 border-zinc-800 text-slate-500 hover:text-slate-300 hover:border-zinc-700"
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <FileCheck2 className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="text-[11px] font-mono font-semibold">garansi digital</span>
-                </div>
-                <span className="text-[10px] font-mono text-slate-600">📦 pengiriman digital</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Raw Credentials */}
-          <div>
-            <div className="flex items-center justify-between gap-4 mb-2">
-              <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap flex items-center gap-2">
-                <Key className="w-3.5 h-3.5 text-purple-400" />
-                Raw Credentials / CDKey
-              </h2>
-              <div className="flex items-center gap-1.5 font-mono text-[10px] overflow-x-auto">
                 <button
                   type="button"
-                  onClick={() => handleLoadSample("eneba_cdkey")}
-                  className="px-2 py-0.5 rounded-md bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 border border-violet-500/30 transition-colors font-bold whitespace-nowrap flex items-center gap-1"
+                  onClick={() => setDeliveryMode("physical_envelope")}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    deliveryMode === "physical_envelope"
+                      ? "bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300"
+                      : "bg-white border-slate-200 hover:bg-slate-50"
+                  }`}
                 >
-                  <Sparkles className="w-3 h-3 text-violet-400" />
-                  <span>Eneba CDKey</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleLoadSample("terraria")}
-                  className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-slate-300 border border-zinc-700/80 transition-colors whitespace-nowrap"
-                >
-                  Terraria Akun
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleLoadSample("minecraft")}
-                  className="px-2 py-0.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-slate-300 border border-zinc-700/80 transition-colors whitespace-nowrap"
-                >
-                  Minecraft
+                  <div className="text-xs font-semibold text-slate-900">Hybrid + Kartu Garansi</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Disertai pengiriman resi / kartu garansi fisik
+                  </div>
                 </button>
               </div>
             </div>
-            <textarea
-              rows={4}
-              value={rawCredentials}
-              onChange={(e) => setRawCredentials(e.target.value)}
-              placeholder={"Contoh CDKey:\nE387N-98Q2B-T7Y9P | Eneba Official Steam Key\n\natau Akun:\nusername:password | mail_access: full"}
-              className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-purple-500/60 focus:ring-1 focus:ring-purple-500/30 transition-all resize-none"
-              required
-            />
-          </div>
 
-          {/* Metadata */}
-          <div>
-            <div className="flex items-center gap-4 mb-3">
-              <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Metadata Pesanan</h2>
-              <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-            </div>
-
-            {catalogGames.length > 0 && (
-              <div className="mb-3">
-                <label className="text-[10px] font-mono uppercase tracking-widest text-purple-400 block mb-1">
-                  Pilih Cepat dari Portofolio ({catalogGames.length} Game)
-                </label>
-                <select
-                  onChange={(e) => {
-                    const sel = catalogGames.find(g => g.id === e.target.value);
-                    if (sel) handleLoadCatalogGame(sel);
-                  }}
-                  className="w-full bg-zinc-950 border border-purple-500/30 rounded-xl px-3 py-2 text-xs font-mono text-purple-200 focus:outline-none focus:border-purple-500"
-                >
-                  <option value="">-- Pilih Game Portofolio --</option>
-                  {catalogGames.map(g => (
-                    <option key={g.id} value={g.id}>
-                      {g.title} ({g.platform})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono uppercase tracking-widest text-slate-600">Nama Game</label>
+            {/* Metadata Pesanan */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Game</label>
                 <input
                   type="text"
                   value={gameTitle}
                   onChange={(e) => setGameTitle(e.target.value)}
-                  placeholder="misal: Terraria"
-                  className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-purple-500/60 focus:ring-1 focus:ring-purple-500/30 transition-all"
                   required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-emerald-500 bg-white"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono uppercase tracking-widest text-slate-600">Platform</label>
-                <select
-                  value={platform}
-                  onChange={(e) => setPlatform(e.target.value)}
-                  className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-zinc-100 focus:outline-none focus:border-purple-500/60 transition-all appearance-none cursor-pointer"
-                >
-                  <option value="Steam">Steam</option>
-                  <option value="PC / Microsoft">PC / Microsoft</option>
-                  <option value="Rockstar / Steam">Rockstar / Steam</option>
-                  <option value="EA App / PC">EA App / PC</option>
-                  <option value="PlayStation 5">PlayStation 5</option>
-                  <option value="Xbox Series X/S">Xbox Series X/S</option>
-                  <option value="Epic Games">Epic Games</option>
-                  <option value="Ubisoft Connect">Ubisoft Connect</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono uppercase tracking-widest text-slate-600">Nama Pembeli</label>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Platform</label>
                 <input
                   type="text"
-                  value={buyerName}
-                  onChange={(e) => setBuyerName(e.target.value)}
-                  placeholder="misal: Kak Dimas"
-                  className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-purple-500/60 focus:ring-1 focus:ring-purple-500/30 transition-all"
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-emerald-500 bg-white"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono uppercase tracking-widest text-slate-600">Gaya Bahasa</label>
-                <select
-                  value={tone}
-                  onChange={(e) => setTone(e.target.value)}
-                  className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-mono text-zinc-100 focus:outline-none focus:border-purple-500/60 transition-all appearance-none cursor-pointer"
-                >
-                  <option value="Ramah, Hangat & Profesional">Ramah & Hangat</option>
-                  <option value="Singkat, Tepat & Padat">Singkat & Padat</option>
-                  <option value="Eksklusif VIP Member">Eksklusif VIP</option>
-                </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Pembeli</label>
+              <input
+                type="text"
+                value={buyerName}
+                onChange={(e) => setBuyerName(e.target.value)}
+                placeholder="Contoh: Kak Dimas"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-emerald-500 bg-white"
+              />
+            </div>
+
+            {/* Raw Credentials Textarea */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Data Mentah Kredensial (Raw dari Supplier)
+                </label>
+                <span className="text-[11px] text-slate-400">username:password atau CDKey</span>
               </div>
+              <textarea
+                rows={4}
+                required
+                value={rawCredentials}
+                onChange={(e) => setRawCredentials(e.target.value)}
+                placeholder="Contoh: user123@outlook.com:SecretPass#999 | steam_guard: off"
+                className="w-full p-3 font-mono text-xs border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 bg-white"
+              />
             </div>
-          </div>
 
-          {/* Generate CTA */}
-          <button
-            type="submit"
-            disabled={isLoading || !rawCredentials.trim()}
-            className="w-full v0-btn-primary py-3 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {isLoading ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                Gemini sedang merangkai pesan...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                Generate Format Serah Terima ({channel})
-              </>
-            )}
-          </button>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full btn-primary text-xs font-semibold py-3 rounded-lg flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>AI Sedang Menyusun Pesan...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <span>Format Pesan Pengiriman Sekarang</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
 
-          {/* SOP Footer */}
-          <div className="pt-1 border-t border-white/[0.06] space-y-2">
-            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-semibold">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              Standar Serah Terima Akshara
-            </div>
-            <ul className="text-[10px] font-mono text-slate-600 space-y-1 pl-4 list-disc leading-relaxed">
-              <li>Akun wajib <span className="text-slate-500">Full Access</span> (pembeli bisa ganti email &amp; password sendiri).</li>
-              <li>Pesan menyertakan <span className="text-slate-500">3 Langkah Pengamanan Akun</span>.</li>
-              <li>Edukasi pembeli soal <span className="text-slate-500">garansi digital &amp; Video No-Cut</span>.</li>
-            </ul>
-          </div>
-        </form>
-
-        {/* RIGHT: Result Panel */}
-        <div className="v0-card rounded-2xl p-5 sm:p-6 card-division-formatter">
+        {/* Kolom Kanan: Hasil Format & Kredensial Terurai (col-span-6) */}
+        <div className="lg:col-span-6 space-y-5">
           {parsedData ? (
-            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-300">
+            <div className="space-y-5">
+              {/* Box Kredensial Terurai */}
+              <div className="app-card p-5 bg-white space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Kredensial Terurai (Clean Extracted)
+                  </h4>
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-xs text-slate-500 hover:text-slate-700 inline-flex items-center gap-1"
+                  >
+                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    <span>{showPassword ? "Sembunyikan" : "Tampilkan"}</span>
+                  </button>
+                </div>
 
-              <div className="flex items-center gap-4">
-                <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap">Hasil Format</h2>
-                <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
-                  channel === "Shopee"
-                    ? "bg-orange-500/10 text-orange-300 border-orange-500/20"
-                    : channel === "WhatsApp"
-                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-                    : "bg-green-500/10 text-green-300 border-green-500/20"
-                }`}>
-                  {channel} Mode
-                </span>
-              </div>
-
-              <div className="text-[11px] font-mono text-slate-500 flex items-center gap-2">
-                <Info className="w-3 h-3 text-purple-400 shrink-0" />
-                Game: <span className="text-slate-300">{gameTitle}</span>
-                <span className="text-slate-700">·</span>
-                <span>{platform}</span>
-              </div>
-
-              {/* Credentials */}
-              <div className="space-y-2">
-                {parsedData.parsed_password?.toLowerCase().includes("redeem") ||
-                parsedData.parsed_password?.toLowerCase().includes("cdkey") ||
-                parsedData.parsed_password?.toLowerCase().includes("0% hackback") ? (
-                  <>
-                    <div className="flex items-center justify-between bg-violet-950/20 border border-violet-500/30 rounded-xl px-4 py-3">
-                      <div className="min-w-0 pr-3">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-violet-400 block mb-0.5">Kode Redeem / Digital CDKey</span>
-                        <span className="text-sm font-mono text-violet-200 truncate block select-all font-bold">
-                          {parsedData.parsed_user || "(tidak terdeteksi)"}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(parsedData.parsed_user, "user")}
-                        className="p-1.5 rounded-lg bg-violet-950/80 border border-violet-500/40 hover:border-violet-400 text-violet-300 hover:text-white transition-all shrink-0"
-                        title="Salin Kode Redeem"
-                      >
-                        {copiedUser ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
+                <div className="space-y-2 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">ID / Username / Key:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900">{parsedData.parsed_user || "-"}</span>
+                      {parsedData.parsed_user && (
+                        <button
+                          onClick={() => copyToClipboard(parsedData.parsed_user, "user")}
+                          className="text-slate-400 hover:text-slate-700 p-0.5"
+                          title="Salin username"
+                        >
+                          {copiedUser ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      )}
                     </div>
+                  </div>
 
-                    <div className="flex items-center justify-between bg-zinc-950/80 border border-violet-500/20 rounded-xl px-4 py-2.5">
-                      <div className="min-w-0 pr-3">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 block mb-0.5">Tipe Lisensi &amp; Keamanan</span>
-                        <span className="text-xs font-mono text-emerald-400 font-semibold flex items-center gap-1.5">
-                          <span>🛡️ 0% Hackback</span>
-                          <span className="text-slate-500">•</span>
-                          <span className="text-slate-300 font-normal">Aktivasi permanen di akun pribadi</span>
+                  {parsedData.parsed_password && (
+                    <div className="flex items-center justify-between border-t border-slate-200/60 pt-2">
+                      <span className="text-slate-500">Password:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">
+                          {showPassword ? parsedData.parsed_password : "••••••••••••"}
                         </span>
+                        <button
+                          onClick={() => copyToClipboard(parsedData.parsed_password, "pass")}
+                          className="text-slate-400 hover:text-slate-700 p-0.5"
+                          title="Salin password"
+                        >
+                          {copiedPass ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                        </button>
                       </div>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30 font-bold shrink-0">
-                        OFFICIAL KEY
+                    </div>
+                  )}
+
+                  {parsedData.additional_info && (
+                    <div className="flex items-center justify-between border-t border-slate-200/60 pt-2">
+                      <span className="text-slate-500">Catatan Tambahan:</span>
+                      <span className="text-slate-700 truncate max-w-[220px]">
+                        {parsedData.additional_info}
                       </span>
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3">
-                      <div className="min-w-0 pr-3">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600 block mb-0.5">Email / Username</span>
-                        <span className="text-xs font-mono text-slate-200 truncate block select-all font-semibold">
-                          {parsedData.parsed_user || "(tidak terdeteksi)"}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(parsedData.parsed_user, "user")}
-                        className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/40 text-slate-500 hover:text-purple-300 transition-all shrink-0"
-                        title="Salin Username"
-                      >
-                        {copiedUser ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3">
-                      <div className="min-w-0 pr-3">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600 block mb-0.5">Password</span>
-                        <span className="text-xs font-mono text-purple-300 truncate block select-all font-semibold">
-                          {showPassword ? parsedData.parsed_password || "(kosong)" : "••••••••••••"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-slate-500 hover:text-slate-300 transition-all"
-                        >
-                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(parsedData.parsed_password, "pass")}
-                          className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/40 text-slate-500 hover:text-purple-300 transition-all"
-                        >
-                          {copiedPass ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {parsedData.additional_info && (
-                  <div className="text-[11px] font-mono text-slate-400 bg-zinc-950/80 rounded-xl px-4 py-2.5 border border-zinc-800 flex items-start gap-2">
-                    <Info className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
-                    <span>Info: <span className="text-purple-300">{parsedData.additional_info}</span></span>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
-              {/* Formatted Message */}
-              <div>
-                <div className="flex items-center gap-4 mb-3">
-                  <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap flex items-center gap-2">
-                    <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
-                    Pesan Siap Kirim
-                  </h2>
-                  <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-                </div>
-
-                <div className="relative group">
-                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 font-mono text-[11px] leading-relaxed text-slate-300 whitespace-pre-wrap max-h-[340px] overflow-y-auto">
-                    {parsedData.formatted_message}
+              {/* Box Pesan Siap Kirim */}
+              <div className="app-card p-5 bg-white space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <MessageSquare className="w-4 h-4 text-emerald-600" />
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                      Pesan Siap Kirim ({channel})
+                    </h4>
                   </div>
-                  <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <button
-                      type="button"
                       onClick={() => copyToClipboard(parsedData.formatted_message, "all")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-semibold transition-all border ${
-                        copiedAll
-                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                          : "bg-zinc-900/90 text-slate-400 border-zinc-700 hover:text-white hover:border-purple-500/40"
-                      }`}
+                      className="btn-secondary text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5"
                     >
-                      {copiedAll ? (
-                        <><Check className="w-3 h-3" /> Tersalin!</>
-                      ) : (
-                        <><Copy className="w-3 h-3" /> Copy</>
-                      )}
+                      {copiedAll ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedAll ? "Tersalin!" : "Salin Pesan"}</span>
                     </button>
-                    {channel === "WhatsApp" && (
-                      <a
-                        href={`https://wa.me/?text=${encodeURIComponent(parsedData.formatted_message)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-semibold hover:bg-emerald-500/30 transition-all"
-                      >
-                        <Smartphone className="w-3 h-3" /> WA Web
-                      </a>
-                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between mt-2 text-[10px] font-mono text-slate-600 px-1">
-                  <span>Channel: <span className={channel === "Shopee" ? "text-orange-400" : channel === "WhatsApp" ? "text-emerald-400" : "text-green-400"}>{channel}</span></span>
-                  <span>Tone: <span className="text-slate-500">{tone}</span></span>
-                </div>
+                <pre className="p-4 rounded-xl bg-slate-50 border border-slate-200 font-mono text-[11px] whitespace-pre-wrap text-slate-800 leading-relaxed max-h-96 overflow-y-auto">
+                  {parsedData.formatted_message}
+                </pre>
               </div>
 
-              {/* Security Steps */}
+              {/* Langkah Pengamanan Akun */}
               {parsedData.security_steps && parsedData.security_steps.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-4 mb-3">
-                    <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap flex items-center gap-2">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      Langkah Pengamanan
-                    </h2>
-                    <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-                  </div>
-                  <ul className="space-y-2">
-                    {parsedData.security_steps.map((step, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-[11px] font-mono text-slate-400">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                        {step}
-                      </li>
+                <div className="app-card p-4 sm:p-5 bg-emerald-50 border-emerald-200 space-y-2">
+                  <h4 className="text-xs font-semibold text-emerald-900 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Langkah Pengamanan &amp; SOP Garansi yang Disertakan:</span>
+                  </h4>
+                  <ul className="text-xs text-emerald-950 space-y-1 list-disc list-inside">
+                    {parsedData.security_steps.map((step, idx) => (
+                      <li key={idx} className="leading-snug">{step}</li>
                     ))}
                   </ul>
                 </div>
               )}
-
-              {/* Cross-Link to Shopee Listing & Cover */}
-              <div className="p-4 rounded-xl bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent border border-orange-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <span className="text-xs font-semibold text-orange-300 flex items-center gap-1.5">
-                    <ShoppingBag className="w-3.5 h-3.5 text-orange-400" />
-                    Siapkan Listing &amp; Cover di Shopee?
-                  </span>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Buat judul 120-karakter, deskripsi terstruktur, dan download cover HD 1080x1080 untuk game {gameTitle}.
-                  </p>
-                </div>
-                <Link
-                  href={`/dashboard/description?game=${encodeURIComponent(gameTitle)}`}
-                  className="px-3.5 py-2 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 text-orange-300 text-xs font-semibold shrink-0 flex items-center justify-center gap-1.5 transition-all shadow-sm group"
-                >
-                  <span>Buka Generator Shopee</span>
-                  <span className="group-hover:translate-x-0.5 transition-transform text-orange-400">→</span>
-                </Link>
-              </div>
-
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center text-center min-h-[420px] space-y-4">
-              <div className="p-4 rounded-2xl bg-purple-500/5 border border-purple-500/20">
-                <Sparkles className="w-8 h-8 text-purple-400/40" />
+            /* Empty State */
+            <div className="app-card p-12 text-center flex flex-col items-center justify-center space-y-3 bg-white">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                <Sparkles className="w-6 h-6" />
               </div>
-              <div className="space-y-1.5">
-                <h3 className="text-sm font-semibold text-slate-300">Belum Ada Pesan yang Diformat</h3>
-                <p className="text-[12px] text-slate-600 max-w-xs leading-relaxed">
-                  Masukkan kredensial akun mentah di form kiri lalu klik{" "}
-                  <span className="text-purple-400 font-mono">Generate Format Serah Terima</span>.
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800">
+                  Belum ada pesan yang diformat
+                </h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                  Masukkan data mentah kredensial di sebelah kiri dan klik &quot;Format Pesan Pengiriman Sekarang&quot;.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleLoadSample("terraria")}
-                className="text-[11px] font-mono text-purple-500 hover:text-purple-300 underline underline-offset-4 transition-colors"
-              >
-                Coba contoh Terraria (Steam) →
-              </button>
             </div>
           )}
         </div>
-
       </div>
-
     </div>
   );
 }

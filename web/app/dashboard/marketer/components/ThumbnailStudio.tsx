@@ -817,12 +817,12 @@ export default function ThumbnailStudio() {
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-600/70 text-emerald-300 text-xs flex items-center justify-between shadow-lg shadow-emerald-950/40">
+        <div className="p-3.5 rounded-xl bg-white border border-emerald-300 text-slate-900 text-xs flex items-center justify-between shadow-lg">
           <div className="flex items-center gap-2 font-medium">
-            <Check className="w-4 h-4 text-emerald-400" />
+            <Check className="w-4 h-4 text-emerald-600" />
             <span>{toastMessage}</span>
           </div>
-          <span className="text-[10px] font-mono text-emerald-400">Siap Pakai</span>
+          <span className="text-[10px] font-mono text-emerald-600 font-semibold">Siap Pakai</span>
         </div>
       )}
 
@@ -831,24 +831,21 @@ export default function ThumbnailStudio() {
       {/* User types any game/product -> AI handles research, artwork, palette,    */}
       {/* platform emblem, title formatting, and rules automatically.              */}
       {/* ========================================================================= */}
-      <div className="v0-card rounded-2xl p-6 border-emerald-500/40 bg-gradient-to-br from-slate-900 via-zinc-900 to-emerald-950/30 space-y-4 shadow-2xl relative overflow-hidden">
-        {/* Subtle background glow */}
-        <div className="absolute -top-24 -right-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-
+      <div className="app-card p-6 space-y-4">
         {/* Header bar with Quick Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08] relative z-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-inner">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm">
               <Wand2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>AI Thumbnail Studio</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-semibold">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
                   Autonomous 1-Input Engine
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Ketik nama game / produk apa saja. AI otomatis meriset cover resmi, warna bingkai, logo brand, dan aturan garansi.
               </p>
             </div>
@@ -858,9 +855,9 @@ export default function ThumbnailStudio() {
             <button
               type="button"
               onClick={() => setShowSampleModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Eye className="w-3.5 h-3.5 text-emerald-400" />
+              <Eye className="w-3.5 h-3.5 text-slate-600" />
               <span>Sampel Asli SMA</span>
             </button>
 
@@ -868,7 +865,7 @@ export default function ThumbnailStudio() {
               type="button"
               onClick={() => handleDownloadThumbnail()}
               disabled={isDownloading}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
               <span>{isDownloading ? "Merender..." : "Download 1080x1080 PNG"}</span>
@@ -877,7 +874,7 @@ export default function ThumbnailStudio() {
         </div>
 
         {/* Command Search Input Bar */}
-        <div className="space-y-3 relative z-10">
+        <div className="space-y-3">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -886,19 +883,19 @@ export default function ThumbnailStudio() {
             className="flex flex-col sm:flex-row items-stretch gap-2.5"
           >
             <div className="relative flex-1">
-              <Search className="w-4 h-4 text-emerald-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={aiSearchInput}
                 onChange={(e) => setAiSearchInput(e.target.value)}
                 placeholder="Ketik nama game atau software (contoh: GTA V, Black Myth Wukong, Minecraft, Netflix, CapCut, Elden Ring)..."
-                className="w-full pl-11 pr-8 py-3 rounded-xl bg-zinc-950/90 border border-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm text-white placeholder-zinc-500 transition-all font-medium"
+                className="w-full pl-10 pr-8 py-2.5 rounded-lg bg-slate-50 border border-slate-300 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-slate-900 placeholder-slate-400 transition-all font-medium"
               />
               {aiSearchInput && (
                 <button
                   type="button"
                   onClick={() => setAiSearchInput("")}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
                 >
                   ✕
                 </button>
@@ -908,16 +905,16 @@ export default function ThumbnailStudio() {
             <button
               type="submit"
               disabled={isGenerating}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50 whitespace-nowrap"
+              className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
             >
-              <Sparkles className={`w-4 h-4 ${isGenerating ? "animate-spin" : ""}`} />
+              <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`} />
               <span>{isGenerating ? "AI Sedang Meriset & Mendesain..." : "⚡ Riset & Desain Otomatis"}</span>
             </button>
           </form>
 
           {/* Quick 1-Click Game Shortcuts */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-            <span className="text-[11px] font-mono text-zinc-500 whitespace-nowrap mr-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin text-xs">
+            <span className="text-[11px] font-medium text-slate-500 whitespace-nowrap mr-1">
               {catalogGames.length > 0 ? "Portofolio Aktif:" : "Rekomendasi Cepat:"}
             </span>
             {catalogGames.map((g) => (
@@ -929,7 +926,7 @@ export default function ThumbnailStudio() {
                   handleAutonomousAiDesign(g.title);
                 }}
                 disabled={isGenerating}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-[11px] font-mono whitespace-nowrap transition-all flex items-center gap-1 disabled:opacity-50 font-semibold shadow-sm"
+                className="px-2.5 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] whitespace-nowrap transition-colors flex items-center gap-1 disabled:opacity-50 font-semibold"
               >
                 <span>🎮 {g.title.split(":")[0]}</span>
               </button>
@@ -954,7 +951,7 @@ export default function ThumbnailStudio() {
                   handleAutonomousAiDesign(chip.query);
                 }}
                 disabled={isGenerating}
-                className="px-2.5 py-1 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-emerald-300 border border-zinc-800 hover:border-emerald-500/50 text-[11px] font-mono whitespace-nowrap transition-all flex items-center gap-1 disabled:opacity-50"
+                className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] whitespace-nowrap transition-colors flex items-center gap-1 disabled:opacity-50"
               >
                 <span>{chip.label}</span>
               </button>
@@ -964,32 +961,32 @@ export default function ThumbnailStudio() {
 
         {/* Live AI Decision Telemetry HUD */}
         {aiReasoning && (
-          <div className="p-4 rounded-xl bg-zinc-950/90 border border-emerald-500/40 text-xs space-y-3 shadow-md relative z-10">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-800">
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="font-bold text-emerald-300 font-mono text-xs">
-                  Keputusan AI untuk: <strong className="text-white">{gameTitle}</strong>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-bold text-slate-900 text-xs">
+                  Keputusan AI untuk: <strong className="text-emerald-700">{gameTitle}</strong>
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-[11px] font-mono text-zinc-400">
-                <span>Platform: <strong className="text-emerald-400">{platformBadge.toUpperCase()}</strong></span>
+              <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                <span>Platform: <strong className="text-slate-800 font-semibold">{platformBadge.toUpperCase()}</strong></span>
                 <span>•</span>
-                <span>Harga: <strong className="text-white">{price}</strong></span>
+                <span>Harga: <strong className="text-slate-800 font-semibold tabular-nums">{price}</strong></span>
                 <span>•</span>
-                <span>Artwork: <strong className="text-cyan-400">{availableArtworks.length} Resmi</strong></span>
+                <span>Artwork: <strong className="text-emerald-700 font-semibold">{availableArtworks.length} Resmi</strong></span>
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 text-[11px] text-zinc-300">
-              <p className="leading-relaxed text-zinc-300 max-w-2xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 text-[11px] text-slate-600">
+              <p className="leading-relaxed text-slate-600 max-w-2xl">
                 {aiReasoning}
               </p>
 
-              {/* Quick Frame Color Swatches for instant alternate testing */}
+              {/* Quick Frame Color Swatches */}
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-[10px] font-mono text-zinc-500">Warna Frame:</span>
-                <div className="flex items-center gap-1.5 p-1 rounded-lg bg-zinc-900 border border-zinc-800">
+                <span className="text-[10px] text-slate-500 font-medium">Warna Frame:</span>
+                <div className="flex items-center gap-1.5 p-1 rounded-lg bg-white border border-slate-200">
                   {suggestedPalettes.map((hex, idx) => (
                     <button
                       key={idx}
@@ -998,7 +995,7 @@ export default function ThumbnailStudio() {
                       title={`Ganti frame ke ${hex}`}
                       className={`w-5 h-5 rounded-md transition-all border ${
                         frameColor.toLowerCase() === hex.toLowerCase()
-                          ? "border-white scale-110 shadow-sm"
+                          ? "border-slate-900 scale-110 shadow-xs"
                           : "border-transparent opacity-70 hover:opacity-100"
                       }`}
                       style={{ backgroundColor: hex }}
@@ -1021,31 +1018,31 @@ export default function ThumbnailStudio() {
       {/* ========================================================================= */}
       {/* SLIDE SWITCHER TABS: SLIDE 1 (COVER GAME) vs SLIDE 2 (RULES & TERMS)       */}
       {/* ========================================================================= */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-zinc-950 p-2 rounded-2xl border border-zinc-800">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
         <div className="flex items-center gap-1.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setActiveSlide("cover")}
-            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
               activeSlide === "cover"
-                ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
-                : "bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                ? "bg-white text-slate-900 shadow-sm border border-slate-200/80 font-bold"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
             }`}
           >
-            <ImageIcon className="w-3.5 h-3.5" />
+            <ImageIcon className="w-3.5 h-3.5 text-purple-600" />
             <span>Slide 1: Cover Game Utama</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSlide("rules")}
-            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
               activeSlide === "rules"
-                ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
-                : "bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                ? "bg-white text-slate-900 shadow-sm border border-slate-200/80 font-bold"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
+            <FileText className="w-3.5 h-3.5 text-purple-600" />
             <span>Slide 2: Rules & Terms / Garansi Toko</span>
           </button>
         </div>
@@ -1055,9 +1052,9 @@ export default function ThumbnailStudio() {
             type="button"
             onClick={() => handleDownloadBothSlides()}
             disabled={isDownloading}
-            className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-emerald-400 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1.5 transition-all"
+            className="px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm text-xs font-medium flex items-center gap-1.5 transition-colors"
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className="w-3.5 h-3.5 text-emerald-600" />
             <span>Download Paket (Slide 1 & 2)</span>
           </button>
         </div>
@@ -1072,20 +1069,20 @@ export default function ThumbnailStudio() {
         <div className="lg:col-span-5 space-y-4">
           
           {/* Form Controls */}
-          <div className="v0-card rounded-2xl p-5 border-slate-700/40 space-y-4 text-xs font-mono">
+          <div className="app-card p-5 space-y-4 text-xs">
             
             {/* Input 1: Judul Produk Game */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-slate-300 font-bold flex items-center gap-1.5">
-                  <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">1</span>
+                <label className="text-slate-800 font-semibold flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px] font-bold">1</span>
                   Nama Game
                 </label>
                 <button
                   type="button"
                   onClick={() => handleFetchOfficialArtwork(gameTitle, true)}
                   disabled={isSearchingArt}
-                  className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+                  className="text-[10px] font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 transition-colors"
                 >
                   <Search className="w-2.5 h-2.5" />
                   <span>{isSearchingArt ? "Mencari..." : "Cari Steam CDN"}</span>
@@ -1099,18 +1096,18 @@ export default function ThumbnailStudio() {
                   setCleanTitle(`${e.target.value} (${platform}) - ${accessType}`);
                 }}
                 placeholder="Contoh: inZOI, Sons Of The Forest, GTA V"
-                className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-white font-sans focus:outline-none focus:border-emerald-500"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors"
               />
             </div>
 
             {/* Input 2: Background Game Resmi (Strict Non-AI) */}
-            <div className="space-y-2.5 pt-2 border-t border-white/[0.08]">
+            <div className="space-y-2.5 pt-2 border-t border-slate-200">
               <div className="flex items-center justify-between">
-                <label className="text-slate-300 font-bold flex items-center gap-1.5">
-                  <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">2</span>
+                <label className="text-slate-800 font-semibold flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px] font-bold">2</span>
                   Pilih Cover Resmi (Non-AI)
                 </label>
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold flex items-center gap-1">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold flex items-center gap-1">
                   <CheckCircle2 className="w-2.5 h-2.5" /> 100% Asli Steam
                 </span>
               </div>
@@ -1118,9 +1115,9 @@ export default function ThumbnailStudio() {
               {/* Artworks Visual Gallery */}
               {availableArtworks.length > 0 ? (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
                     <span>{availableArtworks.length} Pilihan Artwork Resmi:</span>
-                    <span className="text-emerald-400 font-bold">{artSource || "Steam Store CDN"}</span>
+                    <span className="text-emerald-700 font-bold">{artSource || "Steam Store CDN"}</span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
@@ -1137,8 +1134,8 @@ export default function ThumbnailStudio() {
                           }}
                           className={`relative rounded-lg overflow-hidden border text-left group transition-all aspect-video flex flex-col justify-end p-1.5 ${
                             isSelected
-                              ? "border-emerald-400 ring-2 ring-emerald-500/50 scale-[1.02]"
-                              : "border-zinc-800 hover:border-zinc-600 opacity-75 hover:opacity-100"
+                              ? "border-emerald-500 ring-2 ring-emerald-500/30 scale-[1.02]"
+                              : "border-slate-200 hover:border-slate-300 opacity-80 hover:opacity-100"
                           }`}
                         >
                           <img
@@ -1146,16 +1143,16 @@ export default function ThumbnailStudio() {
                             alt={art.label}
                             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
                           {isSelected && (
-                            <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[9px] font-bold z-10 shadow">
+                            <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-bold z-10 shadow">
                               ✓
                             </span>
                           )}
 
                           <div className="relative z-10 space-y-0.5">
-                            <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-black/80 text-zinc-200 block truncate font-medium">
+                            <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-black/80 text-white block truncate font-medium">
                               {art.label}
                             </span>
                           </div>
@@ -1169,9 +1166,9 @@ export default function ThumbnailStudio() {
                   type="button"
                   onClick={() => handleFetchOfficialArtwork(gameTitle, true)}
                   disabled={isSearchingArt}
-                  className="w-full py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all border border-zinc-700 shadow-sm"
+                  className="w-full py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-200 shadow-sm"
                 >
-                  <Search className={`w-3.5 h-3.5 text-emerald-400 ${isSearchingArt ? "animate-spin" : ""}`} />
+                  <Search className={`w-3.5 h-3.5 text-emerald-600 ${isSearchingArt ? "animate-spin" : ""}`} />
                   <span>Ambil Poster Resmi dari Steam CDN</span>
                 </button>
               )}
@@ -1183,7 +1180,7 @@ export default function ThumbnailStudio() {
                   value={bgUrl}
                   onChange={(e) => setBgUrl(e.target.value)}
                   placeholder="Atau tempel URL gambar custom (JPG / PNG)"
-                  className="w-full bg-slate-900/80 border border-white/10 rounded-lg px-2.5 py-1 text-[11px] text-zinc-300 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 text-[11px] text-slate-700 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
@@ -1191,20 +1188,20 @@ export default function ThumbnailStudio() {
             {/* ========================================================================= */}
             {/* AI SMART IMAGE AUTO-FIT ENGINE (LANDSCAPE & CUSTOM IMAGES)                */}
             {/* ========================================================================= */}
-            <div className="pt-3 border-t border-white/[0.08] space-y-3 bg-zinc-950/40 p-3 rounded-xl border border-zinc-800/80">
+            <div className="pt-3 border-t border-slate-200 space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 font-bold text-emerald-400 text-xs">
-                  <Wand2 className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+                  <Wand2 className="w-3.5 h-3.5 text-emerald-600" />
                   <span>AI Smart Image Auto-Fit</span>
                 </div>
                 {detectedAspect && (
-                  <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
                     {detectedAspect}
                   </span>
                 )}
               </div>
 
-              <p className="text-[10px] text-zinc-400 font-sans leading-relaxed">
+              <p className="text-[11px] text-slate-500 leading-relaxed">
                 Mencegah gambar landscape 16:9 atau banner gepeng dan terpotong di dalam kotak 1:1.
               </p>
 
@@ -1213,51 +1210,51 @@ export default function ThumbnailStudio() {
                 <button
                   type="button"
                   onClick={() => setFitMode("ambient_blur")}
-                  className={`p-2 rounded-xl border text-left transition-all flex flex-col gap-0.5 ${
+                  className={`p-2.5 rounded-lg border text-left transition-all flex flex-col gap-0.5 shadow-sm ${
                     fitMode === "ambient_blur"
-                      ? "bg-emerald-950/60 border-emerald-500/80 text-white font-bold ring-1 ring-emerald-500/40"
-                      : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                      ? "bg-white border-emerald-500 text-emerald-950 font-bold ring-1 ring-emerald-500/30"
+                      : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
                   <div className="flex items-center gap-1 text-[11px] font-bold">
-                    <Maximize2 className="w-3 h-3 text-emerald-400" />
+                    <Maximize2 className="w-3 h-3 text-emerald-600" />
                     <span>Ambient Blur (Utuh 100%)</span>
                   </div>
-                  <span className="text-[9px] text-zinc-500 font-sans">Poster di tengah, latar blur senada</span>
+                  <span className="text-[9px] text-slate-500">Poster di tengah, latar blur senada</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setFitMode("focal_crop")}
-                  className={`p-2 rounded-xl border text-left transition-all flex flex-col gap-0.5 ${
+                  className={`p-2.5 rounded-lg border text-left transition-all flex flex-col gap-0.5 shadow-sm ${
                     fitMode === "focal_crop"
-                      ? "bg-emerald-950/60 border-emerald-500/80 text-white font-bold ring-1 ring-emerald-500/40"
-                      : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                      ? "bg-white border-emerald-500 text-emerald-950 font-bold ring-1 ring-emerald-500/30"
+                      : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
                   <div className="flex items-center gap-1 text-[11px] font-bold">
-                    <Focus className="w-3 h-3 text-emerald-400" />
+                    <Focus className="w-3 h-3 text-emerald-600" />
                     <span>Focal Crop (Penuh Kotak)</span>
                   </div>
-                  <span className="text-[9px] text-zinc-500 font-sans">Crop fokus karakter/wajah</span>
+                  <span className="text-[9px] text-slate-500">Crop fokus karakter/wajah</span>
                 </button>
               </div>
 
               {/* Controls for Focal Crop Mode */}
               {fitMode === "focal_crop" && (
-                <div className="space-y-2 pt-1 border-t border-zinc-800 text-[11px]">
+                <div className="space-y-2 pt-1 border-t border-slate-200 text-[11px]">
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Titik Fokus Gambar:</span>
+                    <span className="text-slate-600 font-medium">Titik Fokus Gambar:</span>
                     <div className="flex items-center gap-1">
                       {(["top", "center", "bottom"] as const).map((pos) => (
                         <button
                           key={pos}
                           type="button"
                           onClick={() => setFocalPosition(pos)}
-                          className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono ${
+                          className={`px-2 py-0.5 rounded text-[10px] uppercase font-semibold ${
                             focalPosition === pos
-                              ? "bg-emerald-500 text-slate-950 font-bold"
-                              : "bg-zinc-800 text-zinc-400 hover:text-white"
+                              ? "bg-emerald-600 text-white font-bold"
+                              : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900"
                           }`}
                         >
                           {pos === "top" ? "Atas" : pos === "center" ? "Tengah" : "Bawah"}
@@ -1267,26 +1264,26 @@ export default function ThumbnailStudio() {
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-zinc-400 text-[10px] whitespace-nowrap">Zoom ({zoomLevel}%):</span>
+                    <span className="text-slate-600 text-[10px] font-medium whitespace-nowrap">Zoom ({zoomLevel}%):</span>
                     <input 
                       type="range" 
                       min="100" 
                       max="180" 
                       value={zoomLevel} 
                       onChange={(e) => setZoomLevel(Number(e.target.value))}
-                      className="w-full accent-emerald-500 h-1.5 bg-zinc-800 rounded-lg cursor-pointer"
+                      className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
                     />
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-zinc-400 text-[10px] whitespace-nowrap">Geser Vertikal:</span>
+                    <span className="text-slate-600 text-[10px] font-medium whitespace-nowrap">Geser Vertikal:</span>
                     <input 
                       type="range" 
                       min="-25" 
                       max="25" 
                       value={panY} 
                       onChange={(e) => setPanY(Number(e.target.value))}
-                      className="w-full accent-emerald-500 h-1.5 bg-zinc-800 rounded-lg cursor-pointer"
+                      className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
                     />
                   </div>
                 </div>
@@ -1294,9 +1291,9 @@ export default function ThumbnailStudio() {
             </div>
 
             {/* Input 3: Estimasi Harga */}
-            <div className="space-y-1 pt-2 border-t border-white/[0.08]">
-              <label className="text-slate-300 font-bold flex items-center gap-1.5">
-                <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">3</span>
+            <div className="space-y-1 pt-2 border-t border-slate-200">
+              <label className="text-slate-800 font-semibold flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px] font-bold">3</span>
                 Estimasi Harga Jual (Rp)
               </label>
               <input
@@ -1304,25 +1301,25 @@ export default function ThumbnailStudio() {
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="Rp 249.900"
-                className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-white font-sans focus:outline-none focus:border-emerald-500"
+                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 font-bold tabular-nums focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
 
             {/* ========================================================================= */}
             {/* SIGNATURE CUSTOMIZATIONS: TITLE, FRAME COLOR, & HARDENED BADGES           */}
             {/* ========================================================================= */}
-            <div className="pt-3 border-t border-white/[0.08] space-y-4">
+            <div className="pt-3 border-t border-slate-200 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 text-purple-600" />
                   Kustomisasi Signature Classic SMA
                 </span>
-                <span className="text-[10px] text-zinc-500 font-mono">100% Sesuai Sampel Asli</span>
+                <span className="text-[10px] text-slate-500">100% Sesuai Sampel Asli</span>
               </div>
 
               {/* Header Clean Title */}
               <div className="space-y-1">
-                <label className="text-slate-300 font-bold text-[11px]">
+                <label className="text-slate-700 font-semibold text-[11px]">
                   {activeSlide === "rules" ? "Judul Slide Garansi:" : "Teks Header Bersih (Atas):"}
                 </label>
                 {activeSlide === "cover" ? (
@@ -1331,10 +1328,10 @@ export default function ThumbnailStudio() {
                     value={cleanTitle}
                     onChange={(e) => setCleanTitle(e.target.value)}
                     placeholder="Contoh: Sons Of The Forest (Steam) - Private"
-                    className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-white font-sans text-xs focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                   />
                 ) : (
-                  <div className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-300 font-bold text-xs">
+                  <div className="px-3 py-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs">
                     RULES & TERMS
                   </div>
                 )}
@@ -1343,10 +1340,10 @@ export default function ThumbnailStudio() {
               {/* Frame Color Swatches & Custom Input */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-slate-300 font-bold text-[11px]">
+                  <label className="text-slate-700 font-semibold text-[11px]">
                     Warna Bingkai Luar (Harmonis):
                   </label>
-                  <span className="font-mono text-[10px] text-zinc-400">{frameColor}</span>
+                  <span className="font-mono text-[10px] text-slate-500">{frameColor}</span>
                 </div>
 
                 <div className="grid grid-cols-7 gap-1.5">
@@ -1358,8 +1355,8 @@ export default function ThumbnailStudio() {
                       title={`${pal.name} (${pal.game})`}
                       className={`w-full aspect-square rounded-lg border transition-all flex items-center justify-center ${
                         frameColor.toLowerCase() === pal.hex.toLowerCase()
-                          ? "ring-2 ring-white border-white scale-110 z-10"
-                          : "border-black/40 hover:scale-105"
+                          ? "ring-2 ring-slate-900 border-white scale-110 z-10 shadow-xs"
+                          : "border-black/20 hover:scale-105"
                       }`}
                       style={{ backgroundColor: pal.hex }}
                     >
@@ -1381,7 +1378,7 @@ export default function ThumbnailStudio() {
                     type="text"
                     value={frameColor}
                     onChange={(e) => setFrameColor(e.target.value)}
-                    className="flex-1 bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1 text-zinc-300 text-xs font-mono"
+                    className="flex-1 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-slate-800 text-xs font-mono"
                   />
                 </div>
               </div>
@@ -1389,10 +1386,10 @@ export default function ThumbnailStudio() {
               {/* Hardened Platform Badge Selector */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-slate-300 font-bold text-[11px]">
+                  <label className="text-slate-700 font-semibold text-[11px]">
                     Emblem Platform Resmi:
                   </label>
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold uppercase">
+                  <span className="text-[10px] text-emerald-700 font-semibold uppercase">
                     {currentBadge.name}
                   </span>
                 </div>
@@ -1405,20 +1402,20 @@ export default function ThumbnailStudio() {
                         key={badge.id}
                         type="button"
                         onClick={() => setPlatformBadge(badge.id)}
-                        className={`p-2 rounded-xl border flex items-center gap-2 transition-all text-left ${
+                        className={`p-2 rounded-lg border flex items-center gap-2 transition-all text-left shadow-xs ${
                           isSelected
-                            ? "bg-zinc-800 border-emerald-400 ring-2 ring-emerald-500/40"
-                            : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
+                            ? "bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400"
+                            : "bg-white border-slate-200 hover:border-slate-300"
                         }`}
                       >
-                        <div className="w-7 h-7 flex-shrink-0 flex items-center justify-center">
+                        <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center">
                           <img 
                             src={badge.asset} 
                             alt={badge.name} 
                             className="w-full h-full object-contain"
                           />
                         </div>
-                        <span className="text-[10px] font-bold text-zinc-200 truncate">
+                        <span className="text-[10px] font-bold text-slate-800 truncate">
                           {badge.name}
                         </span>
                       </button>
@@ -1429,7 +1426,7 @@ export default function ThumbnailStudio() {
 
               {/* Tipe Akses Quick Buttons */}
               <div className="space-y-1.5">
-                <label className="text-slate-300 font-bold text-[11px]">
+                <label className="text-slate-700 font-semibold text-[11px]">
                   Tipe Akses Produk:
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -1441,10 +1438,10 @@ export default function ThumbnailStudio() {
                         setAccessType(t);
                         setCleanTitle(`${gameTitle} (${platform}) - ${t}`);
                       }}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-mono transition-all ${
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all shadow-xs ${
                         accessType === t
-                          ? "bg-emerald-500 text-slate-950 font-bold"
-                          : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                          ? "bg-emerald-600 text-white font-bold"
+                          : "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"
                       }`}
                     >
                       {t}
@@ -1456,18 +1453,18 @@ export default function ThumbnailStudio() {
               {/* ========================================================================= */}
               {/* COMBINED 4-IN-1 ANTI-THEFT SUITE CONTROLS                                 */}
               {/* ========================================================================= */}
-              <div className="pt-3 border-t border-white/[0.08] space-y-3 bg-gradient-to-b from-zinc-900/40 to-emerald-950/20 p-3 rounded-xl border border-emerald-900/30">
+              <div className="pt-3 border-t border-slate-200 space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                    <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-emerald-600" />
                     Sistem Anti-Maling & Hak Cipta
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
                     4-in-1 Suite
                   </span>
                 </div>
 
-                <p className="text-[10px] text-zinc-400 leading-relaxed font-sans">
+                <p className="text-[11px] text-slate-500 leading-relaxed">
                   Kombinasi 4 proteksi: Segel Hologram, Garis Mikro Guilloche, Anti-AI Watermark Poisoning, dan Sidik Jari Kriptografis Steganografi.
                 </p>
 
@@ -1482,40 +1479,40 @@ export default function ThumbnailStudio() {
                       key={m.id}
                       type="button"
                       onClick={() => setAntiTheftMode(m.id as "full" | "subtle" | "off")}
-                      className={`p-1.5 rounded-lg border text-center transition-all ${
+                      className={`p-1.5 rounded-lg border text-center transition-all shadow-xs ${
                         antiTheftMode === m.id
-                          ? "bg-emerald-950/80 border-emerald-500 text-white font-bold ring-1 ring-emerald-500/50"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                          ? "bg-white border-emerald-500 text-emerald-950 font-bold ring-1 ring-emerald-500/30"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                       }`}
                     >
                       <div className="text-[11px] font-bold">{m.label}</div>
-                      <div className="text-[9px] text-zinc-500">{m.desc}</div>
+                      <div className="text-[9px] text-slate-500">{m.desc}</div>
                     </button>
                   ))}
                 </div>
 
                 {antiTheftMode !== "off" && (
-                  <div className="space-y-2.5 pt-2 border-t border-zinc-800/80 text-[11px]">
+                  <div className="space-y-2.5 pt-2 border-t border-slate-200 text-[11px]">
                     {/* Brand Name Input */}
                     <div className="space-y-1">
-                      <label className="text-slate-300 font-bold text-[10px] flex items-center justify-between">
+                      <label className="text-slate-700 font-semibold text-[10px] flex items-center justify-between">
                         <span>Nama Brand / Toko Anda:</span>
-                        <span className="text-emerald-400 font-mono text-[9px]">Stempel Otomatis</span>
+                        <span className="text-emerald-700 font-semibold text-[9px]">Stempel Otomatis</span>
                       </label>
                       <input
                         type="text"
                         value={storeBrandName}
                         onChange={(e) => setStoreBrandName(e.target.value)}
                         placeholder="AKSHARA GAMING CENTER"
-                        className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 uppercase tracking-wide"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 uppercase tracking-wide"
                       />
                     </div>
 
                     {/* Watermark Opacity Slider */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-[10px]">
-                        <span className="text-zinc-400">Intensitas Segel & Watermark:</span>
-                        <span className="font-mono text-emerald-400 font-bold">{watermarkOpacity}%</span>
+                        <span className="text-slate-600">Intensitas Segel & Watermark:</span>
+                        <span className="font-semibold text-emerald-700">{watermarkOpacity}%</span>
                       </div>
                       <input
                         type="range"
@@ -1523,26 +1520,26 @@ export default function ThumbnailStudio() {
                         max="60"
                         value={watermarkOpacity}
                         onChange={(e) => setWatermarkOpacity(Number(e.target.value))}
-                        className="w-full accent-emerald-500 h-1.5 bg-zinc-800 rounded-lg cursor-pointer"
+                        className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
                       />
                     </div>
 
                     {/* Active Layers Checklist */}
-                    <div className="grid grid-cols-2 gap-1.5 pt-1 text-[10px] font-mono text-zinc-300">
-                      <div className="flex items-center gap-1 bg-zinc-900/80 p-1.5 rounded border border-zinc-800">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                    <div className="grid grid-cols-2 gap-1.5 pt-1 text-[10px] text-slate-700">
+                      <div className="flex items-center gap-1 bg-white p-1.5 rounded border border-slate-200 shadow-2xs">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
                         <span className="truncate">Hologram Seal</span>
                       </div>
-                      <div className="flex items-center gap-1 bg-zinc-900/80 p-1.5 rounded border border-zinc-800">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                      <div className="flex items-center gap-1 bg-white p-1.5 rounded border border-slate-200 shadow-2xs">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
                         <span className="truncate">Micro-Guilloche</span>
                       </div>
-                      <div className="flex items-center gap-1 bg-zinc-900/80 p-1.5 rounded border border-zinc-800">
-                        <CheckCircle2 className={`w-3 h-3 flex-shrink-0 ${antiTheftMode === "full" ? "text-emerald-400" : "text-zinc-600"}`} />
-                        <span className={`truncate ${antiTheftMode === "full" ? "" : "text-zinc-500"}`}>Anti-AI Poison</span>
+                      <div className="flex items-center gap-1 bg-white p-1.5 rounded border border-slate-200 shadow-2xs">
+                        <CheckCircle2 className={`w-3 h-3 flex-shrink-0 ${antiTheftMode === "full" ? "text-emerald-600" : "text-slate-400"}`} />
+                        <span className={`truncate ${antiTheftMode === "full" ? "" : "text-slate-400"}`}>Anti-AI Poison</span>
                       </div>
-                      <div className="flex items-center gap-1 bg-zinc-900/80 p-1.5 rounded border border-zinc-800">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                      <div className="flex items-center gap-1 bg-white p-1.5 rounded border border-slate-200 shadow-2xs">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
                         <span className="truncate">Stego Metadata</span>
                       </div>
                     </div>
@@ -1561,11 +1558,11 @@ export default function ThumbnailStudio() {
         <div className="lg:col-span-7 space-y-4">
           
           {/* View Mode Switcher: Clean Canvas vs Shopee App Simulation */}
-          <div className="flex items-center justify-between bg-zinc-950 p-2 rounded-xl border border-zinc-800">
+          <div className="flex items-center justify-between bg-slate-100 p-1.5 rounded-xl border border-slate-200">
             <div className="flex items-center gap-2">
-              <Monitor className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs font-bold text-zinc-200">Pratinjau:</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-emerald-400 border border-zinc-700">
+              <Monitor className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs font-bold text-slate-800">Pratinjau:</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white text-emerald-800 border border-slate-200 shadow-2xs">
                 {activeSlide === "rules" ? "Slide 2: Garansi & SOP" : "Slide 1: Cover Game"}
               </span>
             </div>
@@ -1573,10 +1570,10 @@ export default function ThumbnailStudio() {
               <button
                 type="button"
                 onClick={() => setViewMode("canvas")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   viewMode === "canvas"
-                    ? "bg-zinc-800 text-white font-bold border border-zinc-600"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-white text-slate-900 font-bold shadow-xs border border-slate-200"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 Kanvas 1:1 Bersih
@@ -1584,10 +1581,10 @@ export default function ThumbnailStudio() {
               <button
                 type="button"
                 onClick={() => setViewMode("shopee_app")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
                   viewMode === "shopee_app"
-                    ? "bg-orange-500 text-slate-950 font-bold"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-orange-500 text-white font-bold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
@@ -1597,7 +1594,7 @@ export default function ThumbnailStudio() {
           </div>
 
           {/* The Canvas Preview Box */}
-          <div className="v0-card rounded-2xl p-5 border-slate-700/40 flex flex-col items-center justify-center space-y-4 bg-zinc-950/60">
+          <div className="app-card p-5 flex flex-col items-center justify-center space-y-4 bg-slate-50">
             
             {/* 1:1 Square Frame Container */}
             <div className="relative w-full max-w-[480px] aspect-square rounded-2xl overflow-hidden shadow-2xl transition-all select-none border-4 border-black/40">
@@ -1896,24 +1893,24 @@ export default function ThumbnailStudio() {
 
             {/* Shopee App Feed Simulation Card */}
             {viewMode === "shopee_app" && (
-              <div className="w-full max-w-[480px] bg-zinc-900 rounded-xl p-3 border border-orange-500/30 space-y-2 text-xs">
-                <div className="flex items-center gap-2 text-[11px] font-medium text-orange-400">
-                  <ShoppingBag className="w-3.5 h-3.5" />
+              <div className="w-full max-w-[480px] bg-white rounded-xl p-3 border border-orange-200 shadow-sm space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-[11px] font-semibold text-orange-700">
+                  <ShoppingBag className="w-3.5 h-3.5 text-orange-600" />
                   <span>Preview Hasil Tampilan di Aplikasi Shopee:</span>
                 </div>
-                <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="bg-orange-500 text-slate-950 text-[9px] font-bold px-1 rounded">Mall</span>
-                    <span className="font-semibold text-zinc-100 truncate">{cleanTitle}</span>
+                    <span className="bg-[#ee4d2d] text-white text-[9px] font-bold px-1 rounded">Mall</span>
+                    <span className="font-semibold text-slate-900 truncate">{cleanTitle}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] pt-1 font-mono">
-                    <span className="text-orange-400 font-bold text-sm">{price}</span>
-                    <span className="text-zinc-500 text-[10px]">1,2RB Terjual</span>
+                    <span className="text-[#ee4d2d] font-bold text-sm tabular-nums">{price}</span>
+                    <span className="text-slate-500 text-[10px]">1,2RB Terjual</span>
                   </div>
-                  <div className="flex items-center gap-1 text-[10px] text-zinc-400 pt-0.5">
-                    <span className="text-amber-400 flex items-center">★ 5.0</span>
+                  <div className="flex items-center gap-1 text-[10px] text-slate-500 pt-0.5">
+                    <span className="text-amber-500 flex items-center">★ 5.0</span>
                     <span>•</span>
-                    <span className="text-emerald-400 font-mono">Gratis Ongkir XTRA</span>
+                    <span className="text-emerald-700 font-medium">Gratis Ongkir XTRA</span>
                   </div>
                 </div>
               </div>
@@ -1921,7 +1918,7 @@ export default function ThumbnailStudio() {
 
             {/* Download Action Footer */}
             <div className="w-full max-w-[480px] flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <span className="text-[11px] text-zinc-400 font-mono">
+              <span className="text-[11px] text-slate-500">
                 1080 x 1080 px • Format: PNG HD • Mode: {activeSlide === "rules" ? "Slide 2 (Rules)" : "Slide 1 (Cover)"}
               </span>
 
@@ -1930,7 +1927,7 @@ export default function ThumbnailStudio() {
                   type="button"
                   onClick={() => handleDownloadThumbnail()}
                   disabled={isDownloading}
-                  className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50"
+                  className="flex-1 sm:flex-initial px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-50"
                 >
                   <Download className="w-4 h-4" />
                   <span>{isDownloading ? "Merender..." : `Download ${activeSlide === "rules" ? "Slide 2" : "Slide 1"} PNG`}</span>
@@ -1941,9 +1938,9 @@ export default function ThumbnailStudio() {
           </div>
 
           {/* Quick Showcase Card: Compare with Original High School Sample */}
-          <div className="v0-card rounded-2xl p-4 border-slate-700/40 bg-zinc-950/40 flex items-center justify-between gap-4">
+          <div className="app-card p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl overflow-hidden border border-emerald-500/40 flex-shrink-0">
+              <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 flex-shrink-0 shadow-xs">
                 <img 
                   src="/samples/test_recreated_sample.png" 
                   alt="Sample Mockup" 
@@ -1951,13 +1948,13 @@ export default function ThumbnailStudio() {
                 />
               </div>
               <div>
-                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                   <span>Reinkarnasi Edisi SMA Otentik</span>
-                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">
+                  <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
                     Signature
                   </span>
                 </div>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
+                <p className="text-[11px] text-slate-500 mt-0.5">
                   Desain bersih, minimalis, dan elegan. Tidak ada stiker atau pita neon yang mengganggu artwork game.
                 </p>
               </div>
@@ -1966,7 +1963,7 @@ export default function ThumbnailStudio() {
             <button
               type="button"
               onClick={() => setShowSampleModal(true)}
-              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium whitespace-nowrap transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium whitespace-nowrap transition-colors"
             >
               Perbesar
             </button>
@@ -1978,17 +1975,17 @@ export default function ThumbnailStudio() {
 
       {/* Modal: Full Resolution Sample Viewer */}
       {showSampleModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-sm font-bold text-white">Sampel Desain Asli Edisi SMA</h3>
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-bold text-slate-900">Sampel Desain Asli Edisi SMA</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowSampleModal(false)}
-                className="text-zinc-400 hover:text-white text-xs font-mono"
+                className="text-slate-400 hover:text-slate-600 text-xs font-mono"
               >
                 [Tutup ✕]
               </button>
@@ -1996,8 +1993,8 @@ export default function ThumbnailStudio() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <span className="text-[10px] font-mono text-zinc-400 block text-center">Slide 1: Cover Game</span>
-                <div className="rounded-xl overflow-hidden border border-zinc-700 aspect-square">
+                <span className="text-[10px] font-medium text-slate-500 block text-center">Slide 1: Cover Game</span>
+                <div className="rounded-xl overflow-hidden border border-slate-200 aspect-square shadow-sm">
                   <img 
                     src="/samples/test_recreated_sample.png" 
                     alt="Sons Of The Forest Sample" 
@@ -2006,8 +2003,8 @@ export default function ThumbnailStudio() {
                 </div>
               </div>
               <div className="space-y-1">
-                <span className="text-[10px] font-mono text-zinc-400 block text-center">Slide 2: Rules & Garansi</span>
-                <div className="rounded-xl overflow-hidden border border-zinc-700 aspect-square">
+                <span className="text-[10px] font-medium text-slate-500 block text-center">Slide 2: Rules & Garansi</span>
+                <div className="rounded-xl overflow-hidden border border-slate-200 aspect-square shadow-sm">
                   <img 
                     src="/samples/rules_terms_canvas.png" 
                     alt="Rules & Terms Sample" 
@@ -2017,12 +2014,12 @@ export default function ThumbnailStudio() {
               </div>
             </div>
 
-            <div className="space-y-1.5 text-xs font-mono text-zinc-400">
+            <div className="space-y-1.5 text-xs text-slate-600">
               <div className="flex justify-between">
-                <span>Rasio: <strong className="text-zinc-200">1:1 Square (1080x1080 px)</strong></span>
-                <span>Gaya: <strong className="text-emerald-400">Signature SMA Minimalist</strong></span>
+                <span>Rasio: <strong className="text-slate-900">1:1 Square (1080x1080 px)</strong></span>
+                <span>Gaya: <strong className="text-emerald-700">Signature SMA Minimalist</strong></span>
               </div>
-              <p className="text-[11px] text-zinc-500 font-sans">
+              <p className="text-[11px] text-slate-500 leading-relaxed">
                 Formula desain otentik yang pernah Anda gunakan: Outer border berwarna harmonis dengan poster game, teks judul putih rapi di atas, sudut kertas terlipat (dog-ear peel), dan logo platform di pojok kanan bawah.
               </p>
             </div>
@@ -2031,7 +2028,7 @@ export default function ThumbnailStudio() {
               <button
                 type="button"
                 onClick={() => setShowSampleModal(false)}
-                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold"
+                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors"
               >
                 Tutup Preview
               </button>

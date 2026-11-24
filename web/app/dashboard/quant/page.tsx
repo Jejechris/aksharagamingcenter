@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { fetchSmartCatalog } from "@/lib/catalogClient";
 import Link from 'next/link';
 import { 
@@ -38,7 +39,10 @@ interface CatalogItem {
   metrics?: any;
 }
 
-export default function QuantPage() {
+function QuantCalculatorContent() {
+  const searchParams = useSearchParams();
+  const gameQueryParam = searchParams.get('game');
+
   // Mode Selection: 'fixed_price' (Mode A) vs 'target_margin' (Mode B)
   const [calcMode, setCalcMode] = useState<'fixed_price' | 'target_margin'>('fixed_price');
   const [isCompetitorModalOpen, setIsCompetitorModalOpen] = useState(false);
@@ -59,7 +63,7 @@ export default function QuantPage() {
   const [qrisFeePct, setQrisFeePct] = useState(0.7); // Direct QRIS 0.7%
   const [shopeeAdminPct, setShopeeAdminPct] = useState(8.0);
   const [shopeeFixedFee, setShopeeFixedFee] = useState(1000);
-  const [packaging, setPackaging] = useState(2000); // garansi digital + sertifikat garansi
+  const [packaging, setPackaging] = useState(0); // Default Rp 0 for full digital mode
   
   // Multi-seller options for current product
   const [sellers, setSellers] = useState<SellerOption[]>([
@@ -102,7 +106,6 @@ export default function QuantPage() {
   ]);
 
   const [activePreset, setActivePreset] = useState('minecraft');
-  const [pulse, setPulse] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveMessage, setSaveMessage] = useState('');
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -130,6 +133,14 @@ export default function QuantPage() {
     tier: string;
   } | null>(null);
   const [isSavingEditSellerQuant, setIsSavingEditSellerQuant] = useState(false);
+
+  const selectedSeller = sellers.find(s => s.is_selected) || sellers[0];
+
+  useEffect(() => {
+    if (selectedSeller) {
+      setCogsG2gIdr(selectedSeller.price_idr);
+    }
+  }, [selectedSeller?.id, selectedSeller?.price_idr]);
 
   const handleSaveEditSellerQuant = async () => {
     if (!editingSellerQuant || !editingSellerQuant.name.trim()) return;
@@ -182,71 +193,61 @@ export default function QuantPage() {
     }
   };
 
-  // Fetch live catalog data — stable, called only on mount or explicit refresh
+  // Fetch live catalog data & support query param `?game=`
   const fetchCatalogData = useCallback(async (applyToUI = true): Promise<any[]> => {
     try {
       const mergedData = await fetchSmartCatalog();
-        if (mergedData && mergedData.length > 0) {
-          setCatalogGames(mergedData);
+      if (mergedData && mergedData.length > 0) {
+        setCatalogGames(mergedData);
 
         if (applyToUI) {
-          if (mergedData && mergedData.length > 0) {
-            const matched = mergedData.find((g: any) => g.id === currentGameId) || mergedData[0];
+          const targetKey = gameQueryParam || currentGameId;
+          const matched = mergedData.find((g: any) => g.id === targetKey || g.title.toLowerCase() === targetKey.toLowerCase()) ||
+                          mergedData.find((g: any) => g.id === currentGameId) ||
+                          mergedData[0];
 
-            if (matched) {
-              setCurrentGameId(matched.id);
-              setActivePreset(matched.id);
-              setGameTitle(matched.title);
-              setPlatform(matched.platform);
-              setCategory(matched.category);
-              setSellingPrice(matched.selling_price_shopee_idr);
-              setTargetMarginPct(matched.target_margin_pct);
+          if (matched) {
+            setCurrentGameId(matched.id);
+            setActivePreset(matched.id);
+            setGameTitle(matched.title);
+            setPlatform(matched.platform);
+            setCategory(matched.category || 'Account (Full Access)');
+            setSellingPrice(matched.selling_price_shopee_idr);
+            setTargetMarginPct(matched.target_margin_pct);
 
-              if (Array.isArray(matched.sellers) && matched.sellers.length > 0) {
-                const mapped: SellerOption[] = matched.sellers.map((s: any) => ({
-                  id: s.seller_id || s.id,
-                  name: s.seller_name || s.name,
-                  price_idr: Number(s.price_g2g_idr || s.price_idr) || 100000,
-                  rating_pct: Number(s.rating_pct) || 99.0,
-                  reviews: Number(s.reviews_count || s.reviews) || 1000,
-                  delivery: s.delivery_speed || 'Instant Delivery',
-                  is_selected: (s.seller_id || s.id) === matched.selected_seller_id,
-                  tier: s.tier,
-                  tier_label: s.tier_label,
-                  tier_desc: s.tier_desc
-                }));
-                setSellers(mapped);
-                const sel = mapped.find(s => s.is_selected) || mapped[0];
-                setCogsG2gIdr(sel.price_idr);
-              } else {
-                setSellers([]);
-                setCogsG2gIdr(Math.round(matched.selling_price_shopee_idr * 0.7));
-              }
+            if (Array.isArray(matched.sellers) && matched.sellers.length > 0) {
+              const mapped: SellerOption[] = matched.sellers.map((s: any) => ({
+                id: s.seller_id || s.id,
+                name: s.seller_name || s.name,
+                price_idr: Number(s.price_g2g_idr || s.price_idr) || 100000,
+                rating_pct: Number(s.rating_pct) || 99.0,
+                reviews: Number(s.reviews_count || s.reviews) || 1000,
+                delivery: s.delivery_speed || 'Instant Delivery',
+                is_selected: (s.seller_id || s.id) === matched.selected_seller_id,
+                tier: s.tier,
+                tier_label: s.tier_label,
+                tier_desc: s.tier_desc
+              }));
+              setSellers(mapped);
+              const sel = mapped.find(s => s.is_selected) || mapped[0];
+              setCogsG2gIdr(sel.price_idr);
+            } else {
+              setSellers([]);
+              setCogsG2gIdr(Math.round(matched.selling_price_shopee_idr * 0.7));
             }
-          } else {
-            // Clean empty state when catalog is empty
-            setCurrentGameId('');
-            setActivePreset('');
-            setGameTitle('Game Baru (Simulasi)');
-            setPlatform('Steam');
-            setCategory('Digital Key / Account');
-            setSellingPrice(150000);
-            setTargetMarginPct(25);
-            setSellers([]);
-            setCogsG2gIdr(100000);
           }
         }
         return mergedData;
       }
     } catch (err) {
-      console.error('Failed to load initial catalog:', err);
+      console.error('Failed to fetch catalog in Quant:', err);
     }
     return [];
-  }, [currentGameId]);
+  }, [gameQueryParam, currentGameId]);
 
   useEffect(() => {
     fetchCatalogData(true);
-  }, []);
+  }, [fetchCatalogData]);
 
   // Autonomous G2G Research Handler
   const handleAutoResearchQuant = async () => {
@@ -293,14 +294,6 @@ export default function QuantPage() {
     }
   };
 
-  const selectedSeller = sellers.find(s => s.is_selected) || sellers[0];
-
-  useEffect(() => {
-    if (selectedSeller) {
-      setCogsG2gIdr(selectedSeller.price_idr);
-    }
-  }, [selectedSeller?.id, selectedSeller?.price_idr]);
-
   // Calculations
   const qrisFeeIdr = Math.round(cogsG2gIdr * (qrisFeePct / 100));
   const modalBersih = cogsG2gIdr + qrisFeeIdr;
@@ -329,12 +322,6 @@ export default function QuantPage() {
   const targetBulanan = 10000000;
   const neededTx = profitBersih > 0 ? Math.ceil(targetBulanan / profitBersih) : 0;
   const neededPerDay = neededTx > 0 ? Math.ceil(neededTx / 30) : 0;
-
-  useEffect(() => {
-    setPulse(true);
-    const timer = setTimeout(() => setPulse(false), 300);
-    return () => clearTimeout(timer);
-  }, [effectiveSellingPrice, cogsG2gIdr, qrisFeePct, shopeeAdminPct, packaging, calcMode]);
 
   const formatRp = (num: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num || 0);
@@ -421,7 +408,7 @@ export default function QuantPage() {
         setLastSavedTime(new Date().toLocaleTimeString('id-ID'));
         setSaveMessage(`✅ Seller "${newS.name}" berhasil ditambahkan & tersimpan permanen!`);
         setTimeout(() => setSaveMessage(''), 4000);
-        fetchCatalogData();
+        fetchCatalogData(false);
       } else {
         setAutoSaveStatus('idle');
       }
@@ -437,7 +424,7 @@ export default function QuantPage() {
   const presets = useMemo(() => {
     if (catalogGames && catalogGames.length > 0) {
       return catalogGames.map((g) => {
-        const selectedSeller =
+        const sel =
           g.sellers?.find((s: any) => (s.seller_id || s.id) === g.selected_seller_id) ||
           g.sellers?.[0] || {
             seller_id: 'default',
@@ -458,9 +445,9 @@ export default function QuantPage() {
           platform: g.platform,
           category: g.category || 'Digital Key / Account',
           price: Number(g.selling_price_shopee_idr) || 100000,
-          g2gIdr: Number(selectedSeller.price_g2g_idr || selectedSeller.price_idr) || 100000,
+          g2gIdr: Number(sel.price_g2g_idr || sel.price_idr) || 100000,
           margin: Number(g.target_margin_pct) || 20,
-          seller: selectedSeller.seller_name || selectedSeller.name || 'G2G Seller',
+          seller: sel.seller_name || sel.name || 'G2G Seller',
           sellers: (g.sellers || []).map((s: any, idx: number) => ({
             id: s.seller_id || s.id || `g2g-s-${idx}`,
             name: s.seller_name || s.name || 'G2G Seller',
@@ -550,11 +537,6 @@ export default function QuantPage() {
     }
   };
 
-  const handleSelectTierStrategy = (tier: 'ultra_safe' | 'lowest_price' | 'mid_level') => {
-    const match = sellers.find(s => s.tier === tier);
-    if (match) handleSelectSeller(match.id);
-  };
-
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -598,64 +580,58 @@ export default function QuantPage() {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [effectiveSellingPrice, targetMarginPct, currentGameId, selectedSeller?.id]);
+  }, [effectiveSellingPrice, netMargin, selectedSeller?.id]);
 
   const handleSaveToCatalog = async () => {
     setSaveStatus('saving');
     try {
-      const payload = {
-        action: 'add',
-        id: currentGameId,
-        title: gameTitle,
-        platform: platform,
-        category: category,
-        selling_price_shopee_idr: effectiveSellingPrice,
-        target_margin_pct: Math.round(netMargin * 10) / 10,
-        selected_seller_id: selectedSeller?.id || sellers[0]?.id || 'g2g-s1',
-        sellers: sellers.map((s, idx) => ({
-          seller_id: s.id || `g2g-s-${idx}`,
-          seller_name: s.name,
-          rating_pct: s.rating_pct,
-          reviews_count: s.reviews,
-          price_g2g_idr: s.price_idr,
-          delivery_speed: s.delivery,
-          tier: s.tier || 'mid_level',
-          tier_label: s.tier_label || '⚖️ Mid-Level',
-          tier_desc: s.tier_desc || '',
-          stock: 25,
-          risk_score: 0,
-          is_recommended: s.is_selected,
-          profile_url: getG2GSellerUrl(s.name, gameTitle)
-        }))
-      };
-
       const res = await fetch('/api/catalog', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          action: 'add',
+          title: gameTitle,
+          platform,
+          category,
+          selling_price_shopee_idr: effectiveSellingPrice,
+          target_margin_pct: Math.round(netMargin * 10) / 10,
+          selected_seller_id: selectedSeller?.id || 'default',
+          sellers: sellers.map(s => ({
+            seller_id: s.id,
+            seller_name: s.name,
+            rating_pct: s.rating_pct,
+            reviews_count: s.reviews,
+            price_g2g_idr: s.price_idr,
+            delivery_speed: s.delivery,
+            stock: 25,
+            risk_score: 0,
+            is_recommended: s.is_selected,
+            profile_url: getG2GSellerUrl(s.name, gameTitle),
+            tier: s.tier,
+            tier_label: s.tier_label,
+            tier_desc: s.tier_desc
+          }))
+        })
       });
 
       if (res.ok) {
         setSaveStatus('saved');
-        setAutoSaveStatus('saved');
-        setLastSavedTime(new Date().toLocaleTimeString('id-ID'));
-        setSaveMessage(`Berhasil menyimpan "${gameTitle}" ke Radar Portofolio!`);
+        setSaveMessage(`✅ "${gameTitle}" berhasil disimpan ke Portofolio Katalog!`);
         setTimeout(() => setSaveStatus('idle'), 4000);
-        fetchCatalogData();
+        fetchCatalogData(false);
       } else {
         setSaveStatus('error');
-        setSaveMessage('Gagal menyimpan ke database catalog.');
-        setTimeout(() => setSaveStatus('idle'), 4000);
+        setSaveMessage('Gagal menyimpan ke katalog.');
       }
-    } catch (e: any) {
+    } catch (e) {
       setSaveStatus('error');
-      setSaveMessage(e.message || 'Terjadi kesalahan jaringan.');
-      setTimeout(() => setSaveStatus('idle'), 4000);
+      setSaveMessage('Kesalahan jaringan.');
     }
   };
 
+  // Sensitivity scenarios
   const sensitivityScenarios = useMemo(() => {
-    const deltas = [-20000, -10000, 0, 10000, 20000];
+    const deltas = [-30000, -20000, -10000, 0, 10000, 20000, 30000];
     return deltas.map(delta => {
       const price = effectiveSellingPrice + delta;
       if (price <= 0) return null;
@@ -668,792 +644,824 @@ export default function QuantPage() {
   }, [effectiveSellingPrice, modalBersih, shopeeAdminPct, shopeeFixedFee, packaging]);
 
   return (
-    <div className="px-5 sm:px-8 py-8 max-w-[960px] mx-auto space-y-7">
-      
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Link href="/dashboard" className="flex items-center gap-1.5 text-[11px] text-slate-600 hover:text-slate-400 font-mono transition-colors">
-              <ArrowLeft className="w-3 h-3" /> Command Deck
-            </Link>
-            <span className="text-slate-700">/</span>
-            <span className="text-[11px] font-mono text-slate-400">The Quant</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              <DollarSign className="w-5 h-5 text-emerald-400" />
-            </div>
-            The Quant — Profit Calculator
-          </h1>
-          <p className="text-[13px] text-slate-500 mt-2 max-w-2xl leading-relaxed">
-            Simulasi profitabilitas real-time untuk <span className="text-slate-300 font-medium">game apapun</span>. 
-            Mendukung dual mode, penambahan seller G2G instan, auto-save sinkronisasi ke disk, dan integrasi ke Radar Portofolio.
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         
-        <div className="flex flex-col items-end gap-3">
-          <div className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-full bg-zinc-950 border border-white/[0.06]">
-            {autoSaveStatus === 'saving' ? (
-              <>
-                <RefreshCw className="w-3 h-3 text-amber-400 animate-spin" />
-                <span className="text-amber-400">Menyimpan...</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                <span className="text-slate-400">
-                  Auto-Save {lastSavedTime ? `(${lastSavedTime})` : ''}
-                </span>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/dashboard/description?game=${encodeURIComponent(gameTitle)}`}
-              className="px-3 py-2 rounded-xl text-xs font-mono font-medium bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30 transition-all flex items-center gap-1.5"
-              title="Buat Deskripsi Shopee untuk game ini"
-            >
-              <FileText className="w-3.5 h-3.5 text-fuchsia-400" />
-              <span className="hidden sm:inline">Deskripsi Shopee</span>
+        {/* Toast / Banner */}
+        {saveStatus === 'saved' && (
+          <div className="fixed bottom-5 right-5 z-50 p-4 rounded-xl bg-white border border-slate-200 text-slate-900 font-sans flex items-center gap-3 shadow-xl max-w-md animate-in fade-in slide-in-from-bottom-2">
+            <div className="p-1 rounded-full bg-emerald-100 text-emerald-600">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-medium flex-1">{saveMessage}</span>
+            <Link href="/dashboard/catalog" className="text-xs font-semibold text-emerald-700 underline">
+              Lihat Radar
             </Link>
-            <button
-              onClick={handleSaveToCatalog}
-              disabled={saveStatus === 'saving'}
-              className="v0-btn-primary bg-emerald-500 hover:bg-emerald-400 text-black px-4 py-2 rounded-xl font-semibold text-xs transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50"
-            >
-              {saveStatus === 'saving' ? (
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Link href="/dashboard" className="text-xs text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1">
+                <ArrowLeft className="w-3.5 h-3.5" /> Command Deck
+              </Link>
+              <span className="text-slate-300">/</span>
+              <span className="text-xs font-semibold text-slate-700">The Quant</span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+              <DollarSign className="w-6 h-6 text-emerald-600" />
+              The Quant — Profit Calculator
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+              Simulasi profitabilitas real-time untuk game apapun. Dual mode kalkulasi, integrasi multi-seller G2G/Eneba, dan auto-save sinkronisasi ke katalog portofolio.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600">
+              {autoSaveStatus === 'saving' ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin inline mr-2" /> Menyimpan...
-                </>
-              ) : saveStatus === 'saved' ? (
-                <>
-                  <Check className="w-4 h-4 inline mr-2" /> Tersimpan!
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                  <span className="text-amber-700 font-semibold">Menyimpan...</span>
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4 inline mr-2" /> Simpan ke Portofolio
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Auto-Save {lastSavedTime ? `(${lastSavedTime})` : ''}</span>
+                </>
+              )}
+            </div>
+
+            <Link
+              href={`/dashboard/description?game=${encodeURIComponent(gameTitle)}`}
+              className="px-3.5 py-2 rounded-xl text-xs font-medium bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-colors flex items-center gap-1.5"
+              title="Buat Deskripsi Shopee untuk game ini"
+            >
+              <FileText className="w-3.5 h-3.5 text-purple-600" />
+              <span>Deskripsi Shopee</span>
+            </Link>
+
+            <button
+              onClick={handleSaveToCatalog}
+              disabled={saveStatus === 'saving'}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            >
+              {saveStatus === 'saving' ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Simpan ke Portofolio</span>
                 </>
               )}
             </button>
           </div>
         </div>
-      </div>
 
-      {saveStatus === 'saved' && (
-        <div className="fixed bottom-5 left-5 right-5 sm:left-auto sm:right-5 sm:max-w-md z-50 p-4 rounded-xl bg-emerald-950/90 border border-emerald-500/30 text-sm text-emerald-300 font-mono flex items-center gap-3 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{saveMessage}</span>
-          <Link href="/dashboard/catalog" className="underline hover:text-white ml-2">Lihat Radar &rarr;</Link>
-        </div>
-      )}
-
-      {/* Game Preset Tabs */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-4 mb-2">
-          <h2 className="text-sm font-semibold text-white tracking-tight whitespace-nowrap flex items-center gap-2">
-            <Zap className="w-4 h-4 text-emerald-400" /> Presets
-          </h2>
-          <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.08] to-transparent" />
-        </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {presets.length === 0 ? (
-            <div className="p-4 rounded-xl border border-white/[0.06] bg-zinc-950/40 text-xs text-slate-400 flex items-center justify-between w-full">
-              <span>Portofolio masih kosong. Tambahkan game baru di <Link href="/dashboard/catalog" className="text-emerald-400 underline font-medium">Katalog Radar</Link> atau ketik langsung di bawah.</span>
-              <Link href="/dashboard/catalog" className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono hover:bg-emerald-500/20 whitespace-nowrap ml-4">
-                + Tambah Game
-              </Link>
-            </div>
-          ) : (
-            presets.map((p) => {
-              const live = catalogGames.find(g => g.id === p.catalogId || g.title.toLowerCase().includes(p.id));
-              const displayPrice = live ? live.selling_price_shopee_idr : p.price;
-              const displayMargin = live ? live.target_margin_pct : p.margin;
-
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => handlePreset(p)}
-                  className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-xs transition-all border ${
-                    activePreset === p.id 
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                      : 'bg-zinc-950/60 border-white/[0.06] text-slate-400 hover:text-slate-200 hover:border-white/[0.1]'
-                  }`}
-                >
-                  <div className="font-semibold text-left">{p.title.split(':')[0]}</div>
-                  <div className="flex items-center gap-3 mt-1 font-mono text-[10px]">
-                    <span className={activePreset === p.id ? 'text-emerald-300' : 'text-slate-500'}>{formatRp(displayPrice)}</span>
-                    <span className={activePreset === p.id ? 'text-emerald-400 font-bold' : 'text-emerald-500/70'}>{displayMargin}%</span>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Mode Selector */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-950/60 border border-white/[0.06] w-full sm:w-max">
-        <button
-          onClick={() => setCalcMode('fixed_price')}
-          className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-xs font-mono font-semibold transition-all ${
-            calcMode === 'fixed_price'
-              ? 'bg-white/10 text-white border border-white/[0.1]' 
-              : 'text-slate-500 hover:text-slate-300'
-          }`}
-        >
-          Mode A: Harga Jual &rarr; Margin
-        </button>
-        <button
-          onClick={() => setCalcMode('target_margin')}
-          className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-xs font-mono font-semibold transition-all ${
-            calcMode === 'target_margin'
-              ? 'bg-white/10 text-white border border-white/[0.1]' 
-              : 'text-slate-500 hover:text-slate-300'
-          }`}
-        >
-          Mode B: Target Margin &rarr; Harga
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
-        
-        {/* Left Column */}
-        <div className="lg:col-span-8 space-y-7">
-          
-          <div className="v0-card rounded-2xl p-5 sm:p-6 space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Tag className="w-4 h-4 text-emerald-400" /> Identitas Game & Lisensi
-              </h2>
-              <div className="flex items-center gap-2">
-                {catalogGames.length > 0 && (
-                  <select
-                    value={currentGameId}
-                    onChange={(e) => {
-                      const selected = catalogGames.find(g => g.id === e.target.value);
-                      if (selected) {
-                        const p = presets.find(pr => pr.catalogId === selected.id) || {
-                          id: selected.id,
-                          catalogId: selected.id,
-                          title: selected.title,
-                          platform: selected.platform,
-                          category: selected.category,
-                          price: selected.selling_price_shopee_idr,
-                          margin: selected.target_margin_pct,
-                          sellers: selected.sellers
-                        };
-                        handlePreset(p);
-                      }
-                    }}
-                    className="text-[11px] font-mono bg-zinc-900 border border-white/[0.1] text-emerald-400 px-2 py-1 rounded-lg focus:outline-none"
-                  >
-                    <option value="" disabled>-- Pilih Portofolio ({catalogGames.length} Game) --</option>
-                    {catalogGames.map(g => (
-                      <option key={g.id} value={g.id} className="bg-zinc-950 text-white">
-                        {g.title} ({formatRp(g.selling_price_shopee_idr)})
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <span className="text-[10px] font-mono text-slate-500 bg-black/40 px-2 py-1 rounded-md border border-white/[0.06]">ID: {currentGameId || 'NEW'}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-5">
-              <div className="sm:col-span-6 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs text-slate-400 font-medium">Nama Produk</label>
-                  {researchMsg && <span className="text-[10px] text-emerald-400 font-mono">{researchMsg}</span>}
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={gameTitle}
-                    onChange={(e) => {
-                      setGameTitle(e.target.value);
-                      setActivePreset('custom');
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAutoResearchQuant();
-                      }
-                    }}
-                    placeholder="Contoh: Monster Hunter Wilds"
-                    className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-2 text-sm font-mono text-zinc-100 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700/50 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAutoResearchQuant}
-                    disabled={isResearching || !gameTitle.trim()}
-                    className="v0-btn-secondary px-3 rounded-xl flex items-center justify-center disabled:opacity-50"
-                  >
-                    {isResearching ? <RotateCcw className="w-4 h-4 animate-spin text-slate-400" /> : <Sparkles className="w-4 h-4 text-emerald-400" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="sm:col-span-3 space-y-2">
-                <label className="text-xs text-slate-400 font-medium">Platform</label>
-                <select
-                  value={platform}
-                  onChange={(e) => setPlatform(e.target.value)}
-                  className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-600 transition-all appearance-none cursor-pointer"
-                >
-                  <option value="Steam">Steam</option>
-                  <option value="PC / Microsoft">PC / Microsoft</option>
-                  <option value="Rockstar / Steam">Rockstar Games</option>
-                  <option value="EA App / PC">EA App / Origin</option>
-                  <option value="PlayStation 5">PlayStation 5</option>
-                  <option value="Xbox Series X/S">Xbox Series</option>
-                  <option value="Steam Trade">Steam Trade (Keys)</option>
-                  <option value="Epic Games">Epic Games</option>
-                  <option value="Nintendo Switch">Nintendo Switch</option>
-                </select>
-              </div>
-
-              <div className="sm:col-span-3 space-y-2">
-                <label className="text-xs text-slate-400 font-medium">Format Lisensi</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-600 transition-all appearance-none cursor-pointer"
-                >
-                  <option value="Account (Full Access)">Full Access Account</option>
-                  <option value="Digital Key / CDKey">Digital CDKey (Global)</option>
-                  <option value="Steam Gift">Steam Gift</option>
-                  <option value="In-Game Asset / Key">Item In-Game / Keys</option>
-                </select>
-              </div>
-            </div>
+        {/* Horizontal Game Presets Bar */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-emerald-600" /> Presets Game Portofolio:
+            </span>
+            <Link href="/dashboard/catalog" className="text-xs font-semibold text-emerald-700 hover:text-emerald-800">
+              + Tambah di Katalog &rarr;
+            </Link>
           </div>
 
-          <div className="v0-card rounded-2xl p-5 sm:p-6 space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-emerald-400" /> Parameter Penjualan
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsCompetitorModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-semibold bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 transition-all shadow-sm"
-                title="Cek Radar Kompetitor Shopee & AI Pricing Advisor"
-              >
-                <ShoppingBag className="w-3.5 h-3.5 text-orange-400" />
-                <span>Radar Kompetitor Shopee</span>
-              </button>
-            </div>
-
-            {calcMode === 'fixed_price' ? (
-              <div className="space-y-4 p-4 rounded-xl bg-black/40 border border-white/[0.04]">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-slate-300">
-                    Harga Jual di Shopee (IDR)
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 font-mono">Rp</span>
-                    <input
-                      type="number"
-                      step="1000"
-                      value={sellingPrice}
-                      onChange={(e) => setSellingPrice(Math.max(10000, Number(e.target.value)))}
-                      className="w-32 bg-zinc-950/80 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm font-mono text-emerald-400 text-right focus:outline-none focus:border-emerald-500/50 transition-all"
-                    />
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min="20000"
-                  max="1000000"
-                  step="1000"
-                  value={sellingPrice}
-                  onChange={(e) => setSellingPrice(Number(e.target.value))}
-                  className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg appearance-none"
-                />
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {presets.length === 0 ? (
+              <div className="app-card p-3 bg-white text-xs text-slate-500 w-full flex items-center justify-between">
+                <span>Portofolio katalog masih kosong.</span>
+                <Link href="/dashboard/catalog" className="text-xs font-semibold text-emerald-700 underline">
+                  Buka Radar Katalog
+                </Link>
               </div>
             ) : (
-              <div className="space-y-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-emerald-400">
-                    Target Margin Bersih (%)
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="5"
-                      max="60"
-                      value={targetMarginPct}
-                      onChange={(e) => setTargetMarginPct(Number(e.target.value))}
-                      className="w-24 bg-zinc-950/80 border border-emerald-900 rounded-lg px-3 py-1.5 text-sm font-mono text-emerald-400 text-right focus:outline-none focus:border-emerald-500/50 transition-all"
-                    />
-                    <span className="text-xs text-slate-500 font-mono">%</span>
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min="5"
-                  max="60"
-                  step="0.5"
-                  value={targetMarginPct}
-                  onChange={(e) => setTargetMarginPct(Number(e.target.value))}
-                  className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg appearance-none"
-                />
-                <div className="flex items-center justify-between text-xs font-mono pt-2 border-t border-emerald-900/50">
-                  <span className="text-slate-400">Rekomendasi Harga Jual:</span>
-                  <span className="text-base font-bold text-emerald-400">{formatRp(calculatedRecommendedPrice)}</span>
+              presets.map((p) => {
+                const live = catalogGames.find(g => g.id === p.catalogId || g.title.toLowerCase().includes(p.id));
+                const displayPrice = live ? live.selling_price_shopee_idr : p.price;
+                const displayMargin = live ? live.target_margin_pct : p.margin;
+                const isSelected = activePreset === p.id || currentGameId === p.catalogId;
+
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => handlePreset(p)}
+                    className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-xs transition-all border text-left cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="truncate max-w-[160px] font-semibold">{p.title.split(':')[0]}</div>
+                    <div className="flex items-center gap-2 mt-0.5 font-mono text-[11px] tabular-nums">
+                      <span className={isSelected ? 'text-emerald-700' : 'text-slate-500'}>{formatRp(displayPrice)}</span>
+                      <span className={isSelected ? 'text-emerald-800 font-bold' : 'text-slate-400'}>{displayMargin}%</span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Mode Switcher */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200/60 w-full sm:w-max">
+          <button
+            onClick={() => setCalcMode('fixed_price')}
+            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              calcMode === 'fixed_price'
+                ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Mode A: Harga Jual &rarr; Margin
+          </button>
+          <button
+            onClick={() => setCalcMode('target_margin')}
+            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              calcMode === 'target_margin'
+                ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Mode B: Target Margin &rarr; Harga
+          </button>
+        </div>
+
+        {/* 2-Column Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* Left Column (8 cols) */}
+          <div className="lg:col-span-8 space-y-6">
+            
+            {/* Card 1: Identitas Game & Lisensi */}
+            <div className="app-card p-5 space-y-4 bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-emerald-600" /> Identitas Game & Lisensi
+                </h2>
+                <div className="flex items-center gap-2">
+                  {catalogGames.length > 0 && (
+                    <select
+                      value={currentGameId}
+                      onChange={(e) => {
+                        const selected = catalogGames.find(g => g.id === e.target.value);
+                        if (selected) {
+                          const p = presets.find(pr => pr.catalogId === selected.id) || {
+                            id: selected.id,
+                            catalogId: selected.id,
+                            title: selected.title,
+                            platform: selected.platform,
+                            category: selected.category,
+                            price: selected.selling_price_shopee_idr,
+                            margin: selected.target_margin_pct,
+                            sellers: selected.sellers
+                          };
+                          handlePreset(p);
+                        }
+                      }}
+                      className="text-xs font-medium bg-slate-50 border border-slate-200 text-slate-800 px-2.5 py-1 rounded-lg focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="" disabled>-- Pilih Game dari Portofolio --</option>
+                      {catalogGames.map(g => (
+                        <option key={g.id} value={g.id}>
+                          {g.title} ({formatRp(g.selling_price_shopee_idr)})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                    ID: {currentGameId || 'NEW'}
+                  </span>
                 </div>
               </div>
-            )}
 
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
-                  <Store className="w-4 h-4 text-emerald-400" /> Supplier G2G
-                </label>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                <div className="sm:col-span-6 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-700">Nama Produk</label>
+                    {researchMsg && <span className="text-[10px] text-emerald-700 font-semibold">{researchMsg}</span>}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={gameTitle}
+                      onChange={(e) => {
+                        setGameTitle(e.target.value);
+                        setActivePreset('custom');
+                      }}
+                      placeholder="Contoh: Monster Hunter Wilds"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAutoResearchQuant}
+                      disabled={isResearching || !gameTitle.trim()}
+                      className="px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center disabled:opacity-50 transition-colors cursor-pointer"
+                      title="Riset AI untuk Seller G2G"
+                    >
+                      {isResearching ? <RotateCcw className="w-4 h-4 animate-spin text-slate-400" /> : <Sparkles className="w-4 h-4 text-purple-600" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="sm:col-span-3 space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Platform</label>
+                  <select
+                    value={platform}
+                    onChange={(e) => setPlatform(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white cursor-pointer"
+                  >
+                    <option value="Steam">Steam</option>
+                    <option value="PC / Microsoft">PC / Microsoft</option>
+                    <option value="Rockstar / Steam">Rockstar Games</option>
+                    <option value="EA App / PC">EA App / Origin</option>
+                    <option value="PlayStation 5">PlayStation 5</option>
+                    <option value="Xbox Series X/S">Xbox Series</option>
+                    <option value="Steam Trade">Steam Trade (Keys)</option>
+                    <option value="Epic Games">Epic Games</option>
+                    <option value="Nintendo Switch">Nintendo Switch</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-3 space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Format Lisensi</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white cursor-pointer"
+                  >
+                    <option value="Account (Full Access)">Full Access Account</option>
+                    <option value="Digital Key / CDKey">Digital CDKey (Global)</option>
+                    <option value="Steam Gift">Steam Gift</option>
+                    <option value="In-Game Asset / Key">Item In-Game / Keys</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Parameter Penjualan & Biaya */}
+            <div className="app-card p-5 space-y-5 bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-emerald-600" /> Parameter Penjualan & Biaya Platform
+                </h2>
                 <button
-                  onClick={() => setShowAddSeller(!showAddSeller)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs font-mono text-slate-300 transition-colors"
+                  type="button"
+                  onClick={() => setIsCompetitorModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Tambah Seller
+                  <ShoppingBag className="w-3.5 h-3.5 text-orange-600" />
+                  <span>Radar Kompetitor Shopee</span>
                 </button>
               </div>
 
-              {showAddSeller && (
-                <div className="p-4 rounded-xl bg-zinc-950 border border-white/[0.06] space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1.5 font-semibold uppercase tracking-wider">Nama Toko</label>
-                      <input
-                        type="text"
-                        value={newSellerName}
-                        onChange={(e) => setNewSellerName(e.target.value)}
-                        className="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono text-zinc-100 focus:outline-none focus:border-zinc-600 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1.5 font-semibold uppercase tracking-wider">Harga (IDR)</label>
+              {calcMode === 'fixed_price' ? (
+                <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800">
+                      Harga Jual Shopee (IDR)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-mono">Rp</span>
                       <input
                         type="number"
-                        value={newSellerPrice}
-                        onChange={(e) => setNewSellerPrice(Number(e.target.value))}
-                        className="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono text-emerald-400 focus:outline-none focus:border-zinc-600 transition-all"
+                        step="1000"
+                        min="10000"
+                        max="2000000"
+                        value={sellingPrice}
+                        onChange={(e) => setSellingPrice(Number(e.target.value))}
+                        className="w-32 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono font-bold text-slate-900 text-right focus:outline-none focus:border-emerald-500 tabular-nums"
                       />
                     </div>
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1.5 font-semibold uppercase tracking-wider">Tier</label>
-                      <select
-                        value={newSellerTier}
-                        onChange={(e: any) => setNewSellerTier(e.target.value)}
-                        className="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-zinc-600 transition-all appearance-none cursor-pointer"
-                      >
-                        <option value="ultra_safe">🛡️ Top Verified</option>
-                        <option value="lowest_price">⚡ Lowest Price</option>
-                        <option value="mid_level">⚖️ Mid-Level</option>
-                      </select>
+                  </div>
+                  <input
+                    type="range"
+                    min="20000"
+                    max="1000000"
+                    step="1000"
+                    value={sellingPrice}
+                    onChange={(e) => setSellingPrice(Number(e.target.value))}
+                    className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3 p-4 rounded-xl bg-emerald-50/50 border border-emerald-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-emerald-900">
+                      Target Margin Bersih (%)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="5"
+                        max="60"
+                        value={targetMarginPct}
+                        onChange={(e) => setTargetMarginPct(Number(e.target.value))}
+                        className="w-24 bg-white border border-emerald-300 rounded-lg px-3 py-1.5 text-sm font-mono font-bold text-emerald-800 text-right focus:outline-none focus:border-emerald-500 tabular-nums"
+                      />
+                      <span className="text-xs text-slate-500 font-mono">%</span>
                     </div>
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1.5 font-semibold uppercase tracking-wider">Rating & Revs</label>
-                      <div className="flex gap-2">
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="60"
+                    step="0.5"
+                    value={targetMarginPct}
+                    onChange={(e) => setTargetMarginPct(Number(e.target.value))}
+                    className="w-full accent-emerald-600 cursor-pointer h-2 bg-emerald-200 rounded-lg appearance-none"
+                  />
+                  <div className="flex items-center justify-between text-xs font-mono pt-2 border-t border-emerald-200">
+                    <span className="text-slate-600 font-sans">Rekomendasi Harga Jual:</span>
+                    <span className="text-base font-bold text-emerald-800 tabular-nums">{formatRp(calculatedRecommendedPrice)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Packaging Input (Fix: Digital default 0, user configurable) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-700">Biaya Packaging / Kartu Fisik (IDR)</label>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {packaging === 0 ? "Full Digital (Rp 0)" : formatRp(packaging)}
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={packaging}
+                    onChange={(e) => setPackaging(Math.max(0, Number(e.target.value)))}
+                    placeholder="0"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white tabular-nums"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Default Rp 0 untuk game digital/akun. Isi Rp 2.000 jika menggunakan amplop kartu fisik untuk resi.
+                  </p>
+                </div>
+
+                <div className="space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div className="font-semibold text-slate-700">Ketentuan Biaya Platform Otomatis:</div>
+                  <div className="flex justify-between text-slate-500 font-mono">
+                    <span>Fee Shopee:</span>
+                    <span className="font-semibold text-slate-700">8.0% + Rp 1.000</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500 font-mono">
+                    <span>Biaya QRIS / Beli:</span>
+                    <span className="font-semibold text-slate-700">0.7% (Instan)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Multi-Seller G2G Options */}
+              <div className="space-y-3 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <Store className="w-4 h-4 text-emerald-600" /> Supplier G2G ({sellers.length})
+                  </label>
+                  <button
+                    onClick={() => setShowAddSeller(!showAddSeller)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Tambah Seller
+                  </button>
+                </div>
+
+                {showAddSeller && (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div className="text-xs font-bold text-slate-900">Tambah Seller Baru</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <label className="text-[10px] text-slate-500 block mb-1">Nama Toko</label>
+                        <input
+                          type="text"
+                          value={newSellerName}
+                          onChange={(e) => setNewSellerName(e.target.value)}
+                          placeholder="Nama Seller"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 block mb-1">Harga Modal G2G (Rp)</label>
+                        <input
+                          type="number"
+                          value={newSellerPrice}
+                          onChange={(e) => setNewSellerPrice(Number(e.target.value))}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 block mb-1">Tier</label>
+                        <select
+                          value={newSellerTier}
+                          onChange={(e: any) => setNewSellerTier(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
+                        >
+                          <option value="ultra_safe">Tier 1: 🛡️ Top Verified</option>
+                          <option value="lowest_price">Tier 2: ⚡ Lowest Price</option>
+                          <option value="mid_level">Tier 3: ⚖️ Mid-Level</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 block mb-1">Rating (%)</label>
                         <input
                           type="number"
                           step="0.1"
                           value={newSellerRating}
                           onChange={(e) => setNewSellerRating(Number(e.target.value))}
-                          className="w-16 bg-black/40 border border-zinc-800 rounded-lg px-2 py-2 text-xs font-mono text-zinc-100 text-center focus:outline-none focus:border-zinc-600 transition-all"
-                        />
-                        <input
-                          type="number"
-                          value={newSellerReviews}
-                          onChange={(e) => setNewSellerReviews(Number(e.target.value))}
-                          className="flex-1 bg-black/40 border border-zinc-800 rounded-lg px-2 py-2 text-xs font-mono text-zinc-100 text-right focus:outline-none focus:border-zinc-600 transition-all"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
                         />
                       </div>
                     </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddSeller(false)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-xs font-medium"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddSeller}
+                        disabled={isAddingSeller || !newSellerName.trim()}
+                        className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {isAddingSeller ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        <span>Simpan Seller</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex justify-end gap-2 pt-2 border-t border-white/[0.04]">
-                    <button
-                      onClick={() => setShowAddSeller(false)}
-                      className="px-4 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white transition-colors"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      onClick={handleAddSeller}
-                      disabled={isAddingSeller || !newSellerName.trim()}
-                      className="px-4 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      {isAddingSeller ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                      Simpan
-                    </button>
-                  </div>
-                </div>
-              )}
+                )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleSelectTierStrategy('ultra_safe')}
-                  className={`px-3 py-2.5 rounded-xl text-xs font-mono text-left transition-all border ${
-                    selectedSeller?.tier === 'ultra_safe'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                      : 'bg-black/20 hover:bg-white/[0.02] text-slate-400 hover:text-emerald-400 border-white/[0.06]'
-                  }`}
-                >
-                  <div className="font-semibold">🛡️ Top Verified</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectTierStrategy('lowest_price')}
-                  className={`px-3 py-2.5 rounded-xl text-xs font-mono text-left transition-all border ${
-                    selectedSeller?.tier === 'lowest_price'
-                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                      : 'bg-black/20 hover:bg-white/[0.02] text-slate-400 hover:text-amber-400 border-white/[0.06]'
-                  }`}
-                >
-                  <div className="font-semibold">⚡ Lowest Price</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectTierStrategy('mid_level')}
-                  className={`px-3 py-2.5 rounded-xl text-xs font-mono text-left transition-all border ${
-                    selectedSeller?.tier === 'mid_level'
-                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
-                      : 'bg-black/20 hover:bg-white/[0.02] text-slate-400 hover:text-purple-400 border-white/[0.06]'
-                  }`}
-                >
-                  <div className="font-semibold">⚖️ Mid-Level</div>
-                </button>
-              </div>
+                {/* Seller Options List */}
+                <div className="space-y-2">
+                  {sellers.map((s) => {
+                    const isSelected = s.is_selected;
+                    const sQris = Math.round(s.price_idr * 0.007);
+                    const sNetCost = s.price_idr + sQris + potonganShopee + packaging;
+                    const sProfit = effectiveSellingPrice - sNetCost;
+                    const sMargin = effectiveSellingPrice > 0 ? (sProfit / effectiveSellingPrice) * 100 : 0;
+                    const isLoss = sMargin < 0;
 
-              <div className="space-y-3">
-                {sellers.map((s) => {
-                  const sQris = Math.round(s.price_idr * (qrisFeePct / 100));
-                  const sNetCost = s.price_idr + sQris + potonganShopee + packaging;
-                  const sProfit = effectiveSellingPrice - sNetCost;
-                  const sMargin = effectiveSellingPrice > 0 ? (sProfit / effectiveSellingPrice) * 100 : 0;
-
-                  return (
-                    <div
-                      key={s.id}
-                      onClick={() => handleSelectSeller(s.id)}
-                      className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-                        s.is_selected
-                          ? 'bg-emerald-500/5 border-emerald-500/30'
-                          : 'bg-black/20 border-white/[0.04] hover:bg-white/[0.02] hover:border-white/[0.1]'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
-                          s.is_selected ? 'border-emerald-400 bg-emerald-500 text-black' : 'border-zinc-700'
-                        }`}>
-                          {s.is_selected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                        </div>
-                        <div className="space-y-1.5">
+                    return (
+                      <div
+                        key={s.id}
+                        className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-emerald-50/60 border-emerald-300 ring-1 ring-emerald-400'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-semibold text-white">{s.name}</span>
-                            {s.tier === 'ultra_safe' && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">🛡️ VERIFIED</span>}
-                            {s.tier === 'lowest_price' && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">⚡ LOW PRICE</span>}
-                            {s.tier === 'mid_level' && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">⚖️ MID</span>}
-                          </div>
-                          <div className="text-[11px] font-mono text-slate-500 flex items-center gap-2">
-                            <span>★ {s.rating_pct}%</span>
-                            <span>•</span>
-                            <span>{s.reviews.toLocaleString()} revs</span>
-                            <span>•</span>
-                            <a 
-                              href={getG2GSellerUrl(s.name, gameTitle)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-slate-400 hover:text-emerald-400 flex items-center gap-1"
-                            >
-                              G2G <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 self-end sm:self-center">
-                        <div className="text-right font-mono">
-                          <div className="text-xs text-slate-400 mb-1">
-                            Modal: <span className="text-slate-300">{formatRp(s.price_idr)}</span>
-                          </div>
-                          <div className="flex items-center sm:justify-end gap-3 text-xs">
-                            <span className={sProfit > 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400'}>{formatRp(sProfit)}</span>
-                            <span className={`px-1.5 py-0.5 rounded ${sMargin >= 20 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                              {formatNum(sMargin)}%
+                            <span className="font-bold text-xs text-slate-900">{s.name}</span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                              s.tier === 'ultra_safe'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : s.tier === 'lowest_price'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            }`}>
+                              {s.tier === 'ultra_safe' ? 'Tier 1' : s.tier === 'lowest_price' ? 'Tier 2' : 'Tier 3'}
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-mono">
+                              ⭐ {s.rating_pct}% ({s.reviews.toLocaleString()} ulasan)
                             </span>
                           </div>
+                          <div className="text-[11px] text-slate-500 font-mono flex items-center gap-3">
+                            <span>Modal: <strong className="text-slate-800">{formatRp(s.price_idr)}</strong></span>
+                            <span>•</span>
+                            <span>Laba: <strong className={isLoss ? 'text-rose-600' : 'text-emerald-700'}>{formatRp(sProfit)}</strong></span>
+                            <span>•</span>
+                            <span>Margin: <strong className={isLoss ? 'text-rose-600' : 'text-slate-800'}>{formatNum(sMargin)}%</strong></span>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingSellerQuant({
+
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => setEditingSellerQuant({
                               id: s.id,
                               name: s.name,
                               price_idr: s.price_idr,
                               rating_pct: s.rating_pct,
                               reviews: s.reviews,
-                              delivery: s.delivery || 'Instant Delivery',
+                              delivery: s.delivery,
                               tier: s.tier || 'mid_level'
-                            });
-                          }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20"
-                          title="Edit detail seller ini"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
+                            })}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                            title="Edit detail seller ini"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
+                          {isSelected ? (
+                            <span className="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
+                              Dipakai
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectSeller(s.id)}
+                              className="px-3 py-1 rounded-lg bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              Pilih
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="v0-card rounded-2xl overflow-hidden">
-            <div className="p-5 border-b border-white/[0.06] flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-white flex items-center gap-2 font-mono">
-                <Activity className="w-4 h-4 text-emerald-400" /> Sensitivitas Harga
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs font-mono text-left min-w-[320px]">
-                <thead className="bg-black/20 border-b border-white/[0.06]">
-                  <tr>
-                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest">Skenario</th>
-                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest">Harga</th>
-                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest">Profit</th>
-                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase tracking-widest text-right">Margin</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04]">
-                  {sensitivityScenarios.map((sc: any) => (
-                    <tr key={sc.delta} className={sc.isCurrent ? 'bg-emerald-500/5' : 'hover:bg-white/[0.02]'}>
-                      <td className="px-5 py-3">
-                        {sc.delta === 0 ? <span className="text-emerald-400 font-bold">CURRENT</span> : <span className="text-slate-400">{sc.delta > 0 ? '+' : ''}{formatRp(sc.delta)}</span>}
-                      </td>
-                      <td className="px-5 py-3 text-slate-200">{formatRp(sc.price)}</td>
-                      <td className={`px-5 py-3 ${sc.profit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRp(sc.profit)}</td>
-                      <td className={`px-5 py-3 text-right ${sc.margin >= 20 ? 'text-emerald-400' : sc.margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
-                        {formatNum(sc.margin)}%
-                      </td>
+            {/* Card 3: Tabel Sensitivitas Harga */}
+            <div className="app-card rounded-2xl overflow-hidden bg-white">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 font-sans">
+                  <Activity className="w-4 h-4 text-emerald-600" /> Analisis Sensitivitas Harga
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs font-mono text-left min-w-[360px]">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Skenario</th>
+                      <th className="px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Harga Jual</th>
+                      <th className="px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Laba Bersih</th>
+                      <th className="px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px] text-right">Margin</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sensitivityScenarios.map((sc: any) => (
+                      <tr key={sc.delta} className={sc.isCurrent ? 'bg-emerald-50/60 font-bold' : 'hover:bg-slate-50'}>
+                        <td className="px-4 py-2.5 whitespace-nowrap">
+                          {sc.delta === 0 ? (
+                            <span className="text-emerald-700 font-bold">AKTIF</span>
+                          ) : (
+                            <span className="text-slate-500">{sc.delta > 0 ? '+' : ''}{formatRp(sc.delta)}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-900 whitespace-nowrap tabular-nums">{formatRp(sc.price)}</td>
+                        <td className={`px-4 py-2.5 whitespace-nowrap tabular-nums ${sc.profit > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          {formatRp(sc.profit)}
+                        </td>
+                        <td className={`px-4 py-2.5 text-right whitespace-nowrap tabular-nums ${
+                          sc.margin >= 20 ? 'text-emerald-700 font-bold' : sc.margin >= 10 ? 'text-amber-700' : 'text-rose-600'
+                        }`}>
+                          {formatNum(sc.margin)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
           </div>
 
-        </div>
-
-        {/* Right Column */}
-        <div className="lg:col-span-4 space-y-7">
-          
-          <div className={`v0-card rounded-2xl p-6 space-y-6 card-division-quant transition-transform ${pulse ? 'scale-[1.02]' : ''}`}>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-semibold">Profit Laba / Unit</span>
-              <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                <Calculator className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-            </div>
-
-            <div className="space-y-3 font-mono text-[11px]">
-              <div className="flex justify-between text-slate-300">
-                <span>Harga Jual</span>
-                <span className="font-semibold">{formatRp(effectiveSellingPrice)}</span>
-              </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Modal ({selectedSeller?.name.substring(0, 10)}...)</span>
-                <span>- {formatRp(cogsG2gIdr)}</span>
-              </div>
-              <div className="flex justify-between text-slate-500">
-                <span>QRIS ({qrisFeePct}%)</span>
-                <span>- {formatRp(qrisFeeIdr)}</span>
-              </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Shopee ({shopeeAdminPct}%)</span>
-                <span>- {formatRp(potonganShopee)}</span>
-              </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Packaging</span>
-                <span>- {formatRp(packaging)}</span>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-white/[0.06] text-center space-y-2">
-              <div className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">Net Profit</div>
-              <div className={`text-3xl font-bold font-mono tracking-tight ${profitBersih > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {formatRp(profitBersih)}
-              </div>
-              <div className={`inline-block px-2 py-1 rounded border text-xs font-mono font-bold ${
-                netMargin >= 20 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 
-                netMargin >= 10 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 
-                'bg-rose-500/10 border-rose-500/20 text-rose-400'
-              }`}>
-                Margin: {formatNum(netMargin)}%
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between text-[11px] font-mono text-slate-400">
-              <span>Break-Even (BEP):</span>
-              <span className="font-semibold text-slate-300">{formatRp(breakEvenPrice)}</span>
-            </div>
-          </div>
-
-          <div className="v0-card rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-5">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 font-semibold">Target 10Jt/Bln</span>
-              <div className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-            </div>
+          {/* Right Column (4 cols, Sticky) */}
+          <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <div className="text-2xl font-bold font-mono text-white tracking-tight">{neededTx}</div>
-                <div className="text-[10px] font-mono text-slate-500">Total Transaksi</div>
+            {/* Profit Laba / Unit Card */}
+            <div className="app-card p-6 space-y-5 bg-white shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Laba Bersih / Unit</span>
+                <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                  <Calculator className="w-4 h-4" />
+                </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold font-mono text-emerald-400 tracking-tight">{neededPerDay}</div>
-                <div className="text-[10px] font-mono text-slate-500">Order / Hari</div>
+
+              {/* Big Profit Number */}
+              <div className="text-center py-2">
+                <div className={`text-3xl font-bold font-mono tracking-tight tabular-nums ${
+                  profitBersih >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                }`}>
+                  {formatRp(profitBersih)}
+                </div>
+                <div className="mt-1.5 flex justify-center">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold border tabular-nums ${
+                    netMargin >= 20
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                      : netMargin >= 10
+                      ? 'bg-amber-50 text-amber-800 border-amber-300'
+                      : 'bg-rose-50 text-rose-800 border-rose-300'
+                  }`}>
+                    Margin: {formatNum(netMargin)}% {netMargin < 0 ? '(Rugi)' : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* Financial Line Item Breakdown */}
+              <div className="space-y-2.5 font-mono text-xs border-t border-slate-100 pt-4">
+                <div className="flex justify-between text-slate-900 font-semibold">
+                  <span>Harga Jual Shopee</span>
+                  <span className="tabular-nums">{formatRp(effectiveSellingPrice)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Modal Supplier ({selectedSeller?.name.substring(0, 10)}...)</span>
+                  <span className="tabular-nums text-slate-700">- {formatRp(cogsG2gIdr)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>QRIS Fee ({qrisFeePct}%)</span>
+                  <span className="tabular-nums text-slate-700">- {formatRp(qrisFeeIdr)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Shopee Fee ({shopeeAdminPct}% + 1k)</span>
+                  <span className="tabular-nums text-slate-700">- {formatRp(potonganShopee)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Packaging & Dokumen</span>
+                  <span className="tabular-nums text-slate-700">- {formatRp(packaging)}</span>
+                </div>
+                <div className="flex justify-between text-slate-700 font-semibold pt-2 border-t border-slate-100">
+                  <span>Total Beban Biaya</span>
+                  <span className="tabular-nums">{formatRp(totalCost)}</span>
+                </div>
+              </div>
+
+              {/* Break Even Price */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-500">Titik Impas (BEP):</span>
+                <span className="font-bold text-slate-900 tabular-nums">{formatRp(breakEvenPrice)}</span>
               </div>
             </div>
+
+            {/* Target 10 Jt / Bulan Card */}
+            <div className="app-card p-6 space-y-4 bg-white shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Target 10 Jt/Bulan</span>
+                <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight tabular-nums">
+                    {neededTx.toLocaleString()}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-sans">Total Transaksi</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold font-mono text-emerald-600 tracking-tight tabular-nums">
+                    {neededPerDay}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-sans">Order / Hari</div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-100 leading-relaxed">
+                Diperlukan rata-rata <strong>{neededPerDay} pesanan per hari</strong> dengan margin laba saat ini untuk mencapai target profit Rp 10.000.000 per bulan.
+              </p>
+            </div>
+
           </div>
 
         </div>
+
+        {/* EDIT SELLER MODAL IN QUANT */}
+        {editingSellerQuant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+            <div className="app-card rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl bg-white border-slate-200 text-slate-900">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                  <Pencil className="w-4 h-4 text-emerald-600" />
+                  <span>Edit Supplier — {gameTitle}</span>
+                </div>
+                <button
+                  onClick={() => setEditingSellerQuant(null)}
+                  className="text-slate-400 hover:text-slate-600 text-sm p-1 rounded cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs font-sans">
+                <div>
+                  <label className="block text-slate-600 font-medium mb-1">Nama Toko Seller</label>
+                  <input
+                    type="text"
+                    value={editingSellerQuant.name}
+                    onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, name: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Harga Modal G2G (IDR)</label>
+                    <input
+                      type="number"
+                      value={editingSellerQuant.price_idr}
+                      onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, price_idr: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-bold font-mono focus:outline-none focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Strategi Tier</label>
+                    <select
+                      value={editingSellerQuant.tier}
+                      onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, tier: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white cursor-pointer"
+                    >
+                      <option value="ultra_safe">Tier 1: 🛡️ Top Verified</option>
+                      <option value="lowest_price">Tier 2: ⚡ Lowest Price</option>
+                      <option value="mid_level">Tier 3: ⚖️ Mid-Level</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Rating Toko (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editingSellerQuant.rating_pct}
+                      onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, rating_pct: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono focus:outline-none focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Total Ulasan</label>
+                    <input
+                      type="number"
+                      value={editingSellerQuant.reviews}
+                      onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, reviews: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono focus:outline-none focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setEditingSellerQuant(null)}
+                  disabled={isSavingEditSellerQuant}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditSellerQuant}
+                  disabled={isSavingEditSellerQuant || !editingSellerQuant.name.trim()}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingEditSellerQuant ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>Simpan Perubahan</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Competitor Modal */}
+        {isCompetitorModalOpen && (
+          <ShopeeCompetitorModal
+            isOpen={isCompetitorModalOpen}
+            onClose={() => setIsCompetitorModalOpen(false)}
+            gameTitle={gameTitle}
+            platform={platform}
+            currentPriceIdr={effectiveSellingPrice}
+            costG2gIdr={cogsG2gIdr}
+            onApplyPrice={(newPrice) => {
+              setSellingPrice(newPrice);
+              setCalcMode('fixed_price');
+              setIsCompetitorModalOpen(false);
+            }}
+          />
+        )}
 
       </div>
-
-      {/* EDIT SELLER MODAL IN QUANT */}
-      {editingSellerQuant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="v0-card rounded-2xl w-full max-w-md p-6 space-y-5 shadow-2xl border-amber-500/30 bg-zinc-950">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm font-mono">
-                <Pencil className="w-4 h-4" />
-                <span>Edit Supplier G2G — {gameTitle}</span>
-              </div>
-              <button
-                onClick={() => setEditingSellerQuant(null)}
-                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3.5 text-xs font-mono">
-              <div>
-                <label className="block text-slate-400 mb-1">Nama Toko Seller</label>
-                <input
-                  type="text"
-                  value={editingSellerQuant.name}
-                  onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, name: e.target.value })}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-100 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 mb-1">Harga Modal G2G (IDR)</label>
-                  <input
-                    type="number"
-                    value={editingSellerQuant.price_idr}
-                    onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, price_idr: Number(e.target.value) })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-amber-400 font-bold focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 mb-1">Strategi Tier</label>
-                  <select
-                    value={editingSellerQuant.tier}
-                    onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, tier: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="ultra_safe">🛡️ Top Verified</option>
-                    <option value="lowest_price">⚡ Lowest Price</option>
-                    <option value="mid_level">⚖️ Mid-Level / Baru</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 mb-1">Rating Toko (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={editingSellerQuant.rating_pct}
-                    onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, rating_pct: Number(e.target.value) })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 mb-1">Total Ulasan</label>
-                  <input
-                    type="number"
-                    value={editingSellerQuant.reviews}
-                    onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, reviews: Number(e.target.value) })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1">Kecepatan Pengiriman</label>
-                <input
-                  type="text"
-                  value={editingSellerQuant.delivery}
-                  onChange={(e) => setEditingSellerQuant({ ...editingSellerQuant, delivery: e.target.value })}
-                  placeholder="Instant Delivery"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/5">
-              <button
-                type="button"
-                onClick={() => setEditingSellerQuant(null)}
-                className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-slate-300 text-xs font-mono transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveEditSellerQuant}
-                disabled={isSavingEditSellerQuant || !editingSellerQuant.name.trim()}
-                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold font-mono transition-all flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isSavingEditSellerQuant ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                <span>Simpan Perubahan</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Shopee Competitor Intelligence Modal */}
-      {isCompetitorModalOpen && (
-        <ShopeeCompetitorModal
-          isOpen={isCompetitorModalOpen}
-          onClose={() => setIsCompetitorModalOpen(false)}
-          gameTitle={gameTitle}
-          platform={platform}
-          currentPriceIdr={sellingPrice}
-          costG2gIdr={cogsG2gIdr}
-          onApplyPrice={(newPrice) => {
-            setSellingPrice(newPrice);
-            setPulse(true);
-            setTimeout(() => setPulse(false), 800);
-          }}
-        />
-      )}
     </div>
+  );
+}
+
+export default function QuantPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-8 text-slate-500 font-mono text-xs">
+        Memuat The Quant Profit Calculator...
+      </div>
+    }>
+      <QuantCalculatorContent />
+    </Suspense>
   );
 }

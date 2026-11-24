@@ -5,89 +5,46 @@ import Link from "next/link";
 import {
   DollarSign,
   TrendingUp,
-  ShieldAlert,
-  Cpu,
-  FileText,
-  Headphones,
-  CheckCircle2,
-  ArrowUpRight,
-  Target,
-  RefreshCw,
   Sliders,
-  Activity,
-  Clock,
-  ShieldCheck,
-  AlertTriangle,
-  Store,
-  Sparkles,
+  CheckCircle2,
+  RefreshCw,
+  Target,
+  ArrowRight,
   Zap,
-  Compass,
-  Key,
-  PackageSearch,
-  Radio,
-  ChevronRight,
-  Layers,
-  ArrowRight
+  ShoppingBag,
+  Store,
+  ShieldCheck,
+  Sparkles,
+  Inbox,
+  Clock,
+  Plus,
 } from "lucide-react";
 
 function formatRp(value: number) {
-  return value.toLocaleString("id-ID");
+  return Math.round(value || 0).toLocaleString("id-ID");
 }
-
-const AnimatedNumber = ({
-  value,
-  isCurrency = false,
-  decimals = 0,
-}: {
-  value: number;
-  isCurrency?: boolean;
-  decimals?: number;
-}) => {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    const duration = 1000;
-    const startTime = performance.now();
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const easeOut = 1 - Math.pow(1 - progress, 3);
-      setCount(value * easeOut);
-      if (progress < 1) requestAnimationFrame(animate);
-      else setCount(value);
-    };
-    requestAnimationFrame(animate);
-  }, [value]);
-
-  if (isCurrency) return <span>{Math.round(count).toLocaleString("id-ID")}</span>;
-  return <span>{count.toFixed(decimals)}</span>;
-};
 
 export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
-  const [currentTime, setCurrentTime] = useState("");
+  const [todayDate, setTodayDate] = useState("");
   const [aiBriefing, setAiBriefing] = useState<string>("");
   const [isBriefingLoading, setIsBriefingLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const updateTime = () => {
-      setCurrentTime(
-        new Date().toLocaleString("id-ID", {
+    try {
+      setTodayDate(
+        new Intl.DateTimeFormat("id-ID", {
           weekday: "long",
           day: "numeric",
-          month: "short",
+          month: "long",
           year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
           timeZone: "Asia/Jakarta",
-        })
+        }).format(new Date())
       );
-    };
-    updateTime();
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
+    } catch {
+      setTodayDate("");
+    }
   }, []);
 
   const fetchAnalytics = async () => {
@@ -95,9 +52,11 @@ export default function AdminDashboardPage() {
     try {
       const res = await fetch("/api/analytics");
       const json = await res.json();
-      if (json.status === "success") setAnalytics(json.data);
+      if (json.status === "success") {
+        setAnalytics(json.data);
+      }
     } catch (e) {
-      console.error("Failed to sync ledger", e);
+      console.error("Gagal sinkronisasi data analitik:", e);
     } finally {
       setIsLoading(false);
     }
@@ -108,9 +67,11 @@ export default function AdminDashboardPage() {
     try {
       const res = await fetch("/api/ai/briefing");
       const json = await res.json();
-      if (json.status === "success" && json.briefing) setAiBriefing(json.briefing);
+      if (json.status === "success" && json.briefing) {
+        setAiBriefing(json.briefing);
+      }
     } catch (e) {
-      console.error("Failed to fetch AI briefing", e);
+      console.error("Gagal mengambil AI briefing:", e);
     } finally {
       setIsBriefingLoading(false);
     }
@@ -121,478 +82,463 @@ export default function AdminDashboardPage() {
     fetchBriefing();
   }, []);
 
+  const handleSyncAll = () => {
+    fetchAnalytics();
+    fetchBriefing();
+  };
+
   const transactions = analytics?.transactions || [];
   const totalGmv = analytics?.total_gmv_idr || 0;
   const totalNetProfit = analytics?.total_net_profit_idr || 0;
   const avgMargin = analytics?.average_net_margin_pct || 0;
   const targetMonthly = analytics?.target_monthly_profit_idr || 10000000;
-  const progressPct = analytics?.target_achievement_pct || 0;
+  const progressPct = analytics?.target_achievement_pct || (targetMonthly > 0 ? (totalNetProfit / targetMonthly) * 100 : 0);
+  const sisaTarget = Math.max(0, targetMonthly - totalNetProfit);
 
-  const divisions = [
-    {
-      title: "The Quant",
-      route: "/dashboard/quant",
-      icon: <DollarSign className="w-5 h-5 text-emerald-400" />,
-      number: "01",
-      desc: "Simulasi profitabilitas dinamis dengan mode target margin & kalkulasi QRIS 0.7%.",
-      stat: "Formula v2.2",
-      cardClass: "card-division-quant",
-      iconBox: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
-      dot: "bg-emerald-400",
-      statClass: "text-emerald-300 border-emerald-500/20 bg-emerald-500/10",
-    },
-    {
-      title: "Catalog Radar",
-      route: "/dashboard/catalog",
-      icon: <Store className="w-5 h-5 text-amber-400" />,
-      number: "02",
-      desc: "Komparasi multi-seller G2G, audit margin bersih, dan pengalihan supplier 1-klik.",
-      stat: "Multi-Seller",
-      cardClass: "card-division-catalog",
-      iconBox: "bg-amber-500/10 border-amber-500/20 text-amber-400",
-      dot: "bg-amber-400",
-      statClass: "text-amber-300 border-amber-500/20 bg-amber-500/10",
-    },
-    {
-      title: "Risk Officer",
-      route: "/dashboard/risk",
-      icon: <ShieldAlert className="w-5 h-5 text-rose-400" />,
-      number: "03",
-      desc: "Audit otomatis supplier G2G untuk memproteksi akun dari risiko hackback & penipuan.",
-      stat: "0/100 Safe",
-      cardClass: "card-division-risk",
-      iconBox: "bg-rose-500/10 border-rose-500/20 text-rose-400",
-      dot: "bg-rose-400",
-      statClass: "text-rose-300 border-rose-500/20 bg-rose-500/10",
-    },
-    {
-      title: "The Operator",
-      route: "/dashboard/operator",
-      icon: <Cpu className="w-5 h-5 text-indigo-400" />,
-      number: "04",
-      desc: "Buku kas digital real-time, tersinkronisasi langsung dari financial ledger riil.",
-      stat: `${transactions.length} Order`,
-      cardClass: "card-division-operator",
-      iconBox: "bg-indigo-500/10 border-indigo-500/20 text-indigo-400",
-      dot: "bg-indigo-400",
-      statClass: "text-indigo-300 border-indigo-500/20 bg-indigo-500/10",
-    },
-    {
-      title: "The Marketer",
-      route: "/dashboard/marketer",
-      icon: <FileText className="w-5 h-5 text-fuchsia-400" />,
-      number: "05",
-      desc: "Fulfillment & Brand Hub: AI Delivery Formatter, Sertifikat Digital, & Voucher VIP.",
-      stat: "AI Formatter",
-      cardClass: "card-division-marketer",
-      iconBox: "bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400",
-      dot: "bg-fuchsia-400",
-      statClass: "text-fuchsia-300 border-fuchsia-500/20 bg-fuchsia-500/10",
-    },
-    {
-      title: "The Support",
-      route: "/dashboard/support",
-      icon: <Headphones className="w-5 h-5 text-sky-400" />,
-      number: "06",
-      desc: "SOP penanganan klaim garansi dan triage komplain pembeli anti-fraud.",
-      stat: "0 Klaim",
-      cardClass: "card-division-support",
-      iconBox: "bg-sky-500/10 border-sky-500/20 text-sky-400",
-      dot: "bg-sky-400",
-      statClass: "text-sky-300 border-sky-500/20 bg-sky-500/10",
-    },
-    {
-      title: "Deskripsi Maker",
-      route: "/dashboard/description",
-      icon: <Sparkles className="w-5 h-5 text-orange-400" />,
-      number: "07",
-      desc: "Shopee AI Copywriter: Generate deskripsi konversi tinggi, judul SEO, & FAQ otomatis.",
-      stat: "Shopee SEO",
-      cardClass: "card-division-catalog",
-      iconBox: "bg-orange-500/10 border-orange-500/20 text-orange-400",
-      dot: "bg-orange-400",
-      statClass: "text-orange-300 border-orange-500/20 bg-orange-500/10",
-    },
-    {
-      title: "Auto-Fulfillment",
-      route: "/dashboard/autonomous",
-      icon: <Zap className="w-5 h-5 text-emerald-400" />,
-      number: "08",
-      desc: "Full Autonomous Fulfillment: Order masuk otomatis dibuatkan lisensi brankas enkripsi.",
-      stat: "Auto-Dispatch",
-      cardClass: "card-division-quant",
-      iconBox: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
-      dot: "bg-emerald-400",
-      statClass: "text-emerald-300 border-emerald-500/20 bg-emerald-500/10",
-    },
-    {
-      title: "Research Center",
-      route: "/dashboard/research",
-      icon: <Compass className="w-5 h-5 text-cyan-400" />,
-      number: "09",
-      desc: "Autonomous G2G Robot: Crawling otomatis peluang arbitrase margin tinggi (>40%).",
-      stat: "Robot Crawler",
-      cardClass: "card-division-quant",
-      iconBox: "bg-cyan-500/10 border-cyan-500/20 text-cyan-400",
-      dot: "bg-cyan-400",
-      statClass: "text-cyan-300 border-cyan-500/20 bg-cyan-500/10",
-    },
-    {
-      title: "Eneba CDKey Terminal",
-      route: "/dashboard/eneba",
-      icon: <Key className="w-5 h-5 text-violet-400" />,
-      number: "10",
-      desc: "Official Digital Key Radar: Kurasi CDKey Steam/Xbox/GOG resmi bergaransi 0% Hackback.",
-      stat: "0% Hackback",
-      cardClass: "card-division-quant",
-      iconBox: "bg-violet-500/10 border-violet-500/20 text-violet-400",
-      dot: "bg-violet-400",
-      statClass: "text-violet-300 border-violet-500/20 bg-violet-500/10",
-    },
-    {
-      title: "Stock Sentry",
-      route: "/dashboard/stock",
-      icon: <PackageSearch className="w-5 h-5 text-amber-400" />,
-      number: "11",
-      desc: "Live Reseller Stock Radar: Monitor stok supplier real-time dengan self-healing failover.",
-      stat: "Anti-Misskom Sync",
-      cardClass: "card-division-catalog",
-      iconBox: "bg-amber-500/10 border-amber-500/20 text-amber-400",
-      dot: "bg-amber-400",
-      statClass: "text-amber-300 border-amber-500/20 bg-amber-500/10",
-    },
-  ];
+  // Status Margin Pill Helper
+  const getMarginStatus = (margin: number) => {
+    if (margin === 0) {
+      return {
+        label: "Belum ada data",
+        className: "bg-slate-100 text-slate-600 border-slate-200",
+      };
+    }
+    if (margin >= 20) {
+      return {
+        label: "Sehat (≥20%)",
+        className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      };
+    }
+    if (margin >= 10) {
+      return {
+        label: "Waspada (10-19%)",
+        className: "bg-amber-50 text-amber-700 border-amber-200",
+      };
+    }
+    return {
+      label: "Rendah (<10%)",
+      className: "bg-rose-50 text-rose-700 border-rose-200",
+    };
+  };
+
+  const marginStatus = getMarginStatus(avgMargin);
+
+  // Take latest 6 transactions
+  const recentTransactions = Array.isArray(transactions)
+    ? [...transactions].reverse().slice(0, 6)
+    : [];
 
   return (
-    <div className="px-5 sm:px-8 py-8 max-w-[1040px] mx-auto space-y-7">
-      {/* ═══ COMMAND DECK HEADER (MACHINED DOUBLE-BEZEL) ═══════════════ */}
-      <div className="machined-card">
-        <div className="machined-card-inner p-5 sm:p-7 relative overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-6">
-            {/* Left Header */}
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/[0.10] bg-black/60 text-[10px] font-mono font-semibold text-slate-300 shadow-inner">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
-                  COMMAND DECK
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[10px] font-mono font-bold text-emerald-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                  RADAR DAEMON: ACTIVE (5M SYNC)
-                </span>
-              </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* ─── 1. Header Bar ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+            Overview Operasional
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            {todayDate ? `${todayDate} (WIB)` : "Waktu Indonesia Barat"} &bull; Real-time Executive Telemetry
+          </p>
+        </div>
 
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
-                Akshara Gaming Center
-                <span className="text-slate-600 font-normal mx-2.5">/</span>
-                <span className="text-slate-400 font-medium text-lg sm:text-2xl">Operations</span>
-              </h1>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleSyncAll}
+            disabled={isLoading || isBriefingLoading}
+            className="btn-secondary text-xs font-medium px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+            title="Sinkronisasi Data Riil"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 text-slate-500 ${
+                isLoading || isBriefingLoading ? "animate-spin text-slate-800" : ""
+              }`}
+            />
+            <span>Sync Data</span>
+          </button>
 
-              {currentTime && (
-                <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-2.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span>{currentTime} WIB</span>
-                </div>
-              )}
-            </div>
-
-            {/* Right — Monthly Target & Live Sync */}
-            <div className="flex items-center gap-4 bg-black/50 p-4 rounded-2xl border border-white/[0.08] shadow-inner shrink-0">
-              <div className="min-w-0">
-                <div className="text-[9px] text-slate-500 font-mono uppercase tracking-widest mb-1 font-semibold">
-                  Target UKT & Living ITS
-                </div>
-                <div className="text-lg sm:text-xl font-bold font-mono text-white flex items-baseline gap-1 whitespace-nowrap">
-                  <span className="text-xs text-slate-500">Rp</span>
-                  <AnimatedNumber value={targetMonthly} isCurrency={true} />
-                  <span className="text-xs font-normal text-slate-500">/bln</span>
-                </div>
-              </div>
-              <button
-                onClick={fetchAnalytics}
-                className="v0-btn-secondary p-2.5 rounded-xl shrink-0"
-                title="Sinkronisasi Data Riil"
-              >
-                <RefreshCw
-                  className={`w-4 h-4 ${isLoading ? "animate-spin text-white" : "text-slate-400"}`}
-                />
-              </button>
-            </div>
-          </div>
-
-          {/* Progress Bar Target */}
-          <div className="pt-2 border-t border-white/[0.06]">
-            <div className="flex items-center justify-between text-xs font-mono mb-2">
-              <span className="text-slate-400 flex items-center gap-1.5">
-                <Target className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                Realisasi Kas Bersih (Nett Senna):
-              </span>
-              <span className="text-white font-bold font-mono">
-                <span className="text-emerald-400 font-black">
-                  <AnimatedNumber value={progressPct} decimals={1} />%
-                </span>
-                {" "}&bull; Rp{" "}
-                <AnimatedNumber value={totalNetProfit} isCurrency={true} />
-              </span>
-            </div>
-            <div className="w-full h-2.5 rounded-full bg-black/60 overflow-hidden border border-white/[0.08]">
-              <div
-                className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-300 rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(52,211,153,0.5)] relative"
-                style={{ width: `${Math.max(2, Math.min(100, progressPct))}%` }}
-              >
-                <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:1rem_1rem] animate-[progress-stripes_1s_linear_infinite]" />
-              </div>
-            </div>
-          </div>
+          <Link
+            href="/dashboard/autonomous"
+            className="btn-primary text-xs font-medium px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Proses Order</span>
+          </Link>
         </div>
       </div>
 
-      {/* ═══ AI STRATEGIC BRIEFING ═════════════════════════════ */}
-      <div className="relative rounded-2xl border border-indigo-500/25 bg-gradient-to-r from-indigo-950/30 via-slate-900/50 to-transparent p-5 sm:p-6 backdrop-blur-xl shadow-lg">
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.25)]">
-            <Sparkles className="w-5 h-5 text-indigo-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold text-indigo-300 font-mono uppercase tracking-wider">
-                  Executive AI Briefing
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-mono font-semibold">
-                  Gemini Flash Autonomous
-                </span>
-              </div>
-              <button
-                onClick={fetchBriefing}
-                className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs font-mono transition-colors"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isBriefingLoading ? "animate-spin text-indigo-400" : ""}`} />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
+      {/* ─── 2. 4 KPI Cards ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* KPI 1: GMV */}
+        <div className="app-card p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+              Total Omzet (GMV)
+            </span>
+            <div className="p-2 rounded-lg bg-slate-100 text-slate-700">
+              <DollarSign className="w-4 h-4" />
             </div>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              {isBriefingLoading ? (
-                <span className="text-slate-500 font-mono text-xs animate-pulse">
-                  Menyusun laporan analisa strategis inventori dan laba harian...
-                </span>
-              ) : (
-                aiBriefing || (
-                  <span className="text-slate-500 text-xs">Briefing AI siap menerima telemetri.</span>
-                )
-              )}
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900 tabular-nums tracking-tight">
+              Rp {formatRp(totalGmv)}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Escrow Shopee &amp; Direct
+            </p>
+          </div>
+        </div>
+
+        {/* KPI 2: Net Profit */}
+        <div className="app-card p-5 flex flex-col justify-between border-emerald-200/80">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-emerald-800 uppercase tracking-wider">
+              Profit Bersih
+            </span>
+            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-emerald-600 tabular-nums tracking-tight">
+              Rp {formatRp(totalNetProfit)}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              <span className="font-semibold text-emerald-700 tabular-nums">
+                {progressPct.toFixed(1)}%
+              </span>{" "}
+              dari target bulanan
+            </p>
+          </div>
+        </div>
+
+        {/* KPI 3: Avg Margin */}
+        <div className="app-card p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+              Rata-rata Margin
+            </span>
+            <div className="p-2 rounded-lg bg-slate-100 text-slate-700">
+              <Sliders className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-slate-900 tabular-nums tracking-tight">
+                {avgMargin.toFixed(1)}%
+              </span>
+              <span
+                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${marginStatus.className}`}
+              >
+                {marginStatus.label}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Threshold target sehat: &ge; 20%
+            </p>
+          </div>
+        </div>
+
+        {/* KPI 4: Total Transactions */}
+        <div className="app-card p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+              Total Transaksi
+            </span>
+            <div className="p-2 rounded-lg bg-slate-100 text-slate-700">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900 tabular-nums tracking-tight">
+              {transactions.length}{" "}
+              <span className="text-sm font-normal text-slate-500">Order</span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Tercatat di financial ledger
             </p>
           </div>
         </div>
       </div>
 
-      {/* ═══ TELEMETRY METRIC CARDS ════════════════════════════ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* GMV */}
-        <div className="v0-card rounded-2xl p-4 sm:p-5 hover:-translate-y-1 transition-all duration-200">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-slate-400 font-semibold mb-3">
-            <span>Total Omzet</span>
-            <div className="p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08]">
-              <DollarSign className="w-3.5 h-3.5 text-slate-400" />
-            </div>
+      {/* ─── 3. Target Bulanan Card (Compact & Actionable) ─── */}
+      <div className="app-card p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-emerald-600" />
+            <h2 className="text-sm font-semibold text-slate-900">
+              Target Bulanan: Rp {formatRp(targetMonthly)}/bln
+            </h2>
+            <span className="text-xs text-slate-500">
+              (Target UKT &amp; Living ITS)
+            </span>
           </div>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-white tracking-tight">
-            <span className="text-xs text-slate-500 font-normal mr-0.5">Rp</span>
-            <AnimatedNumber value={totalGmv} isCurrency={true} />
-          </div>
-          <div className="text-[10px] font-mono text-slate-500 mt-3 pt-2.5 border-t border-white/[0.06] flex justify-between items-center">
-            <span>Escrow + Web</span>
-            <span className="text-emerald-400 flex items-center gap-0.5 font-bold">
-              <ArrowUpRight className="w-3 h-3" /> Riil
+          <div className="text-xs text-slate-600 tabular-nums">
+            Terkumpul:{" "}
+            <span className="font-bold text-slate-900">
+              Rp {formatRp(totalNetProfit)}
+            </span>{" "}
+            &bull;{" "}
+            <span className="text-slate-500">
+              Sisa target:{" "}
+              <strong className="text-slate-800">
+                Rp {formatRp(sisaTarget)}
+              </strong>
             </span>
           </div>
         </div>
 
-        {/* Net Profit */}
-        <div className="v0-card rounded-2xl p-4 sm:p-5 border-emerald-500/25 hover:-translate-y-1 transition-all duration-200 shadow-[0_0_20px_rgba(16,185,129,0.06)]">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-semibold mb-3">
-            <span>Profit Bersih</span>
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-          </div>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400 tracking-tight">
-            <span className="text-xs text-emerald-600 font-normal mr-0.5">Rp</span>
-            <AnimatedNumber value={totalNetProfit} isCurrency={true} />
-          </div>
-          <div className="text-[10px] font-mono text-emerald-600 mt-3 pt-2.5 border-t border-emerald-500/15 flex justify-between items-center">
-            <span>Kas Bersih Senna</span>
-            <span className="text-emerald-400 font-bold">+100% Valid</span>
-          </div>
-        </div>
-
-        {/* Avg Margin */}
-        <div className="v0-card rounded-2xl p-4 sm:p-5 border-cyan-500/25 hover:-translate-y-1 transition-all duration-200 shadow-[0_0_20px_rgba(6,182,212,0.06)]">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-semibold mb-3">
-            <span>Avg Margin</span>
-            <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-              <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-            </div>
-          </div>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-cyan-300 tracking-tight">
-            <AnimatedNumber value={avgMargin} decimals={1} />
-            <span className="text-base text-cyan-500 ml-0.5">%</span>
-          </div>
-          <div className="text-[10px] font-mono text-cyan-600 mt-3 pt-2.5 border-t border-cyan-500/15 flex justify-between items-center">
-            <span>Threshold Minimum</span>
-            <span className="text-cyan-400 font-bold">&ge; 25%</span>
-          </div>
-        </div>
-
-        {/* Transactions */}
-        <div className="v0-card rounded-2xl p-4 sm:p-5 border-indigo-500/25 hover:-translate-y-1 transition-all duration-200 shadow-[0_0_20px_rgba(99,102,241,0.06)]">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-indigo-400 font-semibold mb-3">
-            <span>Transaksi</span>
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-              <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />
-            </div>
-          </div>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-indigo-200 tracking-tight">
-            <AnimatedNumber value={transactions.length} />
-            <span className="text-xs font-normal text-indigo-400 ml-1">Order</span>
-          </div>
-          <div className="text-[10px] font-mono text-indigo-500 mt-3 pt-2.5 border-t border-indigo-500/15 flex justify-between items-center">
-            <span>0% Hackback</span>
-            <span className="text-indigo-400 font-bold">0 Refund</span>
-          </div>
+        {/* Progress Bar Solid */}
+        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+          <div
+            className="bg-emerald-600 h-2.5 rounded-full transition-all duration-500"
+            style={{ width: `${Math.max(0, Math.min(100, progressPct))}%` }}
+          />
         </div>
       </div>
 
-      {/* ═══ DIVISION GRID ════════════════════════════════════ */}
-      <div>
-        <div className="flex items-center gap-4 mb-5">
-          <h2 className="text-sm font-bold text-white tracking-tight uppercase font-mono">
-            Divisi &amp; Modul Operasional
-          </h2>
-          <div className="flex-1 h-[1px] bg-gradient-to-r from-white/[0.10] to-transparent" />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {divisions.map((div, idx) => (
-            <Link
-              key={idx}
-              href={div.route}
-              className={`group relative v0-card ${div.cardClass} p-5 rounded-2xl flex flex-col justify-between overflow-hidden transition-all duration-200 hover:-translate-y-1`}
-            >
+      {/* ─── 4. Main Workspace 2 Kolom ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Kolom Kiri: Tabel Transaksi Terbaru (col-span-8) */}
+        <div className="lg:col-span-8 space-y-4">
+          <div className="app-card overflow-hidden">
+            {/* Header Card */}
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
               <div>
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`w-10 h-10 rounded-xl border ${div.iconBox} flex items-center justify-center shrink-0 shadow-inner`}>
-                    {div.icon}
-                  </div>
-                  <span className="text-3xl font-black text-white/[0.05] group-hover:text-white/[0.14] transition-colors font-mono tracking-tighter">
-                    {div.number}
-                  </span>
-                </div>
-
-                <h3 className="text-sm font-bold text-white mb-1.5 group-hover:text-emerald-300 transition-colors">
-                  {div.title}
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Transaksi Terbaru
                 </h3>
-                <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                  {div.desc}
+                <p className="text-xs text-slate-500">
+                  Data riil dari financial ledger toko
                 </p>
               </div>
+              <Link
+                href="/dashboard/operator"
+                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 transition-colors"
+              >
+                <span>Lihat semua di Buku Kas</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
 
-              <div className="mt-5 pt-3 border-t border-white/[0.06] flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${div.dot} opacity-75`} />
-                    <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${div.dot}`} />
-                  </span>
-                  <span className="text-[10px] font-semibold text-slate-500 tracking-wider uppercase font-mono">
-                    ONLINE
-                  </span>
+            {/* Table Content */}
+            {recentTransactions.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 text-slate-500 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="px-5 py-3">Order / Waktu</th>
+                      <th className="px-4 py-3">Produk &amp; Pembeli</th>
+                      <th className="px-4 py-3 text-right">Omzet</th>
+                      <th className="px-4 py-3 text-right">Profit Bersih</th>
+                      <th className="px-5 py-3 text-right">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {recentTransactions.map((trx: any, idx: number) => {
+                      const orderId = trx.order_id || `TRX-${idx + 1}`;
+                      const buyer = trx.buyer_username || trx.buyer_name || trx.buyer || "buyer";
+                      const product = trx.product_name || trx.game_title || trx.title || "Order Produk Game";
+                      const timestamp = trx.timestamp || trx.created_at || "Baru saja";
+                      const gross = Number(trx.gross_revenue_idr) || 0;
+                      const profit = Number(trx.net_profit_idr) || 0;
+                      const margin = Number(trx.net_margin_pct) || (gross > 0 ? (profit / gross) * 100 : 0);
+
+                      return (
+                        <tr
+                          key={orderId}
+                          className="hover:bg-slate-50 transition-colors"
+                        >
+                          <td className="px-5 py-3.5">
+                            <span className="font-mono font-medium text-slate-900 block">
+                              {orderId}
+                            </span>
+                            <span className="text-[11px] text-slate-400 block mt-0.5">
+                              {timestamp}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 max-w-[220px]">
+                            <span className="font-medium text-slate-900 block truncate" title={product}>
+                              {product}
+                            </span>
+                            <span className="text-[11px] text-slate-500 block mt-0.5">
+                              @{buyer}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-medium text-slate-800 tabular-nums">
+                            Rp {formatRp(gross)}
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-semibold text-emerald-600 tabular-nums">
+                            +Rp {formatRp(profit)}
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-medium text-slate-600 tabular-nums">
+                            {margin.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* Empty State Bersih */
+              <div className="py-12 px-6 text-center flex flex-col items-center justify-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                  <Inbox className="w-6 h-6" />
                 </div>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border font-bold ${div.statClass}`}>
-                  {div.stat}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-800">
+                    Belum ada transaksi tercatat
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                    Transaksi dari Shopee dan Direct akan otomatis masuk ke sini saat diproses.
+                  </p>
+                </div>
+                <Link
+                  href="/dashboard/autonomous"
+                  className="btn-primary text-xs font-medium px-4 py-2 rounded-lg mt-2 inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Buka Auto-Fulfillment</span>
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Kolom Kanan: Card A & Card B (col-span-4) */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* Card A: Executive AI Briefing */}
+          <div className="app-card p-5 border-l-4 border-l-indigo-500 bg-white shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 inline-flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-indigo-600" />
+                  Gemini AI
+                </span>
+                <span className="text-xs font-semibold text-slate-900">
+                  Executive Briefing
                 </span>
               </div>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* ═══ AI FORMATTER BANNER ═════════════════════════════ */}
-      <div className="v0-card p-5 sm:p-6 rounded-2xl border-purple-500/25 bg-gradient-to-r from-purple-950/25 via-indigo-950/15 to-transparent flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative overflow-hidden group shadow-lg">
-        <div className="relative z-10 flex items-center gap-4">
-          <div className="p-3.5 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-300 shrink-0 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h3 className="text-sm font-bold text-white">AI Account Delivery Formatter</h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/25 inline-flex items-center gap-1 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-                Anti-Ban Shopee Filter
-              </span>
+              <button
+                onClick={fetchBriefing}
+                disabled={isBriefingLoading}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded transition-colors disabled:opacity-50"
+                title="Perbarui analisa AI"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${
+                    isBriefingLoading ? "animate-spin text-indigo-600" : ""
+                  }`}
+                />
+              </button>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Konversi kredensial raw supplier menjadi template pesan ramah pembeli dengan format garansi dan SOP unboxing otomatis.
-            </p>
-          </div>
-        </div>
-        <Link
-          href="/dashboard/formatter"
-          className="relative z-10 v0-btn-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-purple-800" />
-          Buka Formatter
-        </Link>
-      </div>
 
-      {/* ═══ ACTIVITY FEED ══════════════════════════════════ */}
-      <div className="v0-card rounded-2xl p-5 sm:p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-emerald-400 shrink-0" />
-            <h3 className="text-sm font-bold text-white">Live Telemetry &amp; Aktivitas Sistem</h3>
-          </div>
-          <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">
-            REALTIME
-          </span>
-        </div>
-
-        <div className="space-y-4">
-          {[
-            {
-              text: "Sinkronisasi financial ledger otomatis berhasil",
-              time: "Baru saja",
-              icon: <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />,
-            },
-            {
-              text: "Audit supplier G2G: Status Evergreen Active (Risk Score: 0/100 Safe)",
-              time: "2 menit lalu",
-              icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />,
-            },
-            {
-              text: "Auto-fulfillment token brankas terbit (#AKSHARA-CLAIM)",
-              time: "15 menit lalu",
-              icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
-            },
-            {
-              text: "Proteksi firewall & verifikasi token AES-256 aktif",
-              time: "1 jam lalu",
-              icon: <Zap className="w-3.5 h-3.5 text-indigo-400" />,
-            },
-          ].map((item, idx) => (
-            <div key={idx} className="flex items-start gap-3.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-colors">
-              <div className="w-7 h-7 rounded-xl bg-black/60 border border-white/[0.08] flex items-center justify-center shrink-0 mt-0.5">
-                {item.icon}
-              </div>
-              <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                <p className="text-xs text-slate-300 leading-snug">
-                  {item.text}
-                </p>
-                <span className="text-[10px] text-slate-500 font-mono shrink-0 whitespace-nowrap">
-                  {item.time}
-                </span>
-              </div>
+            <div className="text-xs text-slate-600 leading-relaxed min-h-[72px]">
+              {isBriefingLoading ? (
+                <div className="space-y-2 py-1">
+                  <div className="h-3 bg-slate-100 rounded w-full animate-pulse" />
+                  <div className="h-3 bg-slate-100 rounded w-5/6 animate-pulse" />
+                  <div className="h-3 bg-slate-100 rounded w-3/4 animate-pulse" />
+                </div>
+              ) : (
+                aiBriefing || (
+                  <p className="text-slate-500 italic">
+                    Ringkasan strategi AI siap menerima telemetri penjualan harian.
+                  </p>
+                )
+              )}
             </div>
-          ))}
+          </div>
+
+          {/* Card B: Aksi Cepat Shopee */}
+          <div className="app-card p-5 space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Aksi Cepat Shopee
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pintasan operasional toko harian
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              {/* Shortcut 1 */}
+              <Link
+                href="/dashboard/autonomous"
+                className="group flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all"
+              >
+                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 shrink-0 mt-0.5">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-slate-800 group-hover:text-emerald-700 transition-colors flex items-center justify-between">
+                    <span>Auto-Fulfillment Order</span>
+                    <ArrowRight className="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Proses order instan &amp; brankas lisensi
+                  </p>
+                </div>
+              </Link>
+
+              {/* Shortcut 2 */}
+              <Link
+                href="/dashboard/shopee-launchpad"
+                className="group flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all"
+              >
+                <div className="p-2 rounded-lg bg-orange-50 text-orange-600 shrink-0 mt-0.5">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-slate-800 group-hover:text-orange-700 transition-colors flex items-center justify-between">
+                    <span>Buat Listing Shopee (1-Flow)</span>
+                    <ArrowRight className="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Generate listing Shopee lengkap otomatis
+                  </p>
+                </div>
+              </Link>
+
+              {/* Shortcut 3 */}
+              <Link
+                href="/dashboard/catalog"
+                className="group flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all"
+              >
+                <div className="p-2 rounded-lg bg-amber-50 text-amber-600 shrink-0 mt-0.5">
+                  <Store className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-slate-800 group-hover:text-amber-700 transition-colors flex items-center justify-between">
+                    <span>Audit Katalog &amp; Stok G2G</span>
+                    <ArrowRight className="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Cek harga beli supplier &amp; stok live
+                  </p>
+                </div>
+              </Link>
+
+              {/* Shortcut 4 */}
+              <Link
+                href="/dashboard/claims"
+                className="group flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all"
+              >
+                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0 mt-0.5">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-slate-800 group-hover:text-indigo-700 transition-colors flex items-center justify-between">
+                    <span>Kelola Brankas Klaim</span>
+                    <ArrowRight className="w-3 h-3 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Manajemen garansi &amp; verifikasi token
+                  </p>
+                </div>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

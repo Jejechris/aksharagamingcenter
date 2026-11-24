@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { callGemini } from "@/lib/gemini";
 import { getEnebaProductUrl } from "@/lib/eneba";
 import { bulkAddOrUpdateGames } from "@/lib/catalog";
+import { verifyCronOrAdminRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,10 @@ async function sendTelegramAlert(text: string) {
 }
 
 export async function GET(req: NextRequest) {
+  if (!verifyCronOrAdminRequest(req)) {
+    return NextResponse.json({ status: "unauthorized", message: "Unauthorized cron access." }, { status: 401 });
+  }
+
   try {
     const prompt = `Berperanlah sebagai Market Intelligence Analyst untuk game PC di Indonesia.
 Temukan 1 judul game yang SAAT INI sedang sangat viral dan memiliki potensi margin tinggi jika dibeli CDKey-nya di Eneba lalu dijual di Shopee Indonesia.
@@ -54,7 +59,8 @@ Format JSON only:
 
     const qris = Math.round(parsed.price_eneba_idr * 0.007);
     const shopeeFee = Math.round(parsed.recommended_shopee_price_idr * 0.08) + 1000;
-    const profit = parsed.recommended_shopee_price_idr - parsed.price_eneba_idr - qris - shopeeFee - 2000;
+    // Mode full digital: 0 operational fee
+    const profit = parsed.recommended_shopee_price_idr - parsed.price_eneba_idr - qris - shopeeFee;
     const margin = parsed.recommended_shopee_price_idr > 0 ? (profit / parsed.recommended_shopee_price_idr) * 100 : 0;
 
     if (margin < 20) {

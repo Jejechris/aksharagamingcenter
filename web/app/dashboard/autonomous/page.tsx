@@ -4,12 +4,39 @@ import React, { useState, useEffect, useCallback } from "react";
 import { fetchSmartCatalog } from "@/lib/catalogClient";
 import Link from "next/link";
 import {
-  Zap, Send, Smartphone, Mail, ShoppingBag, CheckCircle2,
-  Clock, ShieldCheck, Copy, ExternalLink, RefreshCw, Sliders,
-  Plus, Check, ArrowLeft, Store, FileText, Search, Filter,
-  Trash2, Eye, EyeOff, Key, Terminal, AlertTriangle, MessageSquare,
-  Sparkles, CheckCheck, Database, Archive, Layers, Upload,
-  AlertCircle, Edit3, DollarSign, Box
+  Zap,
+  Send,
+  Smartphone,
+  Mail,
+  ShoppingBag,
+  CheckCircle2,
+  Clock,
+  ShieldCheck,
+  Copy,
+  ExternalLink,
+  RefreshCw,
+  Plus,
+  Check,
+  Search,
+  Filter,
+  Trash2,
+  Eye,
+  EyeOff,
+  Key,
+  AlertTriangle,
+  MessageSquare,
+  Sparkles,
+  Database,
+  Upload,
+  AlertCircle,
+  Edit3,
+  DollarSign,
+  Box,
+  ChevronDown,
+  X,
+  Layers,
+  Inbox,
+  ArrowRight,
 } from "lucide-react";
 
 interface AutonomousOrder {
@@ -27,10 +54,12 @@ interface AutonomousOrder {
   credentials: {
     username: string;
     password: string;
-    serial_warranty: string;
+    serial_warranty?: string;
+    claim_code?: string;
+    passcode?: string;
     vault_id?: string;
     source_mode?: string;
-    notes: string;
+    notes?: string;
   };
   status: "PENDING" | "PROCESSED" | "DISPATCHED";
   dispatched_channels: string[];
@@ -73,6 +102,10 @@ interface CatalogItem {
   }>;
 }
 
+function formatRp(val: number) {
+  return Math.round(val || 0).toLocaleString("id-ID");
+}
+
 export default function AutonomousFulfillmentPage() {
   // Navigation & Tab Switcher
   const [mainTab, setMainTab] = useState<"dispatch" | "vault">("dispatch");
@@ -85,7 +118,7 @@ export default function AutonomousFulfillmentPage() {
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [autoPilotOn, setAutoPilotOn] = useState(true);
+  const [showSimulationPanel, setShowSimulationPanel] = useState(false);
 
   // Vault (Mode A) State
   const [vaultItems, setVaultItems] = useState<VaultItem[]>([]);
@@ -182,14 +215,16 @@ export default function AutonomousFulfillmentPage() {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) setOrders(parsed);
         }
-      } catch(e) {}
+      } catch (e) {}
 
       const res = await fetch("/api/orders/autonomous");
       const json = await res.json();
       if (json.status === "success" && Array.isArray(json.orders)) {
         setOrders(json.orders);
         setStats(json.stats);
-        try { localStorage.setItem("akshara_autonomous_orders_v1", JSON.stringify(json.orders)); } catch(e) {}
+        try {
+          localStorage.setItem("akshara_autonomous_orders_v1", JSON.stringify(json.orders));
+        } catch (e) {}
       }
     } catch (e) {
       console.error("Failed to fetch autonomous orders:", e);
@@ -208,14 +243,16 @@ export default function AutonomousFulfillmentPage() {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) setVaultItems(parsed);
         }
-      } catch(e) {}
+      } catch (e) {}
 
       const res = await fetch("/api/inventory/vault");
       const json = await res.json();
       if (json.status === "success" && Array.isArray(json.items)) {
         setVaultItems(json.items);
         setVaultStats(json.stats);
-        try { localStorage.setItem("akshara_inventory_vault_v1", JSON.stringify(json.items)); } catch(e) {}
+        try {
+          localStorage.setItem("akshara_inventory_vault_v1", JSON.stringify(json.items));
+        } catch (e) {}
       }
     } catch (e) {
       console.error("Failed to fetch vault items:", e);
@@ -249,7 +286,7 @@ export default function AutonomousFulfillmentPage() {
   // Trigger WhatsApp Dispatch
   const handleDispatchWhatsApp = async (order: AutonomousOrder) => {
     const waPhone = formatPhoneForWa(order.buyer_phone);
-    const waText = encodeURIComponent(order.messages.whatsapp);
+    const waText = encodeURIComponent(order.messages?.whatsapp || "");
     const waUrl = `https://wa.me/${waPhone}?text=${waText}`;
 
     window.open(waUrl, "_blank");
@@ -258,14 +295,20 @@ export default function AutonomousFulfillmentPage() {
       const res = await fetch("/api/orders/autonomous", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: order.id, channel: "WhatsApp" })
+        body: JSON.stringify({ id: order.id, channel: "WhatsApp" }),
       });
       if (res.ok) {
-        setOrders(prev => prev.map(o => o.id === order.id ? {
-          ...o,
-          status: "DISPATCHED",
-          dispatched_channels: Array.from(new Set([...(o.dispatched_channels || []), "WhatsApp"]))
-        } : o));
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === order.id
+              ? {
+                  ...o,
+                  status: "DISPATCHED",
+                  dispatched_channels: Array.from(new Set([...(o.dispatched_channels || []), "WhatsApp"])),
+                }
+              : o
+          )
+        );
         showToast(`✅ WhatsApp siap kirim ke ${order.buyer_name}!`);
       }
     } catch (e) {
@@ -276,8 +319,8 @@ export default function AutonomousFulfillmentPage() {
   // Trigger Gmail Dispatch
   const handleDispatchGmail = async (order: AutonomousOrder) => {
     const email = encodeURIComponent(order.buyer_email);
-    const subject = encodeURIComponent(order.messages.gmail_subject);
-    const body = encodeURIComponent(order.messages.gmail_body);
+    const subject = encodeURIComponent(order.messages?.gmail_subject || "");
+    const body = encodeURIComponent(order.messages?.gmail_body || "");
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
 
     window.open(gmailUrl, "_blank");
@@ -286,15 +329,21 @@ export default function AutonomousFulfillmentPage() {
       const res = await fetch("/api/orders/autonomous", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: order.id, channel: "Gmail" })
+        body: JSON.stringify({ id: order.id, channel: "Gmail" }),
       });
       if (res.ok) {
-        setOrders(prev => prev.map(o => o.id === order.id ? {
-          ...o,
-          status: "DISPATCHED",
-          dispatched_channels: Array.from(new Set([...(o.dispatched_channels || []), "Gmail"]))
-        } : o));
-        showToast(`✅ Draft Gmail berhasil disiapkan untuk ${order.buyer_email}!`);
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === order.id
+              ? {
+                  ...o,
+                  status: "DISPATCHED",
+                  dispatched_channels: Array.from(new Set([...(o.dispatched_channels || []), "Gmail"])),
+                }
+              : o
+          )
+        );
+        showToast(`✅ Draft Gmail siap untuk ${order.buyer_email}!`);
       }
     } catch (e) {
       console.error(e);
@@ -303,20 +352,42 @@ export default function AutonomousFulfillmentPage() {
 
   // Copy Shopee Message
   const handleCopyShopeeChat = async (order: AutonomousOrder) => {
-    navigator.clipboard.writeText(order.messages.shopee_chat);
+    navigator.clipboard.writeText(order.messages?.shopee_chat || "");
     try {
       await fetch("/api/orders/autonomous", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: order.id, channel: "Shopee" })
+        body: JSON.stringify({ id: order.id, channel: "Shopee" }),
       });
-      setOrders(prev => prev.map(o => o.id === order.id ? {
-        ...o,
-        status: "DISPATCHED",
-        dispatched_channels: Array.from(new Set([...(o.dispatched_channels || []), "Shopee"]))
-      } : o));
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === order.id
+            ? {
+                ...o,
+                status: "DISPATCHED",
+                dispatched_channels: Array.from(new Set([...(o.dispatched_channels || []), "Shopee"])),
+              }
+            : o
+        )
+      );
     } catch (e) {}
     showToast(`📋 Chat Shopee berhasil disalin ke clipboard!`);
+  };
+
+  // Delete Order
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm("Hapus pesanan ini dari antrean dispatch?")) return;
+    try {
+      const res = await fetch(`/api/orders/autonomous?id=${encodeURIComponent(orderId)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        showToast("Pesanan berhasil dihapus.");
+      }
+    } catch (e) {
+      showToast("Gagal menghapus pesanan.");
+    }
   };
 
   // Simulate or Create Order
@@ -335,1541 +406,1356 @@ export default function AutonomousFulfillmentPage() {
       const res = await fetch("/api/orders/autonomous", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(preset)
+        body: JSON.stringify(preset),
       });
       const json = await res.json();
       if (json.status === "success" && json.order) {
-        setOrders(prev => [json.order, ...prev]);
-        fetchVault(); // Refresh vault to sync consumed stock
+        setOrders((prev) => [json.order, ...prev]);
+        fetchVault();
         const sourceNotice = json.order.credentials?.vault_id
           ? ` (Dialokasikan dari Brankas #${json.order.credentials.vault_id})`
           : "";
         showToast(`⚡ Pesanan (${json.order.order_id}) diproses${sourceNotice}!`);
       }
     } catch (e) {
-      showToast("Gagal memproses pesanan.");
+      showToast("Gagal memproses pesanan simulasi.");
     } finally {
       setIsSimulating(false);
     }
   };
 
-  // Delete order
-  const handleDeleteOrder = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm("Hapus pesanan ini dari antrean otonom?")) return;
-    try {
-      const res = await fetch(`/api/orders/autonomous?id=${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setOrders(prev => prev.filter(o => o.id !== id));
-        showToast("Pesanan dihapus.");
-      }
-    } catch (e) {}
-  };
-
-  // Add Single Item to Vault
-  const handleAddSingleVault = async (e: React.FormEvent) => {
+  // Handle Manual Order Submission
+  const handleManualOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vFormUser.trim()) {
-      showToast("Username / Email wajib diisi!");
+    if (!formName.trim() || !formGame.trim()) {
+      showToast("Nama pembeli dan judul game wajib diisi.");
       return;
     }
+    await handleSimulateOrder({
+      buyer_name: formName,
+      buyer_phone: formPhone || "081234567890",
+      buyer_email: formEmail || `${formName.toLowerCase().replace(/[^a-z0-9]/g, "")}@example.com`,
+      game_title: formGame,
+      platform: formPlatform,
+      price_idr: Number(formPrice) || 199000,
+      channel: formChannel,
+      use_vault: formUseVault,
+    });
+    setShowManualModal(false);
+    setFormName("");
+    setFormPhone("");
+    setFormEmail("");
+  };
+
+  // Save or Update Vault Item
+  const handleSaveVaultItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vFormUser.trim() || !vFormPass.trim()) {
+      showToast("Username dan password wajib diisi.");
+      return;
+    }
+
+    const payload = {
+      id: editingVaultItem ? editingVaultItem.id : undefined,
+      game_title: vFormGame,
+      platform: vFormPlatform,
+      category: vFormCategory,
+      username: vFormUser.trim(),
+      password: vFormPass.trim(),
+      cost_idr: Number(vFormCost) || 100000,
+      supplier_name: vFormSupplier || "G2G Verified",
+      notes: vFormNotes || "",
+    };
+
     try {
       const res = await fetch("/api/inventory/vault", {
-        method: "POST",
+        method: editingVaultItem ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          game_title: vFormGame,
-          platform: vFormPlatform,
-          category: vFormCategory,
-          username: vFormUser.trim(),
-          password: vFormPass.trim(),
-          cost_idr: vFormCost,
-          supplier_name: vFormSupplier,
-          notes: vFormNotes
-        })
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (json.status === "success") {
-        showToast(`✅ ${json.message}`);
+        fetchVault();
         setShowAddVaultModal(false);
+        setEditingVaultItem(null);
         setVFormUser("");
         setVFormPass("");
-        fetchVault();
+        showToast(editingVaultItem ? "Item brankas diperbarui!" : "Stok brankas berhasil ditambahkan!");
+      } else {
+        showToast(json.error || "Gagal menyimpan item brankas.");
       }
-    } catch (e) {
-      showToast("Gagal menambahkan unit ke brankas.");
+    } catch (err) {
+      showToast("Terjadi kesalahan jaringan.");
     }
   };
 
-  // Bulk Import to Vault
-  const handleBulkImportVault = async (e: React.FormEvent) => {
+  // Bulk Import Vault Items
+  const handleBulkImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bulkRaw.trim()) {
-      showToast("Masukkan data kredensial massal terlebih dahulu!");
+      showToast("Isi data akun terlebih dahulu.");
       return;
     }
-    try {
-      const res = await fetch("/api/inventory/vault", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bulk_raw: bulkRaw,
+
+    const lines = bulkRaw
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    const itemsToImport: any[] = [];
+    for (const line of lines) {
+      let u = "";
+      let p = "";
+      let n = "";
+
+      if (line.includes(":")) {
+        const parts = line.split(":");
+        u = parts[0]?.trim() || "";
+        p = parts[1]?.trim() || "";
+        n = parts.slice(2).join(":").trim();
+      } else if (line.includes(",")) {
+        const parts = line.split(",");
+        u = parts[0]?.trim() || "";
+        p = parts[1]?.trim() || "";
+        n = parts.slice(2).join(",").trim();
+      } else if (line.includes("|")) {
+        const parts = line.split("|");
+        u = parts[0]?.trim() || "";
+        p = parts[1]?.trim() || "";
+        n = parts.slice(2).join("|").trim();
+      }
+
+      if (u && p) {
+        itemsToImport.push({
           game_title: bulkGame,
           platform: bulkPlatform,
           category: bulkCategory,
-          cost_idr: bulkCost,
-          supplier_name: bulkSupplier,
-          notes: "Impor massal Mode A"
-        })
-      });
-      const json = await res.json();
-      if (json.status === "success") {
-        showToast(`⚡ ${json.message}`);
-        setShowBulkImportModal(false);
-        setBulkRaw("");
-        fetchVault();
+          username: u,
+          password: p,
+          cost_idr: Number(bulkCost) || 100000,
+          supplier_name: bulkSupplier || "G2G Bulk Import",
+          notes: n || "Impor massal",
+        });
       }
+    }
+
+    if (itemsToImport.length === 0) {
+      showToast("Format tidak valid. Gunakan format username:password per baris.");
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      for (const item of itemsToImport) {
+        const res = await fetch("/api/inventory/vault", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item),
+        });
+        if (res.ok) successCount++;
+      }
+      fetchVault();
+      setShowBulkImportModal(false);
+      setBulkRaw("");
+      showToast(`✅ Berhasil mengimpor ${successCount} item ke brankas!`);
     } catch (e) {
       showToast("Gagal melakukan impor massal.");
     }
   };
 
-  // Delete item from Vault
-  const handleDeleteVaultItem = async (id: string) => {
-    if (!confirm(`Hapus unit ${id} dari brankas stok?`)) return;
+  // Delete Vault Item
+  const handleDeleteVaultItem = async (itemId: string) => {
+    if (!confirm("Hapus item ini dari brankas stok?")) return;
     try {
-      const res = await fetch(`/api/inventory/vault?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/inventory/vault?id=${encodeURIComponent(itemId)}`, {
+        method: "DELETE",
+      });
       if (res.ok) {
-        setVaultItems(prev => prev.filter(i => i.id !== id));
-        fetchVault();
-        showToast("Unit dihapus dari brankas.");
+        setVaultItems((prev) => prev.filter((v) => v.id !== itemId));
+        showToast("Item brankas berhasil dihapus.");
       }
-    } catch (e) {}
+    } catch (e) {
+      showToast("Gagal menghapus item brankas.");
+    }
   };
 
-  // Toggle Mask Password in Vault Table
-  const toggleRevealPassword = (id: string) => {
-    setRevealedPasswords(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+  // Calculations for Vault metrics
+  const availableVaultCount = vaultItems.filter((i) => i.status === "AVAILABLE").length;
+  const dispatchedVaultCount = vaultItems.filter((i) => i.status === "DISPATCHED").length;
+  const totalCostReady = vaultItems
+    .filter((i) => i.status === "AVAILABLE")
+    .reduce((acc, curr) => acc + (Number(curr.cost_idr) || 0), 0);
 
-  const formatRp = (val: number) => {
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(val || 0);
-  };
+  // Group vault by game to check low stock
+  const vaultByGame: Record<string, number> = {};
+  vaultItems.forEach((item) => {
+    if (item.status === "AVAILABLE") {
+      vaultByGame[item.game_title] = (vaultByGame[item.game_title] || 0) + 1;
+    }
+  });
+  const lowStockGames = Object.entries(vaultByGame).filter(([, count]) => count <= 2);
 
   // Filtered Orders
-  const filteredOrders = orders.filter(o => {
+  const filteredOrders = orders.filter((o) => {
     const matchesSearch =
-      o.order_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.buyer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.game_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.buyer_phone.includes(searchQuery) ||
-      o.buyer_email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "ALL" || o.status === statusFilter;
+      (o.buyer_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (o.order_id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (o.game_title || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus =
+      statusFilter === "ALL" ? true : statusFilter === "PROCESSED" ? o.status === "PROCESSED" || o.status === "PENDING" : o.status === "DISPATCHED";
     return matchesSearch && matchesStatus;
   });
 
-  // Filtered Vault Items
-  const filteredVaultItems = vaultItems.filter(item => {
+  // Filtered Vault
+  const filteredVault = vaultItems.filter((v) => {
     const matchesSearch =
-      item.game_title.toLowerCase().includes(vaultSearchQuery.toLowerCase()) ||
-      item.username.toLowerCase().includes(vaultSearchQuery.toLowerCase()) ||
-      item.supplier_name.toLowerCase().includes(vaultSearchQuery.toLowerCase()) ||
-      item.id.toLowerCase().includes(vaultSearchQuery.toLowerCase()) ||
-      (item.assigned_order_id && item.assigned_order_id.toLowerCase().includes(vaultSearchQuery.toLowerCase()));
-    const matchesStatus = vaultStatusFilter === "ALL" || item.status === vaultStatusFilter;
+      (v.game_title || "").toLowerCase().includes(vaultSearchQuery.toLowerCase()) ||
+      (v.username || "").toLowerCase().includes(vaultSearchQuery.toLowerCase()) ||
+      (v.supplier_name || "").toLowerCase().includes(vaultSearchQuery.toLowerCase());
+    const matchesStatus = vaultStatusFilter === "ALL" ? true : v.status === vaultStatusFilter;
     return matchesSearch && matchesStatus;
   });
-
-  const availableVaultCount = vaultItems.filter(i => i.status === "AVAILABLE").length;
-  const dispatchedVaultCount = vaultItems.filter(i => i.status === "DISPATCHED").length;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-medium px-4 py-3 rounded-xl shadow-lg border border-slate-800 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
 
-        {/* Top Header & Breadcrumb */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-zinc-800/80">
-          <div className="flex items-center gap-2 text-sm text-zinc-400">
-            <Link href="/dashboard" className="hover:text-zinc-200 transition-colors flex items-center gap-1">
-              <ArrowLeft className="w-4 h-4" /> Command Deck
-            </Link>
-            <span className="text-zinc-600">/</span>
-            <span className="text-zinc-200 font-medium">Auto-Fulfillment & Vault</span>
-            <span className="text-zinc-600">/</span>
-            <span className="text-emerald-400 font-mono text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-800/50 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              Mode A & JIT Active
+      {/* ─── 1. Header Halaman ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              Auto-Fulfillment &amp; Buffer Vault
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Mode A Vault + JIT
             </span>
           </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setAutoPilotOn(!autoPilotOn)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all border flex items-center gap-2 ${
-                autoPilotOn
-                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <Zap className={`w-3.5 h-3.5 ${autoPilotOn ? "text-emerald-400 animate-bounce" : "text-zinc-500"}`} />
-              <span>Auto-Pilot: {autoPilotOn ? "ON (OTONOM)" : "PAUSED"}</span>
-            </button>
-
-            <Link
-              href="/dashboard/catalog"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-all"
-            >
-              <Store className="w-3.5 h-3.5 text-amber-400" /> Radar Portofolio ({catalogGames.length})
-            </Link>
-            <Link
-              href="/dashboard/description"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-all"
-            >
-              <FileText className="w-3.5 h-3.5 text-fuchsia-400" /> Deskripsi Maker
-            </Link>
-          </div>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Otomasi pemenuhan pesanan Shopee &amp; Direct: dispatch instan dari brankas stok (Mode A) dan approval JIT HITL via Telegram.
+          </p>
         </div>
 
-        {/* Hero Banner */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-gradient-to-r from-emerald-950/25 via-zinc-900 to-transparent p-6 rounded-2xl border border-emerald-500/20">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-md">
-                <Zap className="w-5 h-5" />
-              </div>
-              Autonomous Fulfillment & Buffer Vault
-            </h1>
-            <p className="text-sm text-zinc-400 mt-2 max-w-2xl leading-relaxed">
-              Arsitektur pemenuhan pesanan otonom: gabungan <span className="text-emerald-400 font-semibold">Mode A (Brankas Stok Buffer / 0 Detik)</span> dengan <span className="text-amber-400 font-semibold">Mode JIT</span> untuk pengiriman otomatis via WhatsApp, Gmail, dan Shopee Chat.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            {mainTab === "vault" ? (
-              <>
-                <button
-                  onClick={() => setShowBulkImportModal(true)}
-                  className="px-3.5 py-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/30 text-purple-300 text-xs font-mono font-semibold transition-all flex items-center gap-1.5 shadow-sm"
-                >
-                  <Upload className="w-4 h-4 text-purple-400" />
-                  <span>Impor Massal (Bulk Paste)</span>
-                </button>
-                <button
-                  onClick={() => setShowAddVaultModal(true)}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-black text-xs font-mono font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-950/40"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Tambah Stok Satuan</span>
-                </button>
-              </>
-            ) : (
+        {/* Action Buttons Right */}
+        <div className="flex items-center gap-2.5">
+          {mainTab === "dispatch" ? (
+            <>
               <button
-                onClick={() => setShowManualModal(true)}
-                className="px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-mono font-semibold transition-all flex items-center gap-1.5"
+                type="button"
+                onClick={() => setShowSimulationPanel(!showSimulationPanel)}
+                className="btn-secondary text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5 shadow-sm"
               >
-                <Plus className="w-4 h-4 text-emerald-400" />
+                <Sparkles className="w-3.5 h-3.5 text-slate-500" />
+                <span>Simulasi Uji Coba</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
+                    showSimulationPanel ? "transform rotate-180" : ""
+                  }`}
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowManualModal(true)}
+                className="btn-primary-emerald text-xs font-semibold px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
                 <span>Input Order Manual</span>
               </button>
-            )}
-          </div>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowBulkImportModal(true)}
+                className="btn-secondary text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5 shadow-sm"
+              >
+                <Upload className="w-3.5 h-3.5 text-slate-500" />
+                <span>Impor Massal</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingVaultItem(null);
+                  setVFormUser("");
+                  setVFormPass("");
+                  setShowAddVaultModal(true);
+                }}
+                className="btn-primary-emerald text-xs font-semibold px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Tambah Stok Satuan</span>
+              </button>
+            </>
+          )}
         </div>
+      </div>
 
-        {/* Master Navigation Switcher: Tab Dispatch vs Tab Vault (Mode A) */}
-        <div className="flex items-center gap-3 p-1.5 bg-zinc-900/80 rounded-2xl border border-zinc-800/80 max-w-xl">
-          <button
-            onClick={() => setMainTab("dispatch")}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 ${
-              mainTab === "dispatch"
-                ? "bg-zinc-800 text-white shadow-md border border-zinc-700/60"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
-            }`}
-          >
-            <Send className="w-4 h-4 text-emerald-400" />
-            <span>Antrean Dispatch Live</span>
-            <span className="px-2 py-0.5 rounded-full bg-zinc-950 text-zinc-300 text-[10px] border border-zinc-700">
-              {orders.length}
-            </span>
-          </button>
+      {/* ─── 2. Segmented Tab Switcher (Clean Light Pill) ─── */}
+      <div className="bg-slate-100 p-1 rounded-xl border border-slate-200 inline-flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setMainTab("dispatch")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
+            mainTab === "dispatch"
+              ? "bg-white text-slate-900 shadow-sm border border-slate-200/80"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Antrean Dispatch ({orders.length})</span>
+        </button>
 
-          <button
-            onClick={() => setMainTab("vault")}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 ${
-              mainTab === "vault"
-                ? "bg-emerald-950/50 text-emerald-300 shadow-md border border-emerald-500/40"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
-            }`}
-          >
-            <Database className="w-4 h-4 text-emerald-400" />
-            <span>Brankas Stok Buffer (Mode A)</span>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[10px] border border-emerald-800/60 font-bold">
-              {availableVaultCount} Ready
-            </span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setMainTab("vault")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
+            mainTab === "vault"
+              ? "bg-white text-slate-900 shadow-sm border border-slate-200/80"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Database className="w-3.5 h-3.5 text-indigo-600" />
+          <span>Brankas Stok Buffer ({availableVaultCount} Ready)</span>
+        </button>
+      </div>
 
-        {/* ========================================================================= */}
-        {/* TAB 1: ANTREAN DISPATCH LIVE                                              */}
-        {/* ========================================================================= */}
-        {mainTab === "dispatch" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Quick Simulator Test Strip */}
-            <div className="v0-card rounded-2xl p-4 border-zinc-800/80 bg-zinc-900/40 space-y-2.5">
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* TAB 1: ANTREAN DISPATCH                                   */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {mainTab === "dispatch" && (
+        <div className="space-y-6">
+          {/* Collapsible Panel Simulasi (Default Tertutup) */}
+          {showSimulationPanel && (
+            <div className="app-card p-5 border-l-4 border-l-emerald-500 bg-white space-y-3">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  Simulasi Order Masuk (Mode A Auto-Consumes Buffer Vault):
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    Simulasi Ingestion Order Cepat
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Uji coba alur pemenuhan pesanan instan. Jika stok tersedia di brankas, kredensial langsung teralokasi otomatis.
+                  </p>
                 </div>
-                <span className="text-[11px] font-mono text-zinc-500">Klik untuk uji eksekusi instan</span>
+                <button
+                  onClick={() => setShowSimulationPanel(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                <button
-                  onClick={() => handleSimulateOrder({
-                    buyer_name: "Kak Dimas Prasetyo",
-                    buyer_phone: "081234567890",
-                    buyer_email: "dimas.prasetyo@gmail.com",
-                    game_title: "Minecraft: Java & Bedrock Edition",
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                {[
+                  {
+                    title: "Terraria (Steam Account)",
+                    buyer: "Kak Dimas",
+                    phone: "081234567890",
+                    price: 99000,
+                    platform: "PC / Steam Key",
+                  },
+                  {
+                    title: "Minecraft: Java & Bedrock Edition",
+                    buyer: "Kak Rian",
+                    phone: "089876543210",
+                    price: 219900,
                     platform: "PC / Microsoft",
-                    price_idr: 219900,
-                    channel: "Shopee",
-                    use_vault: true
-                  })}
-                  disabled={isSimulating}
-                  className="p-2.5 rounded-xl bg-zinc-950/80 hover:bg-emerald-950/30 border border-zinc-800 hover:border-emerald-500/40 text-left transition-all text-xs font-mono group disabled:opacity-50"
-                >
-                  <div className="font-bold text-zinc-200 group-hover:text-emerald-400 flex items-center justify-between">
-                    <span>Minecraft (Kak Dimas)</span>
-                    <span className="text-[10px] text-emerald-400 font-normal">Vault Auto</span>
-                  </div>
-                  <div className="text-[10px] text-zinc-500 mt-1">Rp 219.900 • Shopee IMAP</div>
-                </button>
-
-                <button
-                  onClick={() => handleSimulateOrder({
-                    buyer_name: "Kak Rian Kurniawan",
-                    buyer_phone: "085712345678",
-                    buyer_email: "rian.kurniawan@gmail.com",
-                    game_title: "Grand Theft Auto V: Enhanced Edition",
+                  },
+                  {
+                    title: "Grand Theft Auto V: Premium Edition",
+                    buyer: "Kak Alvin",
+                    phone: "081345678901",
+                    price: 185000,
                     platform: "Rockstar / Steam",
-                    price_idr: 149000,
-                    channel: "Shopee",
-                    use_vault: true
-                  })}
-                  disabled={isSimulating}
-                  className="p-2.5 rounded-xl bg-zinc-950/80 hover:bg-amber-950/30 border border-zinc-800 hover:border-amber-500/40 text-left transition-all text-xs font-mono group disabled:opacity-50"
-                >
-                  <div className="font-bold text-zinc-200 group-hover:text-amber-400 flex items-center justify-between">
-                    <span>GTA V (Kak Rian)</span>
-                    <span className="text-[10px] text-amber-400 font-normal">Vault Ready</span>
-                  </div>
-                  <div className="text-[10px] text-zinc-500 mt-1">Rp 149.000 • Shopee Direct</div>
-                </button>
-
-                <button
-                  onClick={() => handleSimulateOrder({
-                    buyer_name: "Kak Satria Ramadhan",
-                    buyer_phone: "081987654321",
-                    buyer_email: "satria.ramadhan@gmail.com",
-                    game_title: "Terraria",
-                    platform: "Steam",
-                    price_idr: 39900,
-                    channel: "WhatsApp Web",
-                    use_vault: true
-                  })}
-                  disabled={isSimulating}
-                  className="p-2.5 rounded-xl bg-zinc-950/80 hover:bg-fuchsia-950/30 border border-zinc-800 hover:border-fuchsia-500/40 text-left transition-all text-xs font-mono group disabled:opacity-50"
-                >
-                  <div className="font-bold text-zinc-200 group-hover:text-fuchsia-400 flex items-center justify-between">
-                    <span>Terraria (Kak Satria)</span>
-                    <span className="text-[10px] text-fuchsia-400 font-normal">Multi-Channel</span>
-                  </div>
-                  <div className="text-[10px] text-zinc-500 mt-1">Rp 39.900 • Web Direct</div>
-                </button>
-
-                <button
-                  onClick={() => handleSimulateOrder({
-                    buyer_name: "Kak Budi Santoso",
-                    buyer_phone: "082198765432",
-                    buyer_email: "budi.santoso@gmail.com",
-                    game_title: "Black Myth: Wukong Standard Edition",
-                    platform: "Steam",
-                    price_idr: 349000,
-                    channel: "Shopee",
-                    use_vault: true
-                  })}
-                  disabled={isSimulating}
-                  className="p-2.5 rounded-xl bg-zinc-950/80 hover:bg-purple-950/30 border border-zinc-800 hover:border-purple-500/40 text-left transition-all text-xs font-mono group disabled:opacity-50"
-                >
-                  <div className="font-bold text-zinc-200 group-hover:text-purple-400 flex items-center justify-between">
-                    <span>Wukong (Kak Budi)</span>
-                    <span className="text-[10px] text-emerald-400 font-normal">Full Auto</span>
-                  </div>
-                  <div className="text-[10px] text-zinc-500 mt-1">Rp 349.000 • Shopee Mall</div>
-                </button>
+                  },
+                ].map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    disabled={isSimulating}
+                    onClick={() =>
+                      handleSimulateOrder({
+                        buyer_name: preset.buyer,
+                        buyer_phone: preset.phone,
+                        buyer_email: `${preset.buyer.toLowerCase().replace(/[^a-z0-9]/g, "")}@example.com`,
+                        game_title: preset.title,
+                        platform: preset.platform,
+                        price_idr: preset.price,
+                        channel: "Shopee",
+                        use_vault: true,
+                      })
+                    }
+                    className="p-3 rounded-lg border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 text-left transition-all group"
+                  >
+                    <div className="text-xs font-semibold text-slate-900 group-hover:text-emerald-700">
+                      {preset.title}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1 flex justify-between tabular-nums">
+                      <span>{preset.buyer}</span>
+                      <span className="font-semibold text-slate-700">Rp {formatRp(preset.price)}</span>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
+          )}
 
-            {/* Quick Metrics Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="v0-card rounded-2xl p-4 border-zinc-800/80 bg-zinc-900/40">
-                <div className="text-[11px] font-mono text-zinc-500 flex items-center justify-between">
-                  <span>TOTAL ORDER OTONOM</span>
-                  <ShoppingBag className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div className="text-2xl font-bold font-mono text-white mt-2">
-                  {stats?.total_orders || orders.length}
-                </div>
-                <div className="text-[11px] text-zinc-400 mt-1">Diproses sistem</div>
+          {/* 4 KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="app-card p-4 sm:p-5">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1">
+                Total Order
+              </span>
+              <div className="text-2xl font-bold text-slate-900 tabular-nums">
+                {orders.length}
               </div>
-
-              <div className="v0-card rounded-2xl p-4 border-zinc-800/80 bg-zinc-900/40">
-                <div className="text-[11px] font-mono text-zinc-500 flex items-center justify-between">
-                  <span>DISPATCH WHATSAPP</span>
-                  <Smartphone className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div className="text-2xl font-bold font-mono text-emerald-400 mt-2">
-                  {orders.filter(o => o.dispatched_channels?.includes("WhatsApp")).length}
-                </div>
-                <div className="text-[11px] text-zinc-400 mt-1">1-Click Direct WA API</div>
-              </div>
-
-              <div className="v0-card rounded-2xl p-4 border-zinc-800/80 bg-zinc-900/40">
-                <div className="text-[11px] font-mono text-zinc-500 flex items-center justify-between">
-                  <span>DISPATCH GMAIL</span>
-                  <Mail className="w-4 h-4 text-rose-400" />
-                </div>
-                <div className="text-2xl font-bold font-mono text-rose-400 mt-2">
-                  {orders.filter(o => o.dispatched_channels?.includes("Gmail")).length}
-                </div>
-                <div className="text-[11px] text-zinc-400 mt-1">Direct Web Composer</div>
-              </div>
-
-              <div className="v0-card rounded-2xl p-4 border-zinc-800/80 bg-zinc-900/40">
-                <div className="text-[11px] font-mono text-zinc-500 flex items-center justify-between">
-                  <span>STOK BUFFER READY</span>
-                  <Database className="w-4 h-4 text-amber-400" />
-                </div>
-                <div className="text-2xl font-bold font-mono text-amber-400 mt-2">
-                  {availableVaultCount} Unit
-                </div>
-                <div className="text-[11px] text-zinc-400 mt-1">Mode A Instant Vault</div>
-              </div>
+              <p className="text-[11px] text-slate-500 mt-1">Antrean diproses</p>
             </div>
 
-            {/* Filter & Search Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-zinc-900/60 p-3 rounded-2xl border border-zinc-800/80">
-              <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input
-                  type="text"
-                  placeholder="Cari order, pembeli, game, no HP..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3.5 py-2 text-xs font-mono text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
-                />
+            <div className="app-card p-4 sm:p-5">
+              <span className="text-xs font-medium text-emerald-800 uppercase tracking-wider block mb-1">
+                Terkirim WA
+              </span>
+              <div className="text-2xl font-bold text-emerald-600 tabular-nums">
+                {orders.filter((o) => o.dispatched_channels?.includes("WhatsApp")).length}
               </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 text-xs font-mono">
-                  <button
-                    onClick={() => setStatusFilter("ALL")}
-                    className={`px-3 py-1 rounded-lg transition-colors ${statusFilter === "ALL" ? "bg-zinc-800 text-white font-bold" : "text-zinc-400 hover:text-zinc-200"}`}
-                  >
-                    Semua ({orders.length})
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter("PROCESSED")}
-                    className={`px-3 py-1 rounded-lg transition-colors ${statusFilter === "PROCESSED" ? "bg-amber-950/60 text-amber-400 font-bold" : "text-zinc-400 hover:text-zinc-200"}`}
-                  >
-                    Pending ({orders.filter(o => o.status === "PROCESSED").length})
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter("DISPATCHED")}
-                    className={`px-3 py-1 rounded-lg transition-colors ${statusFilter === "DISPATCHED" ? "bg-emerald-950/60 text-emerald-400 font-bold" : "text-zinc-400 hover:text-zinc-200"}`}
-                  >
-                    Terkirim ({orders.filter(o => o.status === "DISPATCHED").length})
-                  </button>
-                </div>
-
-                <button
-                  onClick={fetchOrders}
-                  className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-                  title="Refresh data"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
+              <p className="text-[11px] text-slate-500 mt-1">Notifikasi WhatsApp</p>
             </div>
 
-            {/* Orders Feed */}
-            {filteredOrders.length === 0 ? (
-              <div className="p-12 text-center rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/20">
-                <Clock className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-                <div className="font-mono text-sm text-zinc-400">Belum ada pesanan dalam antrean</div>
-                <p className="text-xs text-zinc-600 mt-1 max-w-sm mx-auto">
-                  Gunakan tombol simulasi di atas atau input manual untuk menguji proses fulfillment otonom.
-                </p>
+            <div className="app-card p-4 sm:p-5">
+              <span className="text-xs font-medium text-indigo-800 uppercase tracking-wider block mb-1">
+                Terkirim Gmail
+              </span>
+              <div className="text-2xl font-bold text-indigo-600 tabular-nums">
+                {orders.filter((o) => o.dispatched_channels?.includes("Gmail")).length}
               </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredOrders.map((order) => {
-                  const isDispatched = order.status === "DISPATCHED";
-                  const isWaDispatched = order.dispatched_channels?.includes("WhatsApp");
-                  const isGmailDispatched = order.dispatched_channels?.includes("Gmail");
-                  const isShopeeDispatched = order.dispatched_channels?.includes("Shopee");
+              <p className="text-[11px] text-slate-500 mt-1">Sertifikat terkirim</p>
+            </div>
 
-                  return (
-                    <div
-                      key={order.id}
-                      onClick={() => setInspectOrder(order)}
-                      className={`v0-card rounded-2xl p-4 md:p-5 border transition-all cursor-pointer hover:border-zinc-700 bg-zinc-900/50 hover:bg-zinc-900/80 ${
-                        isDispatched ? "border-zinc-800/80 opacity-90" : "border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
-                      }`}
-                    >
-                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        {/* Order & Game Info */}
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono font-bold text-xs px-2.5 py-0.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300">
-                              {order.order_id}
-                            </span>
-                            <span className="font-mono text-[11px] text-zinc-500">
-                              {order.created_at}
-                            </span>
-                            <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
-                              {order.channel}
-                            </span>
-                            {order.credentials?.vault_id && (
-                              <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-emerald-950/70 border border-emerald-800/50 text-emerald-300 flex items-center gap-1">
-                                <Database className="w-3 h-3 text-emerald-400" /> Mode A Vault ({order.credentials.vault_id})
-                              </span>
-                            )}
-                            <span className={`font-mono text-[10px] px-2 py-0.5 rounded font-semibold flex items-center gap-1 ${
-                              isDispatched ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800/60" : "bg-amber-950/80 text-amber-400 border border-amber-800/60"
-                            }`}>
-                              {isDispatched ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                              {isDispatched ? "DISPATCHED" : "READY TO DISPATCH"}
-                            </span>
-                          </div>
+            <div className="app-card p-4 sm:p-5">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1">
+                Stok Buffer Ready
+              </span>
+              <div className="text-2xl font-bold text-slate-900 tabular-nums">
+                {availableVaultCount}{" "}
+                <span className="text-xs font-normal text-slate-500">Unit</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">Siap alokasi instan</p>
+            </div>
+          </div>
 
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                            <div className="font-bold text-sm text-white flex items-center gap-1.5">
-                              <span>{order.game_title}</span>
-                              <span className="text-xs font-normal text-zinc-400 font-mono">[{order.platform}]</span>
-                            </div>
-                            <span className="text-xs font-mono text-emerald-400 font-semibold">
-                              {formatRp(order.price_idr)}
-                            </span>
-                          </div>
+          {/* Filter & Search Bar */}
+          <div className="app-card p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari pembeli, order ID, atau judul game..."
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-slate-400 text-slate-900 placeholder-slate-400"
+              />
+            </div>
 
-                          <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-zinc-400">
-                            <span className="flex items-center gap-1 text-zinc-300">
-                              👤 {order.buyer_name}
-                            </span>
-                            <span className="flex items-center gap-1 text-zinc-500">
-                              📱 {order.buyer_phone}
-                            </span>
-                            <span className="flex items-center gap-1 text-zinc-500">
-                              ✉️ {order.buyer_email}
-                            </span>
-                            <span className="flex items-center gap-1 text-zinc-500">
-                              🔑 {order.credentials?.username}
-                            </span>
-                          </div>
-                        </div>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                {(["ALL", "PROCESSED", "DISPATCHED"] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setStatusFilter(st)}
+                    className={`px-3 py-1 rounded-md font-medium text-[11px] transition-colors ${
+                      statusFilter === st
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    {st === "ALL" ? "Semua" : st === "PROCESSED" ? "Ready Kirim" : "Terkirim"}
+                  </button>
+                ))}
+              </div>
 
-                        {/* 1-Click Action Dispatch Buttons */}
-                        <div className="flex flex-wrap items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                          {/* WhatsApp Button */}
-                          <button
-                            onClick={() => handleDispatchWhatsApp(order)}
-                            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 border ${
-                              isWaDispatched
-                                ? "bg-emerald-950/40 border-emerald-800/40 text-emerald-300 hover:bg-emerald-900/50"
-                                : "bg-emerald-600 hover:bg-emerald-500 text-black border-emerald-500 shadow-md shadow-emerald-950/40"
-                            }`}
-                            title="Kirim kredensial via WhatsApp"
-                          >
-                            <Smartphone className="w-3.5 h-3.5" />
-                            <span>{isWaDispatched ? "Sent WA ✓" : "Kirim WA"}</span>
-                          </button>
+              <button
+                onClick={() => fetchOrders()}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                title="Refresh Antrean"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
 
-                          {/* Gmail Button */}
-                          <button
-                            onClick={() => handleDispatchGmail(order)}
-                            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 border ${
-                              isGmailDispatched
-                                ? "bg-rose-950/40 border-rose-800/40 text-rose-300 hover:bg-rose-900/50"
-                                : "bg-zinc-900 hover:bg-zinc-800 text-rose-400 border-rose-900/50"
-                            }`}
-                            title="Kirim data via Gmail"
-                          >
-                            <Mail className="w-3.5 h-3.5" />
-                            <span>{isGmailDispatched ? "Drafted ✓" : "Gmail"}</span>
-                          </button>
+          {/* Daftar Order Cards */}
+          {filteredOrders.length > 0 ? (
+            <div className="space-y-3">
+              {filteredOrders.map((order) => {
+                const isDispatched = order.status === "DISPATCHED";
+                const hasWa = order.dispatched_channels?.includes("WhatsApp");
+                const hasGmail = order.dispatched_channels?.includes("Gmail");
+                const hasShopee = order.dispatched_channels?.includes("Shopee");
 
-                          {/* Shopee Chat Copy Button */}
-                          <button
-                            onClick={() => handleCopyShopeeChat(order)}
-                            className={`px-3 py-2 rounded-xl text-xs font-mono font-semibold transition-all flex items-center gap-1.5 border ${
-                              isShopeeDispatched
-                                ? "bg-amber-950/40 border-amber-800/40 text-amber-300"
-                                : "bg-zinc-900 hover:bg-zinc-800 text-amber-400 border-amber-900/50"
-                            }`}
-                            title="Salin chat Shopee"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>{isShopeeDispatched ? "Chat Copied ✓" : "Shopee Chat"}</span>
-                          </button>
+                return (
+                  <div
+                    key={order.id}
+                    className="app-card p-4 sm:p-5 bg-white hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    {/* Left: Info Order */}
+                    <div className="space-y-1.5 min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-slate-900">
+                          {order.order_id}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                            isDispatched
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          {isDispatched ? "Dispatched" : "Ready to Send"}
+                        </span>
+                        <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                          {order.channel}
+                        </span>
+                        {order.credentials?.vault_id && (
+                          <span className="text-[10px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                            Vault #{order.credentials.vault_id.slice(-4)}
+                          </span>
+                        )}
+                      </div>
 
-                          {/* Detail & Delete */}
-                          <button
-                            onClick={() => setInspectOrder(order)}
-                            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
-                            title="Lihat pesan lengkap"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <h4 className="text-sm font-semibold text-slate-900">
+                          {order.game_title}
+                        </h4>
+                        <span className="text-xs text-slate-500">({order.platform})</span>
+                      </div>
 
-                          <button
-                            onClick={(e) => handleDeleteOrder(order.id, e)}
-                            className="p-2 rounded-xl bg-zinc-900 hover:bg-rose-950/40 text-zinc-500 hover:text-rose-400 border border-zinc-800"
-                            title="Hapus"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                      <div className="text-xs text-slate-600 flex flex-wrap items-center gap-3 tabular-nums">
+                        <span>
+                          Buyer: <strong className="text-slate-800">{order.buyer_name}</strong>
+                        </span>
+                        <span>&bull;</span>
+                        <span>{order.buyer_phone}</span>
+                        <span>&bull;</span>
+                        <span className="font-semibold text-slate-900">Rp {formatRp(order.price_idr)}</span>
+                        <span>&bull;</span>
+                        <span className="text-slate-400 text-[11px]">{order.created_at}</span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* ========================================================================= */}
-        {/* TAB 2: BRANKAS STOK BUFFER (MODE A - PRE-STOCKING)                        */}
-        {/* ========================================================================= */}
-        {mainTab === "vault" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Vault Metrics Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="v0-card rounded-2xl p-4 border-zinc-800/80 bg-zinc-900/40">
-                <div className="text-[11px] font-mono text-zinc-500 flex items-center justify-between">
-                  <span>TOTAL UNIT DI BRANKAS</span>
-                  <Database className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div className="text-2xl font-bold font-mono text-white mt-2">
-                  {vaultStats?.total_items || vaultItems.length}
-                </div>
-                <div className="text-[11px] text-zinc-400 mt-1">Akun / Kunci Digital</div>
-              </div>
+                    {/* Right: Quick Action Buttons */}
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                      <button
+                        onClick={() => handleDispatchWhatsApp(order)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium inline-flex items-center gap-1.5 transition-colors ${
+                          hasWa
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                        }`}
+                        title="Kirim ke WhatsApp"
+                      >
+                        <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>WA</span>
+                      </button>
 
-              <div className="v0-card rounded-2xl p-4 border-zinc-800/80 bg-zinc-900/40">
-                <div className="text-[11px] font-mono text-zinc-500 flex items-center justify-between">
-                  <span>SIAP DISPATCH (READY)</span>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div className="text-2xl font-bold font-mono text-emerald-400 mt-2">
-                  {vaultStats?.available_items || availableVaultCount}
-                </div>
-                <div className="text-[11px] text-zinc-400 mt-1">Instant 0 Detik Delivery</div>
-              </div>
+                      <button
+                        onClick={() => handleDispatchGmail(order)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium inline-flex items-center gap-1.5 transition-colors ${
+                          hasGmail
+                            ? "bg-indigo-50 text-indigo-800 border-indigo-200"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                        }`}
+                        title="Kirim ke Gmail"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Gmail</span>
+                      </button>
 
-              <div className="v0-card rounded-2xl p-4 border-zinc-800/80 bg-zinc-900/40">
-                <div className="text-[11px] font-mono text-zinc-500 flex items-center justify-between">
-                  <span>SUDAH TERKIRIM</span>
-                  <Layers className="w-4 h-4 text-blue-400" />
-                </div>
-                <div className="text-2xl font-bold font-mono text-blue-400 mt-2">
-                  {vaultStats?.dispatched_items || dispatchedVaultCount}
-                </div>
-                <div className="text-[11px] text-zinc-400 mt-1">Teralokasi ke Pembeli</div>
-              </div>
+                      <button
+                        onClick={() => handleCopyShopeeChat(order)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium inline-flex items-center gap-1.5 transition-colors ${
+                          hasShopee
+                            ? "bg-orange-50 text-orange-800 border-orange-200"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                        }`}
+                        title="Salin Template Shopee Chat"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-orange-600" />
+                        <span>Shopee</span>
+                      </button>
 
-              <div className="v0-card rounded-2xl p-4 border-zinc-800/80 bg-zinc-900/40">
-                <div className="text-[11px] font-mono text-zinc-500 flex items-center justify-between">
-                  <span>NILAI ASET MODAL</span>
-                  <DollarSign className="w-4 h-4 text-amber-400" />
-                </div>
-                <div className="text-xl font-bold font-mono text-amber-400 mt-2">
-                  {formatRp(vaultStats?.total_capital_value_idr || 0)}
-                </div>
-                <div className="text-[11px] text-zinc-400 mt-1">Modal Stok Aktif</div>
-              </div>
-            </div>
+                      <button
+                        onClick={() => {
+                          setInspectOrder(order);
+                          setInspectTab("whatsapp");
+                        }}
+                        className="btn-secondary text-xs px-2.5 py-1.5 rounded-lg"
+                        title="Buka Detail Pesanan"
+                      >
+                        Inspect
+                      </button>
 
-            {/* Low-Stock Warning Strip */}
-            {vaultStats?.low_stock_alerts && vaultStats.low_stock_alerts.length > 0 && (
-              <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-                  <div className="text-xs font-mono">
-                    <span className="font-bold text-amber-300">Peringatan Buffer Stok: </span>
-                    <span className="text-zinc-300">
-                      Ada {vaultStats.low_stock_alerts.length} game dengan stok sisa &le; 2 unit:{" "}
-                    </span>
-                    <span className="text-amber-400 font-semibold">
-                      {vaultStats.low_stock_alerts.map((a: any) => `${a.game_title} (${a.available_count} tersisa)`).join(", ")}
-                    </span>
+                      <button
+                        onClick={() => handleDeleteOrder(order.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Hapus Pesanan"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <button
-                  onClick={() => setShowBulkImportModal(true)}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono font-bold shrink-0 transition-colors"
-                >
-                  Restock Sekarang &rarr;
-                </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="app-card py-12 px-6 text-center flex flex-col items-center justify-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                <Inbox className="w-6 h-6" />
               </div>
-            )}
-
-            {/* Vault Filter & Search Toolbar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-zinc-900/60 p-3 rounded-2xl border border-zinc-800/80">
-              <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input
-                  type="text"
-                  placeholder="Cari game, username, ID unit, supplier..."
-                  value={vaultSearchQuery}
-                  onChange={(e) => setVaultSearchQuery(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3.5 py-2 text-xs font-mono text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 text-xs font-mono">
-                  <button
-                    onClick={() => setVaultStatusFilter("ALL")}
-                    className={`px-3 py-1 rounded-lg transition-colors ${vaultStatusFilter === "ALL" ? "bg-zinc-800 text-white font-bold" : "text-zinc-400 hover:text-zinc-200"}`}
-                  >
-                    Semua ({vaultItems.length})
-                  </button>
-                  <button
-                    onClick={() => setVaultStatusFilter("AVAILABLE")}
-                    className={`px-3 py-1 rounded-lg transition-colors ${vaultStatusFilter === "AVAILABLE" ? "bg-emerald-950/60 text-emerald-400 font-bold" : "text-zinc-400 hover:text-zinc-200"}`}
-                  >
-                    Ready ({availableVaultCount})
-                  </button>
-                  <button
-                    onClick={() => setVaultStatusFilter("DISPATCHED")}
-                    className={`px-3 py-1 rounded-lg transition-colors ${vaultStatusFilter === "DISPATCHED" ? "bg-blue-950/60 text-blue-400 font-bold" : "text-zinc-400 hover:text-zinc-200"}`}
-                  >
-                    Terkirim ({dispatchedVaultCount})
-                  </button>
-                </div>
-
-                <button
-                  onClick={fetchVault}
-                  className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-                  title="Muat ulang brankas"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800">Tidak ada pesanan di antrean</h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                  Gunakan tombol &quot;Simulasi Uji Coba&quot; atau &quot;Input Order Manual&quot; untuk memasukkan pesanan baru ke antrean.
+                </p>
               </div>
             </div>
+          )}
+        </div>
+      )}
 
-            {/* Vault Inventory Table */}
-            <div className="v0-card rounded-2xl border border-zinc-800/80 bg-zinc-900/40 overflow-hidden">
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* TAB 2: BRANKAS STOK BUFFER (MODE A)                       */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {mainTab === "vault" && (
+        <div className="space-y-6">
+          {/* Low Stock Warning Banner */}
+          {lowStockGames.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <span className="font-bold">Peringatan Stok Buffer Menipis:</span> Terdapat game dengan stok &le; 2 unit:{" "}
+                  {lowStockGames.map(([game, count]) => `${game} (${count} unit)`).join(", ")}.
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingVaultItem(null);
+                  setShowAddVaultModal(true);
+                }}
+                className="btn-primary text-xs font-medium px-3 py-1.5 rounded-lg shrink-0 self-start sm:self-auto"
+              >
+                + Restock Sekarang
+              </button>
+            </div>
+          )}
+
+          {/* 4 KPI Cards Vault */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="app-card p-4 sm:p-5">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1">
+                Total Akun Terdaftar
+              </span>
+              <div className="text-2xl font-bold text-slate-900 tabular-nums">
+                {vaultItems.length}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">Seluruh inventori</p>
+            </div>
+
+            <div className="app-card p-4 sm:p-5">
+              <span className="text-xs font-medium text-emerald-800 uppercase tracking-wider block mb-1">
+                Ready (Available)
+              </span>
+              <div className="text-2xl font-bold text-emerald-600 tabular-nums">
+                {availableVaultCount}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">Siap dialokasikan</p>
+            </div>
+
+            <div className="app-card p-4 sm:p-5">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1">
+                Dispatched
+              </span>
+              <div className="text-2xl font-bold text-slate-700 tabular-nums">
+                {dispatchedVaultCount}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">Telah diserahkan</p>
+            </div>
+
+            <div className="app-card p-4 sm:p-5">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1">
+                Nilai Aset Modal
+              </span>
+              <div className="text-2xl font-bold text-slate-900 tabular-nums">
+                Rp {formatRp(totalCostReady)}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">Modal stok aktif</p>
+            </div>
+          </div>
+
+          {/* Filter & Search Bar Vault */}
+          <div className="app-card p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={vaultSearchQuery}
+                onChange={(e) => setVaultSearchQuery(e.target.value)}
+                placeholder="Cari judul game, username, atau supplier..."
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-slate-400 text-slate-900 placeholder-slate-400"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                {(["ALL", "AVAILABLE", "DISPATCHED"] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setVaultStatusFilter(st)}
+                    className={`px-3 py-1 rounded-md font-medium text-[11px] transition-colors ${
+                      vaultStatusFilter === st
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    {st === "ALL" ? "Semua" : st === "AVAILABLE" ? "Ready" : "Dispatched"}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => fetchVault()}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                title="Refresh Brankas"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isVaultLoading ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Tabel Brankas Light Mode */}
+          <div className="app-card overflow-hidden bg-white">
+            {filteredVault.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono min-w-[680px]">
-                  <thead className="bg-zinc-950/80 text-zinc-400 border-b border-zinc-800 uppercase tracking-wider text-[10px]">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 text-slate-500 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="p-3.5">ID Unit & Game</th>
-                      <th className="p-3.5">Kredensial / Akun</th>
-                      <th className="p-3.5">Modal & Supplier</th>
-                      <th className="p-3.5">Status Brankas</th>
-                      <th className="p-3.5">Order / Tanggal</th>
-                      <th className="p-3.5 text-right">Aksi</th>
+                      <th className="px-5 py-3">Game &amp; Platform</th>
+                      <th className="px-4 py-3">Kredensial Akun</th>
+                      <th className="px-4 py-3 text-right">Modal</th>
+                      <th className="px-4 py-3">Supplier</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-5 py-3 text-right">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
-                    {filteredVaultItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="p-8 text-center text-zinc-500">
-                          Tidak ada unit stok ditemukan di brankas.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredVaultItems.map((item) => {
-                        const isAvailable = item.status === "AVAILABLE";
-                        const isRevealed = revealedPasswords[item.id] || false;
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredVault.map((item) => {
+                      const isRevealed = !!revealedPasswords[item.id];
+                      const isAvailable = item.status === "AVAILABLE";
 
-                        return (
-                          <tr key={item.id} className="hover:bg-zinc-900/80 transition-colors">
-                            <td className="p-3.5 align-top">
-                              <div className="font-bold text-white flex items-center gap-1.5">
-                                <Box className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                <span>{item.game_title}</span>
-                              </div>
-                              <div className="text-[10px] text-zinc-500 mt-0.5 flex items-center gap-2">
-                                <span className="font-semibold text-zinc-400">{item.id}</span>
-                                <span>•</span>
-                                <span>{item.platform}</span>
-                                <span>•</span>
-                                <span>{item.category}</span>
-                              </div>
-                            </td>
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-5 py-3.5">
+                            <span className="font-semibold text-slate-900 block">
+                              {item.game_title}
+                            </span>
+                            <span className="text-[11px] text-slate-500 block mt-0.5">
+                              {item.platform} &bull; {item.category}
+                            </span>
+                          </td>
 
-                            <td className="p-3.5 align-top">
-                              <div className="flex items-center gap-1.5 text-zinc-200">
-                                <span className="bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800 text-[11px]">
-                                  {item.username}
-                                </span>
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(item.username);
-                                    showToast("Username disalin!");
-                                  }}
-                                  className="text-zinc-500 hover:text-zinc-300"
-                                  title="Salin username"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-zinc-400 mt-1">
-                                <span className="bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800 text-[11px] text-zinc-300 font-mono">
-                                  {isRevealed ? item.password : "••••••••••••"}
-                                </span>
-                                <button
-                                  onClick={() => toggleRevealPassword(item.id)}
-                                  className="text-zinc-500 hover:text-zinc-300"
-                                  title={isRevealed ? "Sembunyikan" : "Tampilkan"}
-                                >
-                                  {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(item.password);
-                                    showToast("Password disalin!");
-                                  }}
-                                  className="text-zinc-500 hover:text-zinc-300"
-                                  title="Salin password"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </td>
+                          <td className="px-4 py-3.5 font-mono">
+                            <div className="flex items-center gap-1.5 text-slate-800">
+                              <span className="font-medium">{item.username}</span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(item.username);
+                                  showToast("Username disalin!");
+                                }}
+                                className="text-slate-400 hover:text-slate-600 p-0.5"
+                                title="Copy username"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-slate-500 text-[11px] mt-0.5">
+                              <span>{isRevealed ? item.password : "••••••••"}</span>
+                              <button
+                                onClick={() =>
+                                  setRevealedPasswords((prev) => ({
+                                    ...prev,
+                                    [item.id]: !isRevealed,
+                                  }))
+                                }
+                                className="text-slate-400 hover:text-slate-600 p-0.5"
+                                title={isRevealed ? "Sembunyikan" : "Tampilkan password"}
+                              >
+                                {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(item.password);
+                                  showToast("Password disalin!");
+                                }}
+                                className="text-slate-400 hover:text-slate-600 p-0.5"
+                                title="Copy password"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
 
-                            <td className="p-3.5 align-top">
-                              <div className="font-bold text-amber-400">
-                                {formatRp(item.cost_idr)}
-                              </div>
-                              <div className="text-[10px] text-zinc-500 mt-0.5">
-                                {item.supplier_name || "G2G"}
-                              </div>
-                            </td>
+                          <td className="px-4 py-3.5 text-right font-medium text-slate-800 tabular-nums">
+                            Rp {formatRp(item.cost_idr)}
+                          </td>
 
-                            <td className="p-3.5 align-top">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                isAvailable
-                                  ? "bg-emerald-950/70 text-emerald-400 border border-emerald-800/60"
-                                  : "bg-blue-950/70 text-blue-400 border border-blue-800/60"
-                              }`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${isAvailable ? "bg-emerald-400 animate-pulse" : "bg-blue-400"}`} />
-                                {item.status}
+                          <td className="px-4 py-3.5 text-slate-600">
+                            <span className="block">{item.supplier_name}</span>
+                            {item.notes && (
+                              <span className="text-[11px] text-slate-400 block truncate max-w-[150px]">
+                                {item.notes}
                               </span>
-                            </td>
+                            )}
+                          </td>
 
-                            <td className="p-3.5 align-top text-zinc-400 text-[11px]">
-                              {item.assigned_order_id ? (
-                                <div>
-                                  <span className="text-blue-400 font-semibold">{item.assigned_order_id}</span>
-                                  <div className="text-[10px] text-zinc-600 mt-0.5">{item.dispatched_at}</div>
-                                </div>
-                              ) : (
-                                <div>
-                                  <span className="text-zinc-500">Deposit Masuk</span>
-                                  <div className="text-[10px] text-zinc-600 mt-0.5">{item.added_at}</div>
-                                </div>
-                              )}
-                            </td>
+                          <td className="px-4 py-3.5">
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                isAvailable
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-slate-100 text-slate-600 border-slate-200"
+                              }`}
+                            >
+                              {item.status}
+                            </span>
+                            {item.assigned_order_id && (
+                              <span className="block text-[10px] font-mono text-slate-400 mt-0.5">
+                                Order: {item.assigned_order_id}
+                              </span>
+                            )}
+                          </td>
 
-                            <td className="p-3.5 align-top text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(`${item.username}:${item.password}`);
-                                    showToast("Kredensial lengkap disalin (user:pass)!");
-                                  }}
-                                  className="p-1.5 rounded-lg bg-zinc-950 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
-                                  title="Salin format user:password"
-                                >
-                                  <Copy className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteVaultItem(item.id)}
-                                  className="p-1.5 rounded-lg bg-zinc-950 hover:bg-rose-950/40 text-zinc-500 hover:text-rose-400 border border-zinc-800"
-                                  title="Hapus unit ini"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
+                          <td className="px-5 py-3.5 text-right space-x-1">
+                            <button
+                              onClick={() => {
+                                setEditingVaultItem(item);
+                                setVFormGame(item.game_title);
+                                setVFormPlatform(item.platform);
+                                setVFormCategory(item.category);
+                                setVFormUser(item.username);
+                                setVFormPass(item.password);
+                                setVFormCost(item.cost_idr);
+                                setVFormSupplier(item.supplier_name);
+                                setVFormNotes(item.notes || "");
+                                setShowAddVaultModal(true);
+                              }}
+                              className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
+                              title="Edit item"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteVaultItem(item.id)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                              title="Hapus item"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* MODAL 1: DETAIL / INSPECTOR PESANAN TERPILIH                               */}
-        {/* ========================================================================= */}
-        {inspectOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900/50">
-                <div className="flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-emerald-400" />
-                  <span className="font-bold text-sm font-mono text-white">
-                    Inspector Kredensial & Pesan Otonom
-                  </span>
-                  <span className="text-xs font-mono text-zinc-400">
-                    ({inspectOrder.order_id})
-                  </span>
+            ) : (
+              <div className="py-12 px-6 text-center flex flex-col items-center justify-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                  <Database className="w-6 h-6" />
                 </div>
-                <button
-                  onClick={() => setInspectOrder(null)}
-                  className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="flex items-center border-b border-zinc-800 bg-zinc-950 px-4 pt-2 gap-2 text-xs font-mono">
-                <button
-                  onClick={() => setInspectTab("whatsapp")}
-                  className={`pb-2 px-3 border-b-2 font-bold transition-all ${
-                    inspectTab === "whatsapp"
-                      ? "border-emerald-500 text-emerald-400"
-                      : "border-transparent text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  📱 Format WhatsApp
-                </button>
-                <button
-                  onClick={() => setInspectTab("gmail")}
-                  className={`pb-2 px-3 border-b-2 font-bold transition-all ${
-                    inspectTab === "gmail"
-                      ? "border-rose-500 text-rose-400"
-                      : "border-transparent text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  ✉️ Format Gmail
-                </button>
-                <button
-                  onClick={() => setInspectTab("shopee")}
-                  className={`pb-2 px-3 border-b-2 font-bold transition-all ${
-                    inspectTab === "shopee"
-                      ? "border-amber-500 text-amber-400"
-                      : "border-transparent text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  🛍️ Shopee Chat
-                </button>
-                <button
-                  onClick={() => setInspectTab("credentials")}
-                  className={`pb-2 px-3 border-b-2 font-bold transition-all ${
-                    inspectTab === "credentials"
-                      ? "border-blue-500 text-blue-400"
-                      : "border-transparent text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  🔑 Kredensial Lisensi
-                </button>
-              </div>
-
-              <div className="p-4 overflow-y-auto flex-1 font-mono text-xs space-y-3">
-                {inspectTab === "whatsapp" && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-zinc-400 text-[11px]">
-                      <span>Nomor Tujuan: {inspectOrder.buyer_phone}</span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(inspectOrder.messages.whatsapp);
-                          showToast("Teks WA disalin!");
-                        }}
-                        className="text-emerald-400 hover:underline flex items-center gap-1"
-                      >
-                        <Copy className="w-3 h-3" /> Salin Teks WA
-                      </button>
-                    </div>
-                    <pre className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 whitespace-pre-wrap font-sans text-xs leading-relaxed max-h-96 overflow-y-auto">
-                      {inspectOrder.messages.whatsapp}
-                    </pre>
-                  </div>
-                )}
-
-                {inspectTab === "gmail" && (
-                  <div className="space-y-2">
-                    <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300">
-                      <div className="text-[10px] text-zinc-500">SUBJECT EMAIL:</div>
-                      <div className="font-semibold text-white">{inspectOrder.messages.gmail_subject}</div>
-                    </div>
-                    <pre className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 whitespace-pre-wrap font-sans text-xs leading-relaxed max-h-80 overflow-y-auto">
-                      {inspectOrder.messages.gmail_body}
-                    </pre>
-                  </div>
-                )}
-
-                {inspectTab === "shopee" && (
-                  <div className="space-y-2">
-                    <div className="text-zinc-400 text-[11px] flex justify-between">
-                      <span>Anti-ban compliant (tanpa link luar / no WA)</span>
-                      <button
-                        onClick={() => handleCopyShopeeChat(inspectOrder)}
-                        className="text-amber-400 hover:underline flex items-center gap-1"
-                      >
-                        <Copy className="w-3 h-3" /> Salin Chat Shopee
-                      </button>
-                    </div>
-                    <pre className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 whitespace-pre-wrap font-sans text-xs leading-relaxed">
-                      {inspectOrder.messages.shopee_chat}
-                    </pre>
-                  </div>
-                )}
-
-                {inspectTab === "credentials" && (
-                  <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <div className="text-[10px] text-zinc-500 uppercase">Username / Email Akun</div>
-                        <div className="text-sm font-bold text-white mt-1 bg-zinc-950 p-2 rounded border border-zinc-800 select-all">
-                          {inspectOrder.credentials.username}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-zinc-500 uppercase">Password Akun</div>
-                        <div className="text-sm font-bold text-emerald-400 mt-1 bg-zinc-950 p-2 rounded border border-zinc-800 select-all">
-                          {inspectOrder.credentials.password}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-[10px] text-zinc-500 uppercase">Kode Serial Garansi Toko</div>
-                      <div className="text-xs font-bold text-amber-300 mt-1 bg-zinc-950 p-2 rounded border border-zinc-800 select-all">
-                        {inspectOrder.credentials.serial_warranty}
-                      </div>
-                    </div>
-
-                    {inspectOrder.credentials?.vault_id && (
-                      <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-emerald-300 text-xs flex items-center gap-2">
-                        <Database className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>Unit ini dialokasikan dari <strong>Brankas Stok Buffer #{inspectOrder.credentials.vault_id}</strong></span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 border-t border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
-                <span className="text-[11px] font-mono text-zinc-500">
-                  Status: <strong className="text-emerald-400">{inspectOrder.status}</strong>
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleDispatchWhatsApp(inspectOrder)}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs font-mono flex items-center gap-1.5"
-                  >
-                    <Smartphone className="w-3.5 h-3.5" /> Kirim WA Sekarang
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* MODAL 2: TAMBAH STOK SATUAN KE BRANKAS (MODE A)                           */}
-        {/* ========================================================================= */}
-        {showAddVaultModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <Database className="w-4 h-4 text-emerald-400" />
-                  <span className="font-bold text-sm font-mono text-white">Tambah Unit ke Brankas Stok (Mode A)</span>
-                </div>
-                <button
-                  onClick={() => setShowAddVaultModal(false)}
-                  className="text-zinc-500 hover:text-white text-xs px-2 py-1"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={handleAddSingleVault} className="space-y-3 text-xs font-mono">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-zinc-400">Judul Game</label>
-                    {catalogGames.length > 0 && (
-                      <span className="text-[10px] text-emerald-400 font-medium">✨ Terhubung Portofolio</span>
-                    )}
-                  </div>
-                  {catalogGames.length > 0 && (
-                    <select
-                      onChange={(e) => {
-                        const sel = catalogGames.find(g => g.id === e.target.value);
-                        if (sel) {
-                          setVFormGame(sel.title);
-                          setVFormPlatform(sel.platform);
-                          setVFormCategory(sel.category);
-                          const activeSeller = sel.sellers?.find((s: any) => s.is_selected) || sel.sellers?.[0];
-                          if (activeSeller) {
-                            setVFormCost(activeSeller.price_g2g_idr);
-                            setVFormSupplier(activeSeller.seller_name);
-                          }
-                        }
+                  <h4 className="text-sm font-semibold text-slate-800">Brankas belum memiliki stok</h4>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                    Gunakan tombol &quot;Tambah Stok Satuan&quot; atau &quot;Impor Massal&quot; untuk mengisi stok penyangga.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* MODAL 1: ORDER INSPECTOR                                  */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {inspectOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Detail Pesanan #{inspectOrder.order_id}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {inspectOrder.game_title} &bull; {inspectOrder.buyer_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setInspectOrder(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+              {/* Tab Selector */}
+              <div className="flex border-b border-slate-200 gap-4">
+                {(["whatsapp", "gmail", "shopee", "credentials"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setInspectTab(t)}
+                    className={`pb-2 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 -mb-px ${
+                      inspectTab === t
+                        ? "border-emerald-600 text-emerald-700"
+                        : "border-transparent text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              {inspectTab === "whatsapp" && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-slate-500">
+                    <span>Format WhatsApp:</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(inspectOrder.messages?.whatsapp || "");
+                        showToast("Pesan WhatsApp disalin!");
                       }}
-                      className="w-full bg-zinc-900 border border-emerald-500/40 rounded-xl px-3.5 py-2 text-emerald-300 mb-2 focus:outline-none focus:border-emerald-500"
+                      className="text-emerald-700 hover:underline flex items-center gap-1"
                     >
-                      <option value="">-- Pilih dari Portofolio ({catalogGames.length} Game) --</option>
-                      {catalogGames.map(g => (
-                        <option key={g.id} value={g.id}>{g.title} ({g.platform})</option>
-                      ))}
-                    </select>
+                      <Copy className="w-3.5 h-3.5" /> Salin Pesan
+                    </button>
+                  </div>
+                  <pre className="p-3 rounded-lg bg-slate-50 border border-slate-200 font-mono text-[11px] whitespace-pre-wrap text-slate-800">
+                    {inspectOrder.messages?.whatsapp || "Format pesan belum dibuat."}
+                  </pre>
+                </div>
+              )}
+
+              {inspectTab === "gmail" && (
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-slate-500 block mb-1">Subject:</span>
+                    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-slate-800">
+                      {inspectOrder.messages?.gmail_subject || "Pemberitahuan Pesanan"}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block mb-1">Body Email:</span>
+                    <pre className="p-3 rounded-lg bg-slate-50 border border-slate-200 font-mono text-[11px] whitespace-pre-wrap text-slate-800">
+                      {inspectOrder.messages?.gmail_body || "Konten email belum dibuat."}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {inspectTab === "shopee" && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-slate-500">
+                    <span>Format Shopee Chat:</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(inspectOrder.messages?.shopee_chat || "");
+                        showToast("Pesan Shopee disalin!");
+                      }}
+                      className="text-emerald-700 hover:underline flex items-center gap-1"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Salin Pesan
+                    </button>
+                  </div>
+                  <pre className="p-3 rounded-lg bg-slate-50 border border-slate-200 font-mono text-[11px] whitespace-pre-wrap text-slate-800">
+                    {inspectOrder.messages?.shopee_chat || "Format Shopee chat belum dibuat."}
+                  </pre>
+                </div>
+              )}
+
+              {inspectTab === "credentials" && (
+                <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Username / ID:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {inspectOrder.credentials?.username || "-"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Password:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {inspectOrder.credentials?.password || "-"}
+                    </span>
+                  </div>
+                  {inspectOrder.credentials?.claim_code && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Kode Klaim:</span>
+                      <span className="font-mono font-bold text-emerald-700">
+                        {inspectOrder.credentials.claim_code}
+                      </span>
+                    </div>
                   )}
-                  <input
-                    type="text"
-                    value={vFormGame}
-                    onChange={(e) => setVFormGame(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                    placeholder="Contoh: Monster Hunter Wilds"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Platform</label>
-                    <input
-                      type="text"
-                      value={vFormPlatform}
-                      onChange={(e) => setVFormPlatform(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Kategori</label>
-                    <select
-                      value={vFormCategory}
-                      onChange={(e) => setVFormCategory(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-200 focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="Account (Full Access)">Account (Full Access)</option>
-                      <option value="CDKey / Digital Key">CDKey / Digital Key</option>
-                      <option value="Steam Gift">Steam Gift</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Email / Username / Key</label>
-                    <input
-                      type="text"
-                      value={vFormUser}
-                      onChange={(e) => setVFormUser(e.target.value)}
-                      placeholder="account@outlook.com"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Password</label>
-                    <input
-                      type="text"
-                      value={vFormPass}
-                      onChange={(e) => setVFormPass(e.target.value)}
-                      placeholder="SecretPassword"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Modal Beli Supplier (IDR)</label>
-                    <input
-                      type="number"
-                      value={vFormCost}
-                      onChange={(e) => setVFormCost(Number(e.target.value))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-amber-400 font-bold focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Nama Supplier (G2G/Lainnya)</label>
-                    <input
-                      type="text"
-                      value={vFormSupplier}
-                      onChange={(e) => setVFormSupplier(e.target.value)}
-                      placeholder="HellenWong"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-zinc-400 mb-1">Catatan Tambahan</label>
-                  <input
-                    type="text"
-                    value={vFormNotes}
-                    onChange={(e) => setVFormNotes(e.target.value)}
-                    placeholder="Full access, siap ganti email pribadi"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddVaultModal(false)}
-                    className="px-4 py-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white text-xs font-mono"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs font-mono flex items-center gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Simpan ke Brankas</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* MODAL 3: IMPOR MASSAL (BULK PASTE MODE A)                                 */}
-        {/* ========================================================================= */}
-        {showBulkImportModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-xl p-6 space-y-4 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-purple-400" />
-                  <span className="font-bold text-sm font-mono text-white">Impor Massal Brankas (Bulk Paste)</span>
-                </div>
-                <button
-                  onClick={() => setShowBulkImportModal(false)}
-                  className="text-zinc-500 hover:text-white text-xs px-2 py-1"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={handleBulkImportVault} className="space-y-3 text-xs font-mono">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-zinc-400">Game Target</label>
-                    {catalogGames.length > 0 && (
-                      <span className="text-[10px] text-purple-400 font-medium">✨ Terhubung Portofolio</span>
-                    )}
-                  </div>
-                  {catalogGames.length > 0 && (
-                    <select
-                      onChange={(e) => {
-                        const sel = catalogGames.find(g => g.id === e.target.value);
-                        if (sel) {
-                          setBulkGame(sel.title);
-                          setBulkPlatform(sel.platform);
-                          setBulkCategory(sel.category);
-                          const activeSeller = sel.sellers?.find((s: any) => s.is_selected) || sel.sellers?.[0];
-                          if (activeSeller) {
-                            setBulkCost(activeSeller.price_g2g_idr);
-                            setBulkSupplier(activeSeller.seller_name);
-                          }
-                        }
-                      }}
-                      className="w-full bg-zinc-900 border border-purple-500/40 rounded-xl px-3.5 py-2 text-purple-300 mb-2 focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="">-- Pilih dari Portofolio ({catalogGames.length} Game) --</option>
-                      {catalogGames.map(g => (
-                        <option key={g.id} value={g.id}>{g.title} ({g.platform})</option>
-                      ))}
-                    </select>
+                  {inspectOrder.credentials?.passcode && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Passcode PIN:</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {inspectOrder.credentials.passcode}
+                      </span>
+                    </div>
                   )}
                 </div>
+              )}
+            </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Nama Judul</label>
-                    <input
-                      type="text"
-                      value={bulkGame}
-                      onChange={(e) => setBulkGame(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Platform</label>
-                    <input
-                      type="text"
-                      value={bulkPlatform}
-                      onChange={(e) => setBulkPlatform(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                </div>
+            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setInspectOrder(null)}
+                className="btn-secondary text-xs px-4 py-2 rounded-lg"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Modal per Unit (IDR)</label>
-                    <input
-                      type="number"
-                      value={bulkCost}
-                      onChange={(e) => setBulkCost(Number(e.target.value))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-amber-400 font-bold focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Supplier</label>
-                    <input
-                      type="text"
-                      value={bulkSupplier}
-                      onChange={(e) => setBulkSupplier(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                </div>
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* MODAL 2: TAMBAH / EDIT STOK SATUAN                        */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {showAddVaultModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">
+                {editingVaultItem ? "Edit Item Brankas" : "Tambah Stok Brankas Satuan"}
+              </h3>
+              <button
+                onClick={() => setShowAddVaultModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
+            <form onSubmit={handleSaveVaultItem} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Judul Game</label>
+                <input
+                  type="text"
+                  value={vFormGame}
+                  onChange={(e) => setVFormGame(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-zinc-400">Paste Kredensial (1 baris per akun):</label>
-                    <span className="text-[10px] text-zinc-500">Format: user:pass atau user|pass</span>
-                  </div>
-                  <textarea
-                    rows={6}
-                    value={bulkRaw}
-                    onChange={(e) => setBulkRaw(e.target.value)}
-                    placeholder={`acc_alpha_01@outlook.com:PassAlpha123!
-acc_alpha_02@outlook.com:PassAlpha456!
-acc_alpha_03@outlook.com:PassAlpha789!`}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-zinc-200 font-mono text-xs focus:outline-none focus:border-purple-500 resize-none leading-relaxed"
+                  <label className="block text-slate-700 font-semibold mb-1">Platform</label>
+                  <input
+                    type="text"
+                    value={vFormPlatform}
+                    onChange={(e) => setVFormPlatform(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Kategori</label>
+                  <input
+                    type="text"
+                    value={vFormCategory}
+                    onChange={(e) => setVFormCategory(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Username / ID</label>
+                  <input
+                    type="text"
+                    value={vFormUser}
+                    onChange={(e) => setVFormUser(e.target.value)}
                     required
+                    placeholder="user@example.com"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
                   />
                 </div>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowBulkImportModal(false)}
-                    className="px-4 py-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white text-xs font-mono"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs font-mono flex items-center gap-1.5 shadow-md shadow-purple-950/50"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Eksekusi Impor Massal</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* MODAL 4: INPUT ORDER MANUAL (DENGAN TOGGLE MODE A BRANKAS)                */}
-        {/* ========================================================================= */}
-        {showManualModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-emerald-400" />
-                  <span className="font-bold text-sm font-mono text-white">Input Pesanan Masuk</span>
-                </div>
-                <button
-                  onClick={() => setShowManualModal(false)}
-                  className="text-zinc-500 hover:text-white text-xs px-2 py-1"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="space-y-3 text-xs font-mono">
-                {/* Mode A Vault Toggle */}
-                <div className="p-3 rounded-xl bg-zinc-900/80 border border-emerald-500/30 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Database className="w-4 h-4 text-emerald-400" />
-                    <div>
-                      <div className="font-bold text-emerald-300 text-xs">Prioritaskan Brankas Stok (Mode A)</div>
-                      <div className="text-[10px] text-zinc-400">Ambil kredensial instan dari stok ready</div>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={formUseVault}
-                    onChange={(e) => setFormUseVault(e.target.checked)}
-                    className="w-4 h-4 accent-emerald-500 cursor-pointer"
-                  />
-                </div>
-
                 <div>
-                  <label className="block text-zinc-400 mb-1">Nama Pembeli</label>
+                  <label className="block text-slate-700 font-semibold mb-1">Password</label>
                   <input
                     type="text"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    placeholder="Kak Alvin"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
+                    value={vFormPass}
+                    onChange={(e) => setVFormPass(e.target.value)}
+                    required
+                    placeholder="KataSandi#123"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">No. WhatsApp</label>
-                    <input
-                      type="text"
-                      value={formPhone}
-                      onChange={(e) => setFormPhone(e.target.value)}
-                      placeholder="081234567890"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Email (Gmail)</label>
-                    <input
-                      type="email"
-                      value={formEmail}
-                      onChange={(e) => setFormEmail(e.target.value)}
-                      placeholder="buyer@gmail.com"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-zinc-400">Game Terpilih</label>
-                    {catalogGames.length > 0 && (
-                      <span className="text-[10px] text-emerald-400 font-medium">✨ Auto-Fill Portofolio</span>
-                    )}
-                  </div>
-                  {catalogGames.length > 0 && (
-                    <select
-                      onChange={(e) => {
-                        const sel = catalogGames.find(g => g.id === e.target.value);
-                        if (sel) {
-                          setFormGame(sel.title);
-                          setFormPlatform(sel.platform);
-                          setFormPrice(sel.selling_price_shopee_idr);
-                        }
-                      }}
-                      className="w-full bg-zinc-900 border border-emerald-500/40 rounded-xl px-3.5 py-2 text-emerald-300 mb-2 focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="">-- Pilih dari Portofolio ({catalogGames.length} Game) --</option>
-                      {catalogGames.map(g => (
-                        <option key={g.id} value={g.id}>
-                          {g.title} ({g.platform}) - Rp {g.selling_price_shopee_idr.toLocaleString('id-ID')}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Game</label>
-                    <input
-                      type="text"
-                      value={formGame}
-                      onChange={(e) => setFormGame(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Platform</label>
-                    <input
-                      type="text"
-                      value={formPlatform}
-                      onChange={(e) => setFormPlatform(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Harga (IDR)</label>
-                    <input
-                      type="number"
-                      value={formPrice}
-                      onChange={(e) => setFormPrice(Number(e.target.value))}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-amber-400 font-bold focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-zinc-400 mb-1">Channel</label>
-                    <select
-                      value={formChannel}
-                      onChange={(e) => setFormChannel(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-200 focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="Shopee">Shopee</option>
-                      <option value="WhatsApp">WhatsApp</option>
-                      <option value="Tokopedia">Tokopedia</option>
-                      <option value="Website">Website</option>
-                    </select>
-                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Harga Modal (Rp)</label>
+                  <input
+                    type="number"
+                    value={vFormCost}
+                    onChange={(e) => setVFormCost(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 tabular-nums focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Supplier</label>
+                  <input
+                    type="text"
+                    value={vFormSupplier}
+                    onChange={(e) => setVFormSupplier(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Catatan Tambahan</label>
+                <input
+                  type="text"
+                  value={vFormNotes}
+                  onChange={(e) => setVFormNotes(e.target.value)}
+                  placeholder="Buffer stock siap kirim"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowManualModal(false)}
-                  className="px-4 py-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white text-xs font-mono"
+                  onClick={() => setShowAddVaultModal(false)}
+                  className="btn-secondary text-xs px-4 py-2 rounded-lg"
                 >
                   Batal
                 </button>
                 <button
-                  type="button"
-                  onClick={async () => {
-                    if (!formName.trim()) return;
-                    await handleSimulateOrder({
-                      buyer_name: formName,
-                      buyer_phone: formPhone || "081234567890",
-                      buyer_email: formEmail || "buyer@gmail.com",
-                      game_title: formGame,
-                      platform: formPlatform,
-                      price_idr: formPrice,
-                      channel: formChannel,
-                      use_vault: formUseVault
-                    });
-                    setShowManualModal(false);
-                    setFormName("");
-                  }}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs font-mono flex items-center gap-1.5"
+                  type="submit"
+                  className="btn-primary-emerald text-xs font-semibold px-4 py-2 rounded-lg"
                 >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>Proses Otomatis Sekarang</span>
+                  Simpan ke Brankas
                 </button>
               </div>
-            </div>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
-      </div>
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* MODAL 3: IMPOR MASSAL BRANKAS                             */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {showBulkImportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Impor Massal Akun ke Brankas</h3>
+              <button
+                onClick={() => setShowBulkImportModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-      {/* Floating Toast Notification */}
-      {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-zinc-900/95 border border-emerald-500/40 text-xs font-mono text-emerald-300 flex items-center gap-3 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{toastMsg}</span>
+            <form onSubmit={handleBulkImportSubmit} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Pilih Judul Game</label>
+                <input
+                  type="text"
+                  value={bulkGame}
+                  onChange={(e) => setBulkGame(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Modal per Akun (Rp)</label>
+                  <input
+                    type="number"
+                    value={bulkCost}
+                    onChange={(e) => setBulkCost(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 tabular-nums focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Supplier</label>
+                  <input
+                    type="text"
+                    value={bulkSupplier}
+                    onChange={(e) => setBulkSupplier(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Data Kredensial (1 Baris per Akun)
+                </label>
+                <p className="text-[11px] text-slate-500 mb-1">
+                  Format yang didukung: <code className="text-slate-800">username:password</code> atau <code className="text-slate-800">username:password:catatan</code>
+                </p>
+                <textarea
+                  rows={6}
+                  value={bulkRaw}
+                  onChange={(e) => setBulkRaw(e.target.value)}
+                  placeholder={`user1@mail.com:Password#1\nuser2@mail.com:Password#2\nuser3@mail.com:Password#3`}
+                  className="w-full p-3 font-mono text-[11px] border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkImportModal(false)}
+                  className="btn-secondary text-xs px-4 py-2 rounded-lg"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary-emerald text-xs font-semibold px-4 py-2 rounded-lg"
+                >
+                  Mulai Impor Massal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* MODAL 4: INPUT ORDER MANUAL                               */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Input Order Manual</h3>
+              <button
+                onClick={() => setShowManualModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleManualOrderSubmit} className="p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Nama Pembeli</label>
+                  <input
+                    type="text"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    required
+                    placeholder="Kak Dimas"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">WhatsApp</label>
+                  <input
+                    type="text"
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value)}
+                    placeholder="081234567890"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Judul Game</label>
+                <input
+                  type="text"
+                  value={formGame}
+                  onChange={(e) => setFormGame(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Harga Jual (Rp)</label>
+                  <input
+                    type="number"
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 tabular-nums focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">Saluran Penjualan</label>
+                  <select
+                    value={formChannel}
+                    onChange={(e) => setFormChannel(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 bg-white"
+                  >
+                    <option value="Shopee">Shopee</option>
+                    <option value="WhatsApp">WhatsApp Direct</option>
+                    <option value="Tokopedia">Tokopedia</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="chk-vault"
+                  checked={formUseVault}
+                  onChange={(e) => setFormUseVault(e.target.checked)}
+                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <label htmlFor="chk-vault" className="text-slate-700 font-medium">
+                  Alokasikan stok dari brankas penyangga jika tersedia (Mode A)
+                </label>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowManualModal(false)}
+                  className="btn-secondary text-xs px-4 py-2 rounded-lg"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSimulating}
+                  className="btn-primary-emerald text-xs font-semibold px-4 py-2 rounded-lg"
+                >
+                  {isSimulating ? "Memproses..." : "Proses Pesanan"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

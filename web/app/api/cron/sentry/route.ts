@@ -3,6 +3,7 @@ import { readAuthoritativeCatalog, writeAuthoritativeCatalog } from "@/lib/catal
 import { queryDb } from "@/lib/db";
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { resolveG2GProductUrl, getG2GGameCategoryUrl } from "@/lib/g2g";
+import { verifyCronOrAdminRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,10 @@ async function sendTelegramAlert(text: string) {
 }
 
 export async function GET(req: NextRequest) {
+  if (!verifyCronOrAdminRequest(req)) {
+    return NextResponse.json({ status: "unauthorized", message: "Unauthorized cron access." }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const forceAlert = searchParams.get("force") === "true";

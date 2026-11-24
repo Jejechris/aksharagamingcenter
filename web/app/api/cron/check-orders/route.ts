@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { verifyCronOrAdminRequest } from "@/lib/auth";
 
 export async function GET(request: Request) {
-  // Verifikasi Vercel Cron Header jika di production
-  const authHeader = request.headers.get("authorization");
-  
+  if (!verifyCronOrAdminRequest(request)) {
+    return NextResponse.json({ status: "unauthorized", message: "Unauthorized cron access." }, { status: 401 });
+  }
+
   // Simulasi pemindaian pesanan oleh serverless worker
   const timestamp = new Date().toISOString();
 
@@ -11,6 +13,6 @@ export async function GET(request: Request) {
     status: "ok",
     timestamp,
     message: "Akshara Vercel Cron: Order scan executed successfully.",
-    scanned_channels: ["Shopee (IMAP)", "Website (Supabase)"]
+    scanned_channels: ["Shopee (IMAP)", "Website (Supabase)"],
   });
 }
