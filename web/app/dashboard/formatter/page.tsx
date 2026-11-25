@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { fetchSmartCatalog } from "@/lib/catalogClient";
 import Link from "next/link";
+import GameSelectorCombobox from "@/app/components/GameSelectorCombobox";
 import {
   Sparkles,
   Copy,
@@ -218,44 +219,38 @@ export default function FormatterPage() {
         </Link>
       </div>
 
-      {/* Quick Presets & Portfolio Integration Bar */}
-      <div className="app-card p-3 sm:p-4 bg-white flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mr-1">
-          <Tag className="w-3.5 h-3.5 text-indigo-600" />
-          <span>Preset Cepat:</span>
-        </span>
-
+      {/* Smart Searchable Portfolio Selector & Quick Samples */}
+      <div className="space-y-2.5 animate-fade-up">
         {catalogGames.length > 0 ? (
-          catalogGames.slice(0, 5).map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => handleLoadCatalogGame(g)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors border ${
-                gameTitle.toLowerCase() === g.title.toLowerCase()
-                  ? "bg-indigo-50 border-indigo-200 text-indigo-800 font-semibold"
-                  : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-              }`}
-            >
-              🎮 {g.title.split(":")[0]} ({g.platform})
-            </button>
-          ))
+          <GameSelectorCombobox
+            label="Pilih Game dari Portofolio Katalog"
+            actionLink={{ label: "Buka Katalog →", href: "/dashboard/catalog" }}
+            games={catalogGames}
+            selectedGameTitle={gameTitle}
+            onSelect={(g) => handleLoadCatalogGame(g)}
+          />
         ) : (
-          [
-            { key: "terraria" as const, label: "🎮 Terraria (Steam)" },
-            { key: "minecraft" as const, label: "⛏️ Minecraft (Microsoft)" },
-            { key: "gtav" as const, label: "🚗 GTA V (Rockstar)" },
-            { key: "eneba_cdkey" as const, label: "🔑 Eneba CDKey" },
-          ].map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => handleLoadSample(s.key)}
-              className="px-3 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-xs font-medium text-slate-700 transition-colors"
-            >
-              {s.label}
-            </button>
-          ))
+          <div className="app-card p-3 sm:p-4 bg-white flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mr-1">
+              <Tag className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Preset Sampel Cepat:</span>
+            </span>
+            {[
+              { key: "terraria" as const, label: "🎮 Terraria (Steam)" },
+              { key: "minecraft" as const, label: "⛏️ Minecraft (Microsoft)" },
+              { key: "gtav" as const, label: "🚗 GTA V (Rockstar)" },
+              { key: "eneba_cdkey" as const, label: "🔑 Eneba CDKey" },
+            ].map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => handleLoadSample(s.key)}
+                className="px-3 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-xs font-medium text-slate-700 transition-colors btn-tactile"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 

@@ -53,7 +53,7 @@ Format JSON only:
   "tactical_reason": "Alasan mengapa game ini sedang trending dan marginnya bagus."
 }`;
 
-    const rawAi = await callGemini(prompt);
+    const rawAi = await callGemini(prompt, undefined, { jsonMode: true });
     const cleaned = rawAi.replace(/```json/g, "").replace(/```/g, "").trim();
     const parsed = JSON.parse(cleaned);
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callGemini } from "@/lib/gemini";
+import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
 import { getG2GSellerUrl, resolveG2GProductUrl } from "@/lib/g2g";
 import { getDbCatalog } from "@/lib/db";
 
@@ -372,8 +373,17 @@ export async function GET() {
         t.includes(opp.title.toLowerCase().trim()) || opp.title.toLowerCase().trim().includes(t)
       );
 
+      const qris = Math.round(opp.g2g_price_idr * 0.007);
+      const shopee = Math.round(opp.shopee_retail_price_idr * 0.08) + 1000;
+      const profit = opp.shopee_retail_price_idr - opp.g2g_price_idr - qris - shopee;
+      const margin = opp.shopee_retail_price_idr > 0 ? Number(((profit / opp.shopee_retail_price_idr) * 100).toFixed(1)) : 0;
+
       return {
         ...opp,
+        qris_fee_idr: qris,
+        shopee_fee_idr: shopee,
+        net_profit_idr: profit,
+        net_margin_pct: margin,
         profile_url: resolveG2GProductUrl(opp.profile_url, opp.best_supplier?.name, opp.title),
         is_already_in_catalog: isAlreadyInCatalog,
       };
@@ -406,7 +416,7 @@ Tugasmu adalah menganalisis peluang arbitrase lintas batas (Cross-Border Arbitra
 ATURAN PERHITUNGAN:
 - Biaya Shopee: 8% dari harga jual + Rp 1.000
 - Biaya QRIS kulakan G2G: 0.7% dari harga modal G2G
-- Net Profit = Harga Jual Shopee - (Harga Modal G2G + Biaya QRIS + Biaya Shopee + Packaging Rp 2.000)
+- Net Profit = Harga Jual Shopee - (Harga Modal G2G + Biaya QRIS + Biaya Shopee)
 - Net Margin = (Net Profit / Harga Jual Shopee) * 100%
 - Spread = ((Harga Jual Shopee - Modal G2G) / Modal G2G) * 100%
 
@@ -433,7 +443,7 @@ Format JSON yang HARUS kamu kembalikan (HANYA JSON murni tanpa markdown triple b
 
     const prompt = `Analisa peluang arbitrase untuk game: "${query}" pada platform "${platform}". Berikan data estimasi real-world yang paling akurat untuk pasar Indonesia saat ini.`;
 
-    const aiText = await callGemini(prompt, systemPrompt);
+    const aiText = await callGemini(prompt, systemPrompt, { jsonMode: true });
 
     let cleaned = (aiText || "").trim();
     if (cleaned.startsWith("```")) {
@@ -442,17 +452,23 @@ Format JSON yang HARUS kamu kembalikan (HANYA JSON murni tanpa markdown triple b
 
     try {
       const parsed = JSON.parse(cleaned);
+
+      // Real Steam Indonesia lookup
+      const realSteam = await fetchRealSteamIndonesiaPrice(query);
+      const finalTitle = realSteam?.official_title || parsed.title || query;
+      const finalSteamPrice = realSteam?.price_idr || Number(parsed.steam_indo_price_idr) || 0;
+
       const g2gPrice = Number(parsed.g2g_price_idr) || 120000;
       const shopeePrice = Number(parsed.shopee_retail_price_idr) || 199000;
       const qrisFee = Math.round(g2gPrice * 0.007);
       const shopeeFee = Math.round(shopeePrice * 0.08) + 1000;
-      const netProfit = shopeePrice - (g2gPrice + qrisFee + shopeeFee + 2000);
+      const netProfit = shopeePrice - (g2gPrice + qrisFee + shopeeFee);
       const netMargin = Math.round((netProfit / shopeePrice) * 1000) / 10;
       const spread = Math.round(((shopeePrice - g2gPrice) / g2gPrice) * 1000) / 10;
 
       const opportunity: ArbitrageOpportunity = {
         id: `arb-ai-${Date.now()}`,
-        title: parsed.title || query,
+        title: finalTitle,
         platform: parsed.platform || platform,
         category: parsed.category || "Digital Key / Account",
         tag: parsed.tag || "⚡ FAST MOVER",
@@ -464,7 +480,7 @@ Format JSON yang HARUS kamu kembalikan (HANYA JSON murni tanpa markdown triple b
           tier: parsed.best_supplier?.tier || "ultra_safe",
         },
         shopee_retail_price_idr: shopeePrice,
-        steam_indo_price_idr: Number(parsed.steam_indo_price_idr) || Math.round(shopeePrice * 1.5),
+        steam_indo_price_idr: finalSteamPrice || Math.round(shopeePrice * 1.5),
         qris_fee_idr: qrisFee,
         shopee_fee_idr: shopeeFee,
         net_profit_idr: netProfit,
@@ -473,9 +489,9 @@ Format JSON yang HARUS kamu kembalikan (HANYA JSON murni tanpa markdown triple b
         demand_score: Number(parsed.demand_score) || 88,
         competition_level: parsed.competition_level || "Sedang",
         arbitrage_reason: parsed.arbitrage_reason || "Potensi arbitrase signifikan antara rate global dan pasar retail lokal.",
-        tactical_tip: parsed.tactical_tip || "Gunakan format pengiriman instan dan cantumkan garansi toko.",
-        profile_url: getG2GSellerUrl(parsed.best_supplier?.name || "HellenWong", parsed.title || query),
-        shopee_search_query: `${parsed.title || query} Original`,
+        tactical_tip: (parsed.tactical_tip || "Gunakan format pengiriman instan.") + " Tip: Buka link kategori G2G untuk memilih offer live aktif.",
+        profile_url: resolveG2GProductUrl(undefined, parsed.best_supplier?.name, finalTitle),
+        shopee_search_query: `${finalTitle} Original`,
       };
 
       return NextResponse.json({

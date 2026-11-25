@@ -20,35 +20,35 @@ HEADERS = {
 }
 
 KNOWN_DEAD_OFFERS = {
-    "G1737050259610GZ": "https://www.g2g.com/categories/terraria-account?q=HellenWong",
-    "G1763801186859QT": "https://www.g2g.com/categories/tf2-item?q=Player",
+    "G1737050259610GZ": "https://www.g2g.com/id/categories/terraria-account",
+    "G1763801186859QT": "https://www.g2g.com/id/categories/tf2-item",
 }
 
 GAME_CATEGORIES = {
-    "minecraft": "https://www.g2g.com/categories/minecraft-account",
-    "terraria": "https://www.g2g.com/categories/terraria-account",
-    "wukong": "https://www.g2g.com/categories/black-myth-wukong-accounts",
-    "gta": "https://www.g2g.com/categories/steam-global-account",
-    "tf2": "https://www.g2g.com/categories/tf2-item",
-    "fc 25": "https://www.g2g.com/categories/fc-25-accounts",
-    "fc25": "https://www.g2g.com/categories/fc-25-accounts",
-    "zomboid": "https://www.g2g.com/categories/project-zomboid-accounts",
-    "stardew": "https://www.g2g.com/categories/stardew-valley-account",
-    "dont starve": "https://www.g2g.com/categories/don-t-starve-together-accounts",
-    "lethal company": "https://www.g2g.com/categories/lethal-company-accounts",
-    "phasmophobia": "https://www.g2g.com/categories/phasmophobia-account",
-    "hollow knight": "https://www.g2g.com/categories/hollow-knight-accounts",
-    "garrys mod": "https://www.g2g.com/categories/garry-s-mod-account",
-    "elden ring": "https://www.g2g.com/categories/elden-ring-account",
-    "palworld": "https://www.g2g.com/categories/palworld-accounts",
-    "rust": "https://www.g2g.com/categories/rust-accounts-buy",
-    "left 4 dead": "https://www.g2g.com/categories/left-4-dead-2-account",
-    "among us": "https://www.g2g.com/categories/among-us-account",
-    "witcher": "https://www.g2g.com/categories/witcher-iii-wild-hunt-account",
-    "ready or not": "https://www.g2g.com/categories/ready-or-not-account",
-    "sons of the forest": "https://www.g2g.com/categories/sons-of-the-forest-accounts",
-    "helldivers": "https://www.g2g.com/categories/helldivers-2-accounts",
-    "forza": "https://www.g2g.com/categories/forza-horizon-5-account",
+    "minecraft": "https://www.g2g.com/id/categories/minecraft-account",
+    "terraria": "https://www.g2g.com/id/categories/terraria-account",
+    "wukong": "https://www.g2g.com/id/categories/black-myth-wukong-accounts",
+    "gta": "https://www.g2g.com/id/categories/steam-global-account",
+    "tf2": "https://www.g2g.com/id/categories/tf2-item",
+    "fc 25": "https://www.g2g.com/id/categories/fc-25-accounts",
+    "fc25": "https://www.g2g.com/id/categories/fc-25-accounts",
+    "zomboid": "https://www.g2g.com/id/categories/project-zomboid-accounts",
+    "stardew": "https://www.g2g.com/id/categories/stardew-valley-account",
+    "dont starve": "https://www.g2g.com/id/categories/don-t-starve-together-accounts",
+    "lethal company": "https://www.g2g.com/id/categories/lethal-company-accounts",
+    "phasmophobia": "https://www.g2g.com/id/categories/phasmophobia-account",
+    "hollow knight": "https://www.g2g.com/id/categories/hollow-knight-accounts",
+    "garrys mod": "https://www.g2g.com/id/categories/garry-s-mod-account",
+    "elden ring": "https://www.g2g.com/id/categories/elden-ring-account",
+    "palworld": "https://www.g2g.com/id/categories/palworld-accounts",
+    "rust": "https://www.g2g.com/id/categories/rust-accounts-buy",
+    "left 4 dead": "https://www.g2g.com/id/categories/left-4-dead-2-account",
+    "among us": "https://www.g2g.com/id/categories/among-us-account",
+    "witcher": "https://www.g2g.com/id/categories/witcher-iii-wild-hunt-account",
+    "ready or not": "https://www.g2g.com/id/categories/ready-or-not-account",
+    "sons of the forest": "https://www.g2g.com/id/categories/sons-of-the-forest-accounts",
+    "helldivers": "https://www.g2g.com/id/categories/helldivers-2-accounts",
+    "forza": "https://www.g2g.com/id/categories/forza-horizon-5-account",
 }
 
 def clean_seller_username(seller_name: str = "") -> str:
@@ -69,39 +69,43 @@ def clean_seller_username(seller_name: str = "") -> str:
         return ""
     return s
 
-def resolve_g2g_product_url(oid: str = "", game_title: str = "", is_live: bool = False, seller_name: str = "") -> str:
+def resolve_g2g_product_url(oid: str = "", game_title: str = "", is_live: bool = True, seller_name: str = "") -> str:
     """
     Menghasilkan URL produk yang 100% aktif dan ZERO 404.
-    Secara default SELALU menggunakan URL Evergreen Category Search URL agar tidak pernah delisted/expired.
+    Jika offer_id valid dan bukan dead offer -> Direct Offer format: https://www.g2g.com/id/categories/{slug}/offer/{oid}
+    Jika delisted / dead offer / tanpa offer_id -> Evergreen Category format: https://www.g2g.com/id/categories/{slug}
     """
     import urllib.parse
     
     lower = game_title.lower() if game_title else ""
     if "eneba" in lower or (oid and "eneba" in oid.lower()) or (seller_name and "eneba" in seller_name.lower()):
         clean = game_title.replace(":", " ").replace("&", " ").replace("-", " ").strip()
-        return f"https://www.eneba.com/store/all?text={urllib.parse.quote_plus(clean)}"
+        return f"https://www.eneba.com/store/all?text={urllib.parse.quote_plus(clean)}&regions[]=global&sortBy=PRICE_LOWEST"
 
-    clean_seller = clean_seller_username(seller_name)
-
-    # Hanya jika is_live eksplisit True dan offer_id valid yang baru saja diverifikasi live saat ini
-    if is_live and oid and oid.startswith("G") and oid not in KNOWN_DEAD_OFFERS:
-        return f"https://www.g2g.com/offer/{oid}"
-
-    # Default bulletproof: Evergreen Category + Seller search URL (NEVER EXPIRES)
+    # Cari category slug
+    matched_cat = "https://www.g2g.com/id/categories/steam-global-account"
+    matched_slug = "steam-global-account"
     for k, v in GAME_CATEGORIES.items():
         if k in lower:
-            if clean_seller:
-                return f"{v}?q={urllib.parse.quote_plus(clean_seller)}"
-            return v
+            matched_cat = v
+            matched_slug = v.split("/categories/")[-1]
+            break
 
-    if game_title and len(game_title.strip()) > 1:
-        clean = game_title.replace(":", " ").replace("&", " ").replace("-", " ").strip()
-        query_str = f"{clean} {clean_seller}".strip() if clean_seller else clean
-        return f"https://www.g2g.com/search?q={urllib.parse.quote_plus(query_str)}"
+    # Jika offer_id valid dan live
+    if is_live and oid and oid.startswith("G") and oid not in KNOWN_DEAD_OFFERS:
+        return f"https://www.g2g.com/id/categories/{matched_slug}/offer/{oid}"
 
-    if clean_seller:
-        return f"https://www.g2g.com/categories/steam-global-account?q={urllib.parse.quote_plus(clean_seller)}"
-    return "https://www.g2g.com/categories/steam-global-account"
+    # Default bulletproof: Clean Category URL Indonesia
+    return matched_cat
+
+
+def get_g2g_seller_profile_url(seller_name: str = "") -> str:
+    """Mengarahkan ke profil toko seller asli di G2G."""
+    import urllib.parse
+    clean = clean_seller_username(seller_name)
+    if clean:
+        return f"https://www.g2g.com/{urllib.parse.quote_plus(clean)}"
+    return "https://www.g2g.com"
 
 
 def find_catalog_path() -> Optional[str]:
@@ -148,6 +152,8 @@ async def fetch_g2g_offer_live(client: httpx.AsyncClient, offer_id: str) -> Dict
                 "price_usd": float(payload.get("unit_price_in_usd", 0.0) or 0.0),
                 "is_online": bool(payload.get("is_online")),
                 "satisfaction_rate": float(payload.get("satisfaction_rate", 0.0) or 0.0),
+                "total_success_order": int(payload.get("total_success_order", 0) or 0),
+                "total_rating": int(payload.get("total_rating", 0) or 0),
                 "title": payload.get("title", ""),
             }
         else:
@@ -225,6 +231,8 @@ async def audit_all_catalog_sellers() -> List[Dict[str, Any]]:
                         seller_name = s.get("seller_name", "Seller")
                         recorded_price = s.get("price_g2g_idr", 0)
                         recorded_stock = s.get("stock", 25)
+                        recorded_rating = float(s.get("seller_rating") or s.get("rating_pct") or 99.0)
+                        recorded_orders = int(s.get("seller_orders") or s.get("reviews_count") or 0)
                         is_selected = (seller_id == selected_seller_id)
 
                         async def bounded_fetch(
@@ -235,6 +243,8 @@ async def audit_all_catalog_sellers() -> List[Dict[str, Any]]:
                             sname=seller_name,
                             rec_price=recorded_price,
                             rec_stock=recorded_stock,
+                            rec_rating=recorded_rating,
+                            rec_orders=recorded_orders,
                             sel_shopee=shopee_price,
                             selected=is_selected
                         ):
@@ -247,6 +257,19 @@ async def audit_all_catalog_sellers() -> List[Dict[str, Any]]:
                                 res["recorded_price_idr"] = rec_price
                                 res["is_selected"] = selected
                                 res["selling_price_shopee_idr"] = sel_shopee
+
+                                raw_sat = float(res.get("satisfaction_rate", 0.0) or 0.0)
+                                rating_pct = round(raw_sat * 100.0, 1) if 0 < raw_sat <= 1.0 else (round(raw_sat, 1) if raw_sat > 1.0 else rec_rating)
+                                orders_cnt = int(res.get("total_success_order") or res.get("total_rating") or rec_orders)
+                                if rating_pct >= 96.0 and orders_cnt >= 20:
+                                    trust_tier = "Safe (A+)"
+                                elif rating_pct >= 92.0:
+                                    trust_tier = "Moderate (B)"
+                                else:
+                                    trust_tier = "Caution (C)"
+                                res["seller_rating"] = rating_pct
+                                res["seller_orders"] = orders_cnt
+                                res["trust_tier"] = trust_tier
 
                                 # Self-Healing Fallback:
                                 # Jika SLS API mengembalikan 404/delisted/error, JANGAN langsung anggap 0 stok / CRITICAL!
@@ -385,12 +408,15 @@ def build_stock_summary_report(audit_results: List[Dict[str, Any]]) -> str:
         price_idr = int(math.ceil(usd * 16350 / 100) * 100) if usd > 0 else 0
         price_str = f"Rp {price_idr:,}" if price_idr > 0 else "-"
         oid = r.get("offer_id", "")
-        is_live = health != "CRITICAL"
+        rating = r.get("seller_rating", 99.0)
+        orders = r.get("seller_orders", 0)
+        trust_tier = r.get("trust_tier", "Safe (A+)")
+        orders_str = f"{orders/1000:.1f}k terjual" if orders >= 1000 else f"{orders} terjual"
 
         product_url = resolve_g2g_product_url(oid, game, is_live=False, seller_name=seller)
         lines.append(
             f"{emoji} *{game}*\n"
-            f"   • Seller: `{seller}` ({online_badge})\n"
+            f"   • Seller: `{seller}` ({online_badge}) • ★ {rating}% • {orders_str} [{trust_tier}]\n"
             f"   • Stok Faktual: *{qty:,} Unit* | Modal: *{price_str}*\n"
             f"   • 🔗 URL Produk: {product_url}"
         )
@@ -410,6 +436,11 @@ def get_critical_stock_alerts(audit_results: List[Dict[str, Any]]) -> List[str]:
             game = r.get("game_title", "Unknown")
             seller = r.get("seller_name") or r.get("recorded_seller_name", "Seller")
             oid = r.get("offer_id", "")
+            rating = r.get("seller_rating", 99.0)
+            orders = r.get("seller_orders", 0)
+            trust_tier = r.get("trust_tier", "Safe (A+)")
+            orders_str = f"{orders/1000:.1f}k terjual" if orders >= 1000 else f"{orders} terjual"
+            rep_badge = f"★ {rating}% • {orders_str} | {trust_tier}"
             url = resolve_g2g_product_url(oid, game, is_live=False, seller_name=seller)
             category_url = resolve_g2g_product_url("", game, is_live=False, seller_name=seller)
             
@@ -418,7 +449,7 @@ def get_critical_stock_alerts(audit_results: List[Dict[str, Any]]) -> List[str]:
                     f"🚨 *[PERINGATAN STOK HABIS / SOLD OUT]*\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"🎮 *Game:* `{game}`\n"
-                    f"👤 *Seller:* `{seller}` (`{oid}`)\n"
+                    f"👤 *Seller:* `{seller}` ({rep_badge})\n"
                     f"🔴 *Sisa Stok:* *0 UNIT (KOSONG)*\n"
                     f"🔗 *Cek Listing:* {url}\n"
                     f"🌐 *Etalase Alternatif:* {category_url}\n"
@@ -429,7 +460,7 @@ def get_critical_stock_alerts(audit_results: List[Dict[str, Any]]) -> List[str]:
                     f"🟡 *[PERINGATAN STOK MENIPIS]*\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"🎮 *Game:* `{game}`\n"
-                    f"👤 *Seller:* `{seller}` (`{oid}`)\n"
+                    f"👤 *Seller:* `{seller}` ({rep_badge})\n"
                     f"⚠️ *Sisa Stok:* *HANYA {qty} UNIT TERSISA!*\n"
                     f"🔗 *Cek Live Offer:* {url}\n"
                     f"💡 *Saran:* Pantau pesanan masuk atau persiapkan supplier alternatif."

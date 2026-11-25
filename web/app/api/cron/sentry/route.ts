@@ -125,7 +125,12 @@ export async function GET(req: NextRequest) {
           }
 
           // Price Spike Guard calculations
-          const livePriceIdr = live.price_usd > 0 ? Math.ceil((live.price_usd * 16350) / 100) * 100 : item.recordedPriceIdr;
+          const livePriceIdr =
+            live.price_idr > 0
+              ? live.price_idr
+              : live.price_usd > 0
+              ? Math.ceil(live.price_usd * 16850 * 1.045)
+              : item.recordedPriceIdr;
           const liveCogsNet = Math.round(livePriceIdr * 1.007);
           const shopeeFee = Math.round(item.sellingPriceShopeeIdr * 0.08) + 1000;
           const liveNetProfit = item.sellingPriceShopeeIdr - liveCogsNet - shopeeFee;
@@ -133,7 +138,7 @@ export async function GET(req: NextRequest) {
 
           let priceAlert: "MARGIN_DANGER" | "NORMAL" = "NORMAL";
           const isPriceSpike = liveMarginPct < 12.0 || (item.recordedPriceIdr > 0 && livePriceIdr > item.recordedPriceIdr * 1.15);
-          if (isPriceSpike && live.price_usd > 0) {
+          if (isPriceSpike && (live.price_idr > 0 || live.price_usd > 0)) {
             priceAlert = "MARGIN_DANGER";
           }
 
@@ -204,7 +209,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (catalogModified) {
-      writeAuthoritativeCatalog(catalog);
+      await writeAuthoritativeCatalog(catalog);
     }
 
     // Filter alerts
@@ -216,7 +221,7 @@ export async function GET(req: NextRequest) {
 
     // Send Critical Alerts (0 Stock / Sold Out)
     for (const item of criticalItems) {
-      const priceIdr = Math.ceil((item.priceUsd * 16350) / 100) * 100;
+      const priceIdr = item.livePriceIdr;
       const priceStr = priceIdr > 0 ? `Rp ${priceIdr.toLocaleString("id-ID")}` : "-";
       const categoryUrl = getG2GGameCategoryUrl(item.gameTitle);
       const alertMsg = (
@@ -236,7 +241,7 @@ export async function GET(req: NextRequest) {
 
     // Send Warning Alerts (Stock <= 4)
     for (const item of warningItems) {
-      const priceIdr = Math.ceil((item.priceUsd * 16350) / 100) * 100;
+      const priceIdr = item.livePriceIdr;
       const priceStr = priceIdr > 0 ? `Rp ${priceIdr.toLocaleString("id-ID")}` : "-";
       const categoryUrl = getG2GGameCategoryUrl(item.gameTitle);
       const alertMsg = (

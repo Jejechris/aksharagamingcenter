@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, Suspense } from "react
 import { fetchSmartCatalog } from "@/lib/catalogClient";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import GameSelectorCombobox from "@/app/components/GameSelectorCombobox";
 import {
   FileText, Sparkles, Copy, Check, ArrowLeft, ArrowRight, RefreshCw,
   Download, ShoppingBag, ShieldCheck, CheckCircle2, Sliders,
@@ -584,40 +585,25 @@ function DescriptionMakerContent() {
           </div>
         </div>
 
-        {/* Quick Inventory Game Chips */}
-        <div className="space-y-2">
-          <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-            <Tag className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Pilih Cepat Game dari Portofolio Aktif:</span>
-          </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-            {catalogGames.length === 0 ? (
-              <div className="p-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-500 flex items-center justify-between w-full shadow-sm">
-                <span>Portofolio masih kosong. Tambahkan game baru di <Link href="/dashboard/catalog" className="text-emerald-600 underline font-semibold">Katalog Radar</Link> atau ketik manual di bawah.</span>
-                <Link href="/dashboard/catalog" className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium hover:bg-emerald-100 whitespace-nowrap ml-4">
-                  + Tambah Game
-                </Link>
-              </div>
-            ) : (
-              catalogGames.map((g) => {
-                const isSelected = selectedGameId === g.id || gameTitle.toLowerCase() === g.title.toLowerCase();
-                return (
-                  <button
-                    key={g.id}
-                    onClick={() => handleSelectPresetGame(g)}
-                    className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-xs transition-all border text-left shadow-sm ${
-                      isSelected
-                        ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold ring-1 ring-emerald-400/20"
-                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="truncate max-w-[200px] font-medium">{g.title.split(":")[0]}</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5 tabular-nums">{formatRp(g.selling_price_shopee_idr)} • {g.platform}</div>
-                  </button>
-                );
-              })
-            )}
-          </div>
+        {/* Smart Searchable Game Portfolio Selector */}
+        <div className="animate-fade-up">
+          {catalogGames.length === 0 ? (
+            <div className="p-3 rounded-xl border border-slate-200 bg-white text-xs text-slate-500 flex items-center justify-between w-full shadow-sm">
+              <span>Portofolio masih kosong. Tambahkan game baru di <Link href="/dashboard/catalog" className="text-emerald-600 underline font-semibold">Katalog Radar</Link> atau ketik manual di bawah.</span>
+              <Link href="/dashboard/catalog" className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium hover:bg-emerald-100 whitespace-nowrap ml-4">
+                + Tambah Game
+              </Link>
+            </div>
+          ) : (
+            <GameSelectorCombobox
+              label="Pilih Cepat Game dari Portofolio Aktif"
+              actionLink={{ label: "+ Kelola di Katalog →", href: "/dashboard/catalog" }}
+              games={catalogGames}
+              selectedGameId={selectedGameId}
+              selectedGameTitle={gameTitle}
+              onSelect={(g) => handleSelectPresetGame(g)}
+            />
+          )}
         </div>
 
         {/* Master 1-Click Copy Bar */}

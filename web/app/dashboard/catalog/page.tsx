@@ -11,15 +11,25 @@ import {
   Award, QrCode, Zap, Layers, BarChart3, CheckCircle2, Clock, Save,
   Pencil, FileText, Download, Upload, Database, ShoppingBag
 } from 'lucide-react';
-import { getG2GSellerUrl, getG2GGameCategoryUrl, resolveG2GProductUrl } from '@/lib/g2g';
+import { getG2GSellerUrl, getG2GGameCategoryUrl, resolveG2GProductUrl, getG2GSellerProfileUrl, extractG2GOfferId } from '@/lib/g2g';
 import { getEnebaSearchUrl } from '@/lib/eneba';
+import { evaluateSellerTrust, formatOrdersCompact, getTrustTierBadgeStyle } from '@/lib/sellerTrust';
 import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
 
 interface Seller {
   seller_id: string;
   seller_name: string;
+  offer_title?: string;
+  quality_score?: number;
   rating_pct: number;
   reviews_count: number;
+  seller_rating?: number;
+  seller_orders?: number;
+  seller_level?: string;
+  verified?: boolean;
+  delivery_time?: string;
+  trust_score?: number;
+  trust_tier?: string;
   price_g2g_idr: number;
   delivery_speed: string;
   stock: number;
@@ -28,6 +38,7 @@ interface Seller {
   profile_url?: string;
   fallback_search_url?: string;
   offer_id?: string;
+  live_status?: string;
   tier?: 'ultra_safe' | 'lowest_price' | 'mid_level' | string;
   tier_label?: string;
   tier_desc?: string;
@@ -72,6 +83,7 @@ export default function CatalogDashboardPage() {
 
   const getValidSellerUrl = (seller?: Seller, gameTitle?: string, category?: string) => {
     const isEneba = seller?.profile_url?.includes('eneba.com') ||
+                    seller?.fallback_search_url?.includes('eneba.com') ||
                     seller?.seller_name?.toLowerCase().includes('eneba') ||
                     category?.toLowerCase().includes('key') ||
                     category?.toLowerCase().includes('cdkey');
@@ -81,8 +93,14 @@ export default function CatalogDashboardPage() {
       }
       return getEnebaSearchUrl(gameTitle || '');
     }
+
+    const rawCandidate = seller?.profile_url || (seller as any)?.offer_id || seller?.fallback_search_url;
+    const cleanCandidate = (typeof rawCandidate === 'string' && rawCandidate.includes('g2g.com/categories/') && rawCandidate.includes('?q='))
+      ? rawCandidate.split('?')[0]
+      : rawCandidate;
+
     return resolveG2GProductUrl(
-      seller?.profile_url || (seller as any)?.offer_id,
+      cleanCandidate,
       seller?.seller_name,
       gameTitle
     );
@@ -176,8 +194,71 @@ export default function CatalogDashboardPage() {
   const updateCatalogState = (nextGames: CatalogGame[]) => {
     setGames(nextGames);
     try {
-      localStorage.setItem('akshara_custom_catalog_v2', JSON.stringify(nextGames));
+      localStorage.setItem('akshara_custom_catalog_v3', JSON.stringify(nextGames));
     } catch (e) {}
+  };
+
+  // Autonomous Seller Finder State & Handlers
+  const [isFindingAllSellers, setIsFindingAllSellers] = useState(false);
+  const [findingSellerGameId, setFindingSellerGameId] = useState<string | null>(null);
+  const [safeSellerOnly, setSafeSellerOnly] = useState(false);
+
+  const handleAutoFindAllSellers = async () => {
+    setIsFindingAllSellers(true);
+    try {
+      const res = await fetch('/api/catalog/auto-find-sellers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'all', safeOnly: safeSellerOnly }),
+      });
+      const json = await res.json();
+      if (res.ok && json.status === 'success') {
+        if (Array.isArray(json.allGames)) {
+          updateCatalogState(json.allGames);
+        }
+        showToast(`🚀 ${json.message}`);
+      } else {
+        showToast(json.message || 'Gagal mencari seller otomatis.', 'error');
+      }
+    } catch (err: any) {
+      showToast('Terjadi kesalahan koneksi saat mencari seller.', 'error');
+    } finally {
+      setIsFindingAllSellers(false);
+    }
+  };
+
+  const handleAutoFindSingleSeller = async (gameId: string, title: string) => {
+    setFindingSellerGameId(gameId);
+    try {
+      const res = await fetch('/api/catalog/auto-find-sellers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game_id: gameId, title, mode: 'single', safeOnly: safeSellerOnly }),
+      });
+      const json = await res.json();
+      if (res.ok && (json.status === 'success' || json.status === 'warning')) {
+        if (Array.isArray(json.allGames)) {
+          updateCatalogState(json.allGames);
+        } else if (json.game) {
+          const next = games.map(g => g.id === gameId ? json.game : g);
+          updateCatalogState(next);
+        }
+        // Buka multi-seller drawer otomatis agar user langsung melihat 3 seller baru
+        setExpandedGames(prev => ({ ...prev, [gameId]: true }));
+
+        if (json.status === 'success') {
+          showToast(`✅ ${json.message}`);
+        } else {
+          showToast(`⚠️ ${json.message}`, 'error');
+        }
+      } else {
+        showToast(json.message || 'Gagal mencari seller live.', 'error');
+      }
+    } catch (err: any) {
+      showToast('Terjadi kesalahan jaringan.', 'error');
+    } finally {
+      setFindingSellerGameId(null);
+    }
   };
 
   const handleAddSellerToGame = async (gameId: string, gameTitle: string) => {
@@ -817,6 +898,17 @@ export default function CatalogDashboardPage() {
             </button>
 
             <button
+              type="button"
+              onClick={handleAutoFindAllSellers}
+              disabled={isFindingAllSellers}
+              className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Autonomous Seller Finder: Pindai dan temukan 3 seller terbaik live untuk semua game"
+            >
+              <Sparkles className={`w-3.5 h-3.5 text-amber-600 ${isFindingAllSellers ? 'animate-spin' : ''}`} />
+              <span>{isFindingAllSellers ? "Mencari Live..." : "Auto-Cari Seller (Semua Game)"}</span>
+            </button>
+
+            <button
               onClick={() => setShowDetectorModal(true)}
               className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-medium transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
@@ -841,7 +933,7 @@ export default function CatalogDashboardPage() {
 
         {/* 4 KPI SUMMARY CARDS */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="app-card p-5">
+          <div className="app-card card-interactive animate-fade-up stagger-1 p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-slate-500">Portofolio Game</span>
               <div className="p-2 rounded-lg bg-slate-100 text-slate-600">
@@ -854,7 +946,7 @@ export default function CatalogDashboardPage() {
             <div className="text-[11px] text-slate-400 mt-2">Item terdaftar aktif</div>
           </div>
 
-          <div className="app-card p-5">
+          <div className="app-card card-interactive animate-fade-up stagger-2 p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-slate-500">Nilai Portofolio (GMV)</span>
               <div className="p-2 rounded-lg bg-slate-100 text-slate-600">
@@ -867,7 +959,7 @@ export default function CatalogDashboardPage() {
             <div className="text-[11px] text-slate-400 mt-2">Potensi omset total</div>
           </div>
 
-          <div className="app-card p-5">
+          <div className="app-card card-interactive animate-fade-up stagger-3 p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-slate-500">Total Laba Bersih</span>
               <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
@@ -880,7 +972,7 @@ export default function CatalogDashboardPage() {
             <div className="text-[11px] text-slate-400 mt-2">Setelah fee Shopee & QRIS</div>
           </div>
 
-          <div className="app-card p-5">
+          <div className="app-card card-interactive animate-fade-up stagger-4 p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-slate-500">Rata-rata Margin</span>
               <div className="p-2 rounded-lg bg-slate-100 text-slate-600">
@@ -948,6 +1040,16 @@ export default function CatalogDashboardPage() {
               </button>
             ))}
           </div>
+          <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-xs text-xs font-medium text-slate-700 cursor-pointer hover:border-emerald-300 transition-colors shrink-0">
+            <input
+              type="checkbox"
+              checked={safeSellerOnly}
+              onChange={(e) => setSafeSellerOnly(e.target.checked)}
+              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+            />
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Hanya Seller Aman (≥ 95% & ≥ 20 Transaksi)</span>
+          </label>
         </div>
 
         {/* 3-TIER SOURCING STRATEGY BANNER */}
@@ -1017,7 +1119,7 @@ export default function CatalogDashboardPage() {
               return (
                 <div 
                   key={game.id}
-                  className="app-card overflow-hidden hover:border-slate-300 transition-all shadow-sm"
+                  className="app-card card-interactive animate-fade-up overflow-hidden hover:border-slate-300 shadow-sm"
                 >
                   <div className="p-5 space-y-4">
                     {/* Top Row: Game Info & Financial Strip */}
@@ -1078,11 +1180,81 @@ export default function CatalogDashboardPage() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-emerald-700 hover:text-emerald-900 font-semibold inline-flex items-center gap-1 underline transition-colors"
+                                title="Buka etalase game di G2G"
                               >
                                 {selectedSeller?.seller_name}
                                 <ExternalLink className="w-3 h-3" />
                               </a>
-                              <span className="text-slate-400">({selectedSeller?.rating_pct}% • {selectedSeller?.reviews_count?.toLocaleString()} ulasan)</span>
+                              {selectedSeller?.seller_name && (
+                                <a
+                                  href={getG2GSellerProfileUrl(selectedSeller.seller_name)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] text-slate-400 hover:text-slate-600 underline"
+                                  title="Buka profil toko seller di G2G"
+                                >
+                                  (Toko ↗)
+                                </a>
+                              )}
+                              {/* Status Badge Live Offer / Delisted / Estimasi */}
+                              {(() => {
+                                if (!selectedSeller) return null;
+                                const hasOid = Boolean(
+                                  selectedSeller.offer_id ||
+                                  extractG2GOfferId(selectedSeller.profile_url)
+                                );
+                                const status = selectedSeller.live_status;
+                                if (hasOid && status === "live") {
+                                  return (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                      Live Offer
+                                    </span>
+                                  );
+                                }
+                                if (status === "delisted") {
+                                  return (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200" title="Offer ini delisted di G2G. Buka etalase untuk cek kategori pengganti">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                      Offer Tutup (Cek Kategori)
+                                    </span>
+                                  );
+                                }
+                                if (!hasOid) {
+                                  return (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200" title="Belum terhubung ke Offer ID spesifik. Paste link /offer/G... lewat Detektor Live Link">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                      Estimasi (Belum Link Offer)
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              {(() => {
+                                if (!selectedSeller) return null;
+                                const trustEval = evaluateSellerTrust({
+                                  rating: selectedSeller.seller_rating ?? selectedSeller.rating_pct,
+                                  orders: selectedSeller.seller_orders ?? selectedSeller.reviews_count,
+                                  stock: selectedSeller.stock,
+                                  deliverySpeed: selectedSeller.delivery_time || selectedSeller.delivery_speed,
+                                  priceIdr: selectedSeller.price_g2g_idr,
+                                  sellingPriceShopeeIdr: game.selling_price_shopee_idr,
+                                });
+                                const trustTier = selectedSeller.trust_tier || trustEval.trust_tier;
+                                const ratingVal = Number((selectedSeller.seller_rating ?? selectedSeller.rating_pct ?? 0).toFixed(1));
+                                const ordersVal = selectedSeller.seller_orders ?? selectedSeller.reviews_count ?? 0;
+                                return (
+                                  <span className="inline-flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-semibold tabular-nums">
+                                      <span className="text-amber-500">★</span>
+                                      {ratingVal}% • {formatOrdersCompact(ordersVal)}
+                                    </span>
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getTrustTierBadgeStyle(trustTier)}`}>
+                                      {trustTier}
+                                    </span>
+                                  </span>
+                                );
+                              })()}
                             </span>
                           )}
                         </div>
@@ -1226,8 +1398,19 @@ export default function CatalogDashboardPage() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          onClick={() => handleAutoFindSingleSeller(game.id, game.title)}
+                          disabled={findingSellerGameId === game.id}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors cursor-pointer disabled:opacity-50"
+                          title="Auto-Cari 3 Seller Live: Temukan 3 seller live termurah & terpercaya dari server G2G SLS"
+                        >
+                          <Sparkles className={`w-3.5 h-3.5 text-amber-600 ${findingSellerGameId === game.id ? 'animate-spin' : ''}`} />
+                          <span>{findingSellerGameId === game.id ? "Mencari..." : "Auto-Cari Seller Live"}</span>
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => {
-                            const url = selectedSeller?.fallback_search_url || selectedSeller?.profile_url || getValidSellerUrl(selectedSeller, game.title);
+                            const url = getValidSellerUrl(selectedSeller, game.title, game.category);
                             handleDetectLink(url);
                           }}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
@@ -1287,6 +1470,17 @@ export default function CatalogDashboardPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleAutoFindSingleSeller(game.id, game.title)}
+                            disabled={findingSellerGameId === game.id}
+                            className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-medium shadow-xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            title="Cari ulang 3 seller live terbaik langsung dari server G2G SLS"
+                          >
+                            <Sparkles className={`w-3.5 h-3.5 text-amber-600 ${findingSellerGameId === game.id ? 'animate-spin' : ''}`} />
+                            <span>{findingSellerGameId === game.id ? "Mencari Live..." : "Auto-Cari Seller Live"}</span>
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => {
@@ -1427,8 +1621,13 @@ export default function CatalogDashboardPage() {
                             {game.sellers
                               .filter(s => {
                                 const currentFilter = drawerTierFilter[game.id] || 'ALL';
-                                if (currentFilter === 'ALL') return true;
-                                return s.tier === currentFilter;
+                                if (currentFilter !== 'ALL' && s.tier !== currentFilter) return false;
+                                if (safeSellerOnly) {
+                                  const ratingVal = s.seller_rating ?? s.rating_pct ?? 0;
+                                  const ordersVal = s.seller_orders ?? s.reviews_count ?? 0;
+                                  if (ratingVal < 95 || ordersVal < 20) return false;
+                                }
+                                return true;
                               })
                               .map((s) => {
                                 const isSelected = s.seller_id === game.selected_seller_id;
@@ -1476,20 +1675,80 @@ export default function CatalogDashboardPage() {
 
                                     {/* Seller Name */}
                                     <td className="px-4 py-3 whitespace-nowrap">
-                                      <a
-                                        href={getValidSellerUrl(s, game.title, game.category)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="font-bold text-slate-900 hover:text-emerald-600 inline-flex items-center gap-1 transition-colors underline"
-                                      >
-                                        <span>{s.seller_name}</span>
-                                        <ExternalLink className="w-3 h-3 text-slate-400" />
-                                      </a>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <a
+                                          href={getValidSellerUrl(s, game.title, game.category)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="font-bold text-slate-900 hover:text-emerald-600 inline-flex items-center gap-1 transition-colors underline"
+                                        >
+                                          <span>{s.seller_name}</span>
+                                          <ExternalLink className="w-3 h-3 text-slate-400" />
+                                        </a>
+                                        {(() => {
+                                          const hasOid = Boolean(s.offer_id || extractG2GOfferId(s.profile_url));
+                                          if (hasOid && s.live_status === "live") {
+                                            return (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                Live Offer
+                                              </span>
+                                            );
+                                          }
+                                          if (s.live_status === "delisted") {
+                                            return (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                                Offer Tutup
+                                              </span>
+                                            );
+                                          }
+                                          if (!hasOid) {
+                                            return (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                                Estimasi
+                                              </span>
+                                            );
+                                          }
+                                          return null;
+                                        })()}
+                                      </div>
+                                      {s.offer_title && (
+                                        <div
+                                          className="text-[11px] text-slate-500 truncate max-w-[260px] font-mono mt-0.5"
+                                          title={s.offer_title}
+                                        >
+                                          {s.offer_title}
+                                        </div>
+                                      )}
                                     </td>
 
                                     {/* Rating */}
                                     <td className="px-4 py-3 whitespace-nowrap text-slate-600">
-                                      {s.rating_pct}% <span className="text-slate-400">({s.reviews_count?.toLocaleString()})</span>
+                                      {(() => {
+                                        const trustEval = evaluateSellerTrust({
+                                          rating: s.seller_rating ?? s.rating_pct,
+                                          orders: s.seller_orders ?? s.reviews_count,
+                                          stock: s.stock,
+                                          deliverySpeed: s.delivery_time || s.delivery_speed,
+                                          priceIdr: s.price_g2g_idr,
+                                          sellingPriceShopeeIdr: game.selling_price_shopee_idr,
+                                        });
+                                        const trustTier = s.trust_tier || trustEval.trust_tier;
+                                        const ratingVal = Number((s.seller_rating ?? s.rating_pct ?? 0).toFixed(1));
+                                        const ordersVal = s.seller_orders ?? s.reviews_count ?? 0;
+                                        return (
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="font-semibold text-slate-800 tabular-nums">
+                                              <span className="text-amber-500">★</span> {ratingVal}%
+                                            </span>
+                                            <span className="text-slate-400 text-[11px] tabular-nums">
+                                              • {formatOrdersCompact(ordersVal)}
+                                            </span>
+                                            <span className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getTrustTierBadgeStyle(trustTier)}`}>
+                                              {trustTier}
+                                            </span>
+                                          </div>
+                                        );
+                                      })()}
                                     </td>
 
                                     {/* Live Stock */}

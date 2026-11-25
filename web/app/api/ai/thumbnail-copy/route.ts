@@ -192,7 +192,7 @@ Format JSON:
 
     let aiResultText = "";
     try {
-      aiResultText = await callGemini(prompt, "Hasilkan output murni JSON valid tanpa pembungkus markdown.");
+      aiResultText = await callGemini(prompt, "Hasilkan output murni JSON valid tanpa pembungkus markdown.", { jsonMode: true });
     } catch (e) {
       console.warn("Gemini call failed, using heuristic fallback:", e);
     }

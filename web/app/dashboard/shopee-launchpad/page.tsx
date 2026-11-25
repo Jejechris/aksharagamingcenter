@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { fetchSmartCatalog } from "@/lib/catalogClient";
+import ThumbnailStudio from "@/app/dashboard/marketer/components/ThumbnailStudio";
+import GameSelectorCombobox from "@/app/components/GameSelectorCombobox";
 import {
   ShoppingBag,
   Sparkles,
-  Download,
   Copy,
   Check,
   CheckCircle2,
@@ -15,20 +16,17 @@ import {
   ShieldCheck,
   Zap,
   Tag,
-  Palette,
-  Layers,
-  Image as ImageIcon,
-  DollarSign,
+  FileText,
   Sliders,
   HelpCircle,
-  FileText,
-  Clock,
   ArrowRight,
-  RefreshCw,
-  Upload,
-  Cpu,
-  Monitor,
-  Award
+  ArrowLeft,
+  Layers,
+  Image as ImageIcon,
+  AlertTriangle,
+  RotateCcw,
+  Smartphone,
+  Info
 } from "lucide-react";
 
 interface CatalogItem {
@@ -45,74 +43,8 @@ interface CatalogItem {
   };
 }
 
-interface CoverPalette {
-  name: string;
-  id: string;
-  primary: string;
-  glow: string;
-  bgGrad1: string;
-  bgGrad2: string;
-  accent: string;
-}
-
-const COVER_PALETTES: CoverPalette[] = [
-  {
-    name: "Emerald Cyber",
-    id: "emerald",
-    primary: "#10b981",
-    glow: "#059669",
-    bgGrad1: "#04140e",
-    bgGrad2: "#0d281e",
-    accent: "#6ee7b7",
-  },
-  {
-    name: "Neon Azure",
-    id: "azure",
-    primary: "#0ea5e9",
-    glow: "#0284c7",
-    bgGrad1: "#04121a",
-    bgGrad2: "#082333",
-    accent: "#7dd3fc",
-  },
-  {
-    name: "Royal Violet",
-    id: "violet",
-    primary: "#8b5cf6",
-    glow: "#7c3aed",
-    bgGrad1: "#0b0714",
-    bgGrad2: "#190f2e",
-    accent: "#c4b5fd",
-  },
-  {
-    name: "Amber Gold",
-    id: "amber",
-    primary: "#f59e0b",
-    glow: "#d97706",
-    bgGrad1: "#140e04",
-    bgGrad2: "#2d1f08",
-    accent: "#fde68a",
-  },
-  {
-    name: "Crimson Forge",
-    id: "crimson",
-    primary: "#ef4444",
-    glow: "#dc2626",
-    bgGrad1: "#140404",
-    bgGrad2: "#2b0a0a",
-    accent: "#fca5a5",
-  },
-  {
-    name: "Obsidian Stealth",
-    id: "stealth",
-    primary: "#94a3b8",
-    glow: "#475569",
-    bgGrad1: "#06070a",
-    bgGrad2: "#0f172a",
-    accent: "#f1f5f9",
-  },
-];
-
 export default function ShopeeLaunchpadPage() {
+  const [activeStep, setActiveStep] = useState<number>(1);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
   const [selectedGameId, setSelectedGameId] = useState<string>("custom");
@@ -125,42 +57,120 @@ export default function ShopeeLaunchpadPage() {
   const [cogsEstimate, setCogsEstimate] = useState<number>(115000);
   const [warrantyDays, setWarrantyDays] = useState<number>(30);
 
-  // Cover Customizer
-  const [coverPalette, setCoverPalette] = useState<string>("emerald");
-  const [badgeHeadline, setBadgeHeadline] = useState("100% GARANSI RESMI 30 HARI");
-  const [badgeDelivery, setBadgeDelivery] = useState("⚡ PENGIRIMAN INSTAN 5 DETIK");
-  const [badgeAccess, setBadgeAccess] = useState("FULL ACCESS & BEBAS GANTI EMAIL/PASS");
-
-  // Description Customizer
+  // Description Customizer Toggles
   const [includeSopUnboxing, setIncludeSopUnboxing] = useState(true);
   const [includeActivationGuide, setIncludeActivationGuide] = useState(true);
   const [includeFaq, setIncludeFaq] = useState(true);
   const [includeVipPromo, setIncludeVipPromo] = useState(true);
   const [customBonusNotes, setCustomBonusNotes] = useState("");
 
-  // Generated Outputs
+  // Outputs (User Editable in Steps 2 & 3)
   const [seoTitle, setSeoTitle] = useState("");
   const [generatedDesc, setGeneratedDesc] = useState("");
   const [seoTags, setSeoTags] = useState("");
 
   // Copy Feedbacks
   const [copiedTitle, setCopiedTitle] = useState(false);
-  const [copiedCover, setCopiedCover] = useState(false);
   const [copiedDesc, setCopiedDesc] = useState(false);
+  const [copiedTags, setCopiedTags] = useState(false);
   const [copiedPrice, setCopiedPrice] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
+  const [copiedAttr, setCopiedAttr] = useState<string | null>(null);
 
   // Checklist State
   const [checklist, setChecklist] = useState({
-    title: false,
     cover: false,
+    title: false,
     desc: false,
     price: false,
   });
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Helper: Build Default SEO Title
+  const generateDefaultTitle = useCallback((title: string, plat: string, days: number) => {
+    const cleanT = (title || "GAME TITLE").toUpperCase().trim();
+    const platClean = (plat || "PC").toUpperCase().trim();
+    let str = `${cleanT} [${platClean}] ORIGINAL FULL ACCESS GARANSI RESMI ${days} HARI`;
+    if (str.length > 120) {
+      str = str.slice(0, 117) + "...";
+    }
+    return str;
+  }, []);
 
-  // Fetch Catalog
+  // Helper: Build Default Description
+  const generateDefaultDesc = useCallback((
+    title: string,
+    plat: string,
+    cat: string,
+    days: number,
+    guide: boolean,
+    unboxing: boolean,
+    faq: boolean,
+    vip: boolean,
+    bonus: string
+  ) => {
+    const cleanT = (title || "GAME TITLE").toUpperCase().trim();
+
+    let desc = `🎮 ${cleanT} — ORIGINAL DIGITAL LICENSE\n`;
+    desc += `Platform: ${plat} | Tipe: ${cat}\n`;
+    desc += `Garansi Toko Resmi: ${days} Hari Penuh\n`;
+    desc += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    desc += `⚡ KEUNGGULAN PRODUK AKSHARA GAMING CENTER:\n`;
+    desc += `✓ 100% Lisensi Game Asli & Legal (Bukan bajakan / bukan sharing bebas).\n`;
+    desc += `✓ Full Access Akun Pribadi & Bebas Ganti Data / Email / Password.\n`;
+    desc += `✓ Pengiriman Instan Otomatis langsung melalui sistem Brankas Digital Terenkripsi.\n`;
+    desc += `✓ Proteksi garansi toko ${days} hari ganti baru anti-hackback.\n\n`;
+
+    if (guide) {
+      desc += `📥 CARA AKTIVASI & PENGAMBILAN KREDENSIAL:\n`;
+      desc += `1. Selesaikan pembayaran pesanan Anda di Shopee.\n`;
+      desc += `2. Cek chat Shopee Anda untuk mendapatkan link Brankas Kredensial Resmi beserta Passcode PIN rahasia.\n`;
+      desc += `3. Buka link brankas, masukkan PIN, dan langsung dapatkan akses email/pass atau serial CD-Key Anda.\n`;
+      desc += `4. Login ke launcher resmi (${plat}) & selamat bermain!\n\n`;
+    }
+
+    if (unboxing) {
+      desc += `🛡️ SYARAT & KETENTUAN KLAIM GARANSI:\n`;
+      desc += `• Wajib merekam video unboxing / screen recording tanpa jeda (no-cut) mulai dari sebelum membuka link brankas hingga mencoba login pertama kali.\n`;
+      desc += `• Garansi meliputi akun tidak bisa login saat serah terima atau kendala lisensi selama masa garansi ${days} hari.\n`;
+      desc += `• Ulasan bintang 5 dan konfirmasi penerimaan pesanan akan mengaktifkan masa garansi otomatis.\n\n`;
+    }
+
+    if (faq) {
+      desc += `❓ PERTANYAAN UMUM (F.A.Q):\n`;
+      desc += `Q: Apakah ini permanen?\n`;
+      desc += `A: Ya, game menjadi milik Anda permanen dan dapat dimainkan online/offline sesuai fitur game.\n`;
+      desc += `Q: Apakah butuh kirim paket fisik?\n`;
+      desc += `A: Pengiriman digital otomatis instan via chat. Kartu bukti fisik opsional dapat disertakan bila dibutuhkan.\n\n`;
+    }
+
+    if (vip) {
+      desc += `🎁 BONUS MEMBER VIP REPEAT ORDER:\n`;
+      desc += `Dapatkan kartu voucher diskon Rp 15.000 untuk pembelian game selanjutnya di official store direct kami!\n\n`;
+    }
+
+    if (bonus.trim()) {
+      desc += `📝 CATATAN TAMBAHAN:\n${bonus.trim()}\n\n`;
+    }
+
+    // Hashtags
+    const cleanWords = cleanT.replace(/[^A-Z0-9\s]/g, "").split(/\s+/).filter((w) => w.length > 2);
+    const tags = [
+      `#${cleanWords.join("")}`,
+      `#Jual${cleanWords[0] || "Game"}Original`,
+      "#GameOriginal",
+      "#AksharaGaming",
+      "#GaransiResmi",
+      `#${plat.replace(/[^a-zA-Z0-9]/g, "")}Gaming`,
+      "#ShopeeGameID",
+      "#DigitalLicense"
+    ].join(" ");
+
+    desc += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${tags}`;
+    return { desc, tags };
+  }, []);
+
+  // Fetch Catalog on Mount
   useEffect(() => {
     async function loadCatalog() {
       setIsLoadingCatalog(true);
@@ -174,7 +184,25 @@ export default function ShopeeLaunchpadPage() {
           setPlatform(first.platform);
           setCategory(first.category);
           setPrice(first.selling_price_shopee_idr);
-          setCogsEstimate(first.metrics?.cogs_g2g_idr || Math.round(first.selling_price_shopee_idr * 0.6));
+          const cogs = first.metrics?.cogs_g2g_idr || Math.round(first.selling_price_shopee_idr * 0.6);
+          setCogsEstimate(cogs);
+
+          const initTitle = generateDefaultTitle(first.title, first.platform, 30);
+          setSeoTitle(initTitle);
+
+          const { desc, tags } = generateDefaultDesc(
+            first.title,
+            first.platform,
+            first.category,
+            30,
+            true,
+            true,
+            true,
+            true,
+            ""
+          );
+          setGeneratedDesc(desc);
+          setSeoTags(tags);
         }
       } catch (e) {
         console.error("Failed to load catalog", e);
@@ -183,282 +211,106 @@ export default function ShopeeLaunchpadPage() {
       }
     }
     loadCatalog();
-  }, []);
+  }, [generateDefaultTitle, generateDefaultDesc]);
 
-  // Handle Game Selection
+  // Handle Game Selection from Catalog
   const handleSelectGame = (id: string) => {
     setSelectedGameId(id);
-    if (id === "custom") {
-      setGameTitle("Custom Game Title");
-      setPlatform("Steam");
-      setCategory("Steam CD-Key Global");
-      setPrice(150000);
-      setCogsEstimate(95000);
-      return;
-    }
-    const found = catalog.find((g) => g.id === id);
-    if (found) {
-      setGameTitle(found.title);
-      setPlatform(found.platform);
-      setCategory(found.category);
-      setPrice(found.selling_price_shopee_idr);
-      setCogsEstimate(found.metrics?.cogs_g2g_idr || Math.round(found.selling_price_shopee_idr * 0.6));
-    }
-  };
+    let newTitle = "Custom Game Title";
+    let newPlat = "Steam";
+    let newCat = "Steam CD-Key Global";
+    let newPrice = 150000;
+    let newCogs = 95000;
 
-  // Generate SEO Title & Description
-  const buildOutputs = useCallback(() => {
-    const cleanT = gameTitle.toUpperCase().trim();
-    const platClean = platform.toUpperCase().trim();
-
-    // 1. Shopee SEO Title (Max 120 chars)
-    let titleStr = `${cleanT} [${platClean}] ORIGINAL FULL ACCESS GARANSI RESMI ${warrantyDays} HARI`;
-    if (titleStr.length > 120) {
-      titleStr = titleStr.slice(0, 117) + "...";
-    }
-    setSeoTitle(titleStr);
-
-    // 2. Formatting Description
-    let desc = `🎮 ${cleanT} — ORIGINAL DIGITAL LICENSE\n`;
-    desc += `Platform: ${platform} | Tipe: ${category}\n`;
-    desc += `Garansi Toko Resmi: ${warrantyDays} Hari Penuh\n`;
-    desc += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-
-    desc += `⚡ KEUNGGULAN PRODUK AKSHARA GAMING CENTER:\n`;
-    desc += `✓ 100% Lisensi Game Asli & Legal (Bukan bajakan / bukan sharing bebas).\n`;
-    desc += `✓ ${badgeAccess}.\n`;
-    desc += `✓ ${badgeDelivery} langsung melalui sistem Brankas Digital Terenkripsi.\n`;
-    desc += `✓ Proteksi garansi toko ${warrantyDays} hari ganti baru anti-hackback.\n\n`;
-
-    if (includeActivationGuide) {
-      desc += `📥 CARA AKTIVASI & PENGAMBILAN KREDENSIAL:\n`;
-      desc += `1. Selesaikan pembayaran pesanan Anda di Shopee.\n`;
-      desc += `2. Cek chat Shopee Anda untuk mendapatkan link Brankas Kredensial Resmi beserta Passcode PIN rahasia.\n`;
-      desc += `3. Buka link brankas, masukkan PIN, dan langsung dapatkan akses email/pass atau serial CD-Key Anda.\n`;
-      desc += `4. Login ke launcher resmi (${platform}) & selamat bermain!\n\n`;
-    }
-
-    if (includeSopUnboxing) {
-      desc += `🛡️ SYARAT & KETENTUAN KLAIM GARANSI:\n`;
-      desc += `• Wajib merekam video unboxing / screen recording tanpa jeda (no-cut) mulai dari sebelum membuka link brankas hingga mencoba login pertama kali.\n`;
-      desc += `• Garansi meliputi akun tidak bisa login saat serah terima atau kendala lisensi selama masa garansi ${warrantyDays} hari.\n`;
-      desc += `• Ulasan bintang 5 dan konfirmasi penerimaan pesanan akan mengaktifkan masa garansi otomatis.\n\n`;
-    }
-
-    if (includeFaq) {
-      desc += `❓ PERTANYAAN UMUM (F.A.Q):\n`;
-      desc += `Q: Apakah ini permanen?\n`;
-      desc += `A: Ya, game menjadi milik Anda permanen dan dapat dimainkan online/offline sesuai fitur game.\n`;
-      desc += `Q: Apakah butuh kirim paket fisik?\n`;
-      desc += `A: Pengiriman digital otomatis instan 5 detik via chat. Kartu bukti fisik opsional dapat disertakan bila dibutuhkan.\n\n`;
-    }
-
-    if (includeVipPromo) {
-      desc += `🎁 BONUS MEMBER VIP REPEAT ORDER:\n`;
-      desc += `Dapatkan kartu voucher diskon Rp 15.000 untuk pembelian game selanjutnya di official store direct kami!\n\n`;
-    }
-
-    if (customBonusNotes.trim()) {
-      desc += `📝 CATATAN TAMBAHAN:\n${customBonusNotes.trim()}\n\n`;
-    }
-
-    // Hashtags
-    const cleanWords = cleanT.replace(/[^A-Z0-9\s]/g, "").split(/\s+/).filter((w) => w.length > 2);
-    const tags = [
-      `#${cleanWords.join("")}`,
-      `#Jual${cleanWords[0] || "Game"}Original`,
-      "#GameOriginal",
-      "#AksharaGaming",
-      "#GaransiResmi",
-      `#${platform.replace(/[^a-zA-Z0-9]/g, "")}Gaming`,
-      "#ShopeeGameID",
-      "#DigitalLicense"
-    ].join(" ");
-
-    desc += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${tags}`;
-
-    setGeneratedDesc(desc);
-    setSeoTags(tags);
-  }, [
-    gameTitle,
-    platform,
-    category,
-    warrantyDays,
-    badgeAccess,
-    badgeDelivery,
-    includeActivationGuide,
-    includeSopUnboxing,
-    includeFaq,
-    includeVipPromo,
-    customBonusNotes,
-  ]);
-
-  useEffect(() => {
-    buildOutputs();
-  }, [buildOutputs]);
-
-  // Render Live Canvas Cover 1080x1080
-  const renderCoverCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const width = 1080;
-    const height = 1080;
-    canvas.width = width;
-    canvas.height = height;
-
-    const pal = COVER_PALETTES.find((p) => p.id === coverPalette) || COVER_PALETTES[0];
-
-    // 1. Dark Gradient Background
-    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-    bgGrad.addColorStop(0, pal.bgGrad1);
-    bgGrad.addColorStop(0.6, pal.bgGrad2);
-    bgGrad.addColorStop(1, "#06070a");
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, width, height);
-
-    // 2. Cyber Telemetry Grid Lines
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
-    ctx.lineWidth = 1;
-    for (let x = 0; x < width; x += 54) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < height; y += 54) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-
-    // 3. Ambient Glow Circles
-    const radGlow = ctx.createRadialGradient(width / 2, 450, 40, width / 2, 450, 480);
-    radGlow.addColorStop(0, pal.glow + "33");
-    radGlow.addColorStop(1, "transparent");
-    ctx.fillStyle = radGlow;
-    ctx.fillRect(0, 0, width, height);
-
-    // 4. Double-Bezel Outer Frame
-    ctx.strokeStyle = pal.primary + "88";
-    ctx.lineWidth = 14;
-    ctx.strokeRect(30, 30, width - 60, height - 60);
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(42, 42, width - 84, height - 84);
-
-    // 5. Top Brand Bar Pill
-    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-    ctx.beginPath();
-    ctx.roundRect(65, 65, width - 130, 90, 24);
-    ctx.fill();
-    ctx.strokeStyle = pal.primary + "66";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 34px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("AKSHARA GAMING CENTER", 100, 122);
-
-    ctx.fillStyle = pal.primary;
-    ctx.font = "bold 24px monospace";
-    ctx.textAlign = "right";
-    ctx.fillText("OFFICIAL LICENSE STORE", width - 100, 120);
-
-    // 6. Platform Pill
-    ctx.fillStyle = pal.primary;
-    ctx.beginPath();
-    ctx.roundRect(65, 180, 360, 68, 20);
-    ctx.fill();
-
-    ctx.fillStyle = "#04140e";
-    ctx.font = "bold 28px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(platform.toUpperCase(), 245, 224);
-
-    // 7. Middle Big Game Title Card
-    ctx.fillStyle = "rgba(10, 14, 24, 0.88)";
-    ctx.beginPath();
-    ctx.roundRect(65, 275, width - 130, 420, 32);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Game Title text wrap
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.font = "bold 64px -apple-system, BlinkMacSystemFont, sans-serif";
-
-    const words = gameTitle.split(" ");
-    let line1 = "";
-    let line2 = "";
-    for (let i = 0; i < words.length; i++) {
-      if (i < Math.ceil(words.length / 2)) {
-        line1 += words[i] + " ";
-      } else {
-        line2 += words[i] + " ";
+    if (id !== "custom") {
+      const found = catalog.find((g) => g.id === id);
+      if (found) {
+        newTitle = found.title;
+        newPlat = found.platform;
+        newCat = found.category;
+        newPrice = found.selling_price_shopee_idr;
+        newCogs = found.metrics?.cogs_g2g_idr || Math.round(found.selling_price_shopee_idr * 0.6);
       }
     }
 
-    if (line2.trim()) {
-      ctx.fillText(line1.trim(), width / 2, 420);
-      ctx.fillText(line2.trim(), width / 2, 495);
+    setGameTitle(newTitle);
+    setPlatform(newPlat);
+    setCategory(newCat);
+    setPrice(newPrice);
+    setCogsEstimate(newCogs);
+
+    // Auto-sync SEO outputs
+    const defTitle = generateDefaultTitle(newTitle, newPlat, warrantyDays);
+    setSeoTitle(defTitle);
+
+    const { desc, tags } = generateDefaultDesc(
+      newTitle,
+      newPlat,
+      newCat,
+      warrantyDays,
+      includeActivationGuide,
+      includeSopUnboxing,
+      includeFaq,
+      includeVipPromo,
+      customBonusNotes
+    );
+    setGeneratedDesc(desc);
+    setSeoTags(tags);
+
+    // Reset step checklist for new game
+    setChecklist({ cover: false, title: false, desc: false, price: false });
+  };
+
+  // Re-generate Description based on toggles
+  const handleRebuildDesc = () => {
+    const { desc, tags } = generateDefaultDesc(
+      gameTitle,
+      platform,
+      category,
+      warrantyDays,
+      includeActivationGuide,
+      includeSopUnboxing,
+      includeFaq,
+      includeVipPromo,
+      customBonusNotes
+    );
+    setGeneratedDesc(desc);
+    setSeoTags(tags);
+  };
+
+  // Re-generate SEO Title
+  const handleRebuildTitle = () => {
+    const defTitle = generateDefaultTitle(gameTitle, platform, warrantyDays);
+    setSeoTitle(defTitle);
+  };
+
+  // Quick Keyword Chips
+  const KEYWORD_CHIPS = [
+    "ORIGINAL",
+    "FULL ACCESS",
+    `GARANSI ${warrantyDays} HARI`,
+    "INSTANT DELIVERY",
+    "GLOBAL",
+    "ANTI-HACKBACK",
+    "100% LEGAL",
+    "REGION FREE"
+  ];
+
+  const handleToggleKeyword = (chip: string) => {
+    if (seoTitle.toUpperCase().includes(chip.toUpperCase())) {
+      // Remove keyword
+      const regex = new RegExp(`\\b${chip}\\b`, "gi");
+      const updated = seoTitle.replace(regex, "").replace(/\s{2,}/g, " ").trim();
+      setSeoTitle(updated);
     } else {
-      ctx.fillText(line1.trim(), width / 2, 460);
+      // Append keyword
+      const updated = `${seoTitle.trim()} ${chip}`.trim();
+      setSeoTitle(updated);
     }
-
-    // Category / Edition Tag
-    ctx.fillStyle = pal.accent;
-    ctx.font = "bold 32px monospace";
-    ctx.fillText(`[ ${category.toUpperCase()} ]`, width / 2, 570);
-
-    // 8. Bottom 3 Value Badges
-    const badges = [
-      { text: badgeHeadline, y: 725, bg: "rgba(0, 0, 0, 0.8)", border: pal.primary },
-      { text: badgeDelivery, y: 815, bg: "rgba(0, 0, 0, 0.8)", border: "#06b6d4" },
-      { text: "100% LEGAL & ANTI-HACKBACK", y: 905, bg: "rgba(0, 0, 0, 0.8)", border: "#f59e0b" },
-    ];
-
-    badges.forEach((b) => {
-      ctx.fillStyle = b.bg;
-      ctx.beginPath();
-      ctx.roundRect(65, b.y, width - 130, 72, 20);
-      ctx.fill();
-      ctx.strokeStyle = b.border + "88";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 28px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(b.text, width / 2, b.y + 46);
-    });
-
-    // 9. Floating Price Tag on Bottom-Right
-    const priceFormatted = "Rp " + Math.round(price).toLocaleString("id-ID");
-    ctx.fillStyle = pal.primary;
-    ctx.beginPath();
-    ctx.roundRect(width - 440, 995, 375, 45, 12);
-    ctx.fill();
-
-    ctx.fillStyle = "#04140e";
-    ctx.font = "bold 22px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(`SHOPEE: ${priceFormatted}`, width - 252, 1026);
-  }, [coverPalette, gameTitle, platform, category, badgeHeadline, badgeDelivery, price]);
-
-  useEffect(() => {
-    renderCoverCanvas();
-  }, [renderCoverCanvas]);
+  };
 
   // Copy Handlers
-  const handleCopyText = (text: string, type: "title" | "desc" | "price" | "tags" | "all") => {
+  const handleCopyText = (text: string, type: "title" | "desc" | "tags" | "price" | "all") => {
     navigator.clipboard.writeText(text);
     if (type === "title") {
       setCopiedTitle(true);
@@ -468,201 +320,579 @@ export default function ShopeeLaunchpadPage() {
       setCopiedDesc(true);
       setChecklist((prev) => ({ ...prev, desc: true }));
       setTimeout(() => setCopiedDesc(false), 2000);
+    } else if (type === "tags") {
+      setCopiedTags(true);
+      setTimeout(() => setCopiedTags(false), 2000);
     } else if (type === "price") {
       setCopiedPrice(true);
       setChecklist((prev) => ({ ...prev, price: true }));
       setTimeout(() => setCopiedPrice(false), 2000);
     } else if (type === "all") {
       setCopiedAll(true);
-      setChecklist({ title: true, cover: true, desc: true, price: true });
+      setChecklist({ cover: true, title: true, desc: true, price: true });
       setTimeout(() => setCopiedAll(false), 2500);
     }
   };
 
-  // Download HD Cover PNG
-  const handleDownloadCover = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const link = document.createElement("a");
-    const safeTitle = gameTitle.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-    link.download = `shopee_cover_${safeTitle}_1080x1080.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-    setChecklist((prev) => ({ ...prev, cover: true }));
+  const handleCopyAttr = (key: string, value: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedAttr(key);
+    setTimeout(() => setCopiedAttr(null), 1800);
   };
 
-  // Copy Image to Clipboard
-  const handleCopyImageToClipboard = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    try {
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-        setCopiedCover(true);
-        setChecklist((prev) => ({ ...prev, cover: true }));
-        setTimeout(() => setCopiedCover(false), 2000);
-      });
-    } catch (e) {
-      console.warn("ClipboardItem image copy failed", e);
-      handleDownloadCover();
-    }
-  };
-
-  // Synchronized Profit Formula with web/lib/catalog.ts
+  // Synchronized Digital Pricing Formula (Packaging = Rp 0)
   const qrisFee = Math.round(cogsEstimate * 0.007);
   const shopeeFee = Math.round(price * 0.08) + 1000;
   const netEarnings = Math.max(0, price - cogsEstimate - qrisFee - shopeeFee);
   const netMarginPct = price > 0 ? ((netEarnings / price) * 100).toFixed(1) : "0";
+  const isLowMargin = Number(netMarginPct) < 15 || netEarnings <= 0;
+
+  // Wizard Steps Metadata
+  const STEPS = [
+    {
+      id: 1,
+      key: "cover" as const,
+      title: "Cover 1080×1080",
+      icon: ImageIcon,
+      description: "Desain cover otentik Slide 1 & Slide 2",
+    },
+    {
+      id: 2,
+      key: "title" as const,
+      title: "Judul SEO",
+      icon: Tag,
+      description: "Optimasi 120 karakter kata kunci tinggi",
+    },
+    {
+      id: 3,
+      key: "desc" as const,
+      title: "Deskripsi & SOP",
+      icon: FileText,
+      description: "Format klaim brankas & anti-komplain",
+    },
+    {
+      id: 4,
+      key: "price" as const,
+      title: "Harga & Publish",
+      icon: ShoppingBag,
+      description: "Kalkulasi laba bersih & final checklist",
+    },
+  ];
+
+  const completedCount = Object.values(checklist).filter(Boolean).length;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
         
-        {/* ── TOP HEADER & QUICK LAUNCHPAD ──────────────────────────── */}
-        <div className="app-card p-6 bg-white border border-slate-200 shadow-sm">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-mono font-bold">
-                  <ShoppingBag className="w-3.5 h-3.5 text-orange-600" />
-                  SHOPEE 1-FLOW LAUNCHPAD
-                </span>
-                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold">
-                  ALL-IN-ONE LISTING TOWER
-                </span>
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* 1. TOP CONTROL BAR (SELALU TAMPIL DI ATAS - COMPACT 1 APP-CARD)   */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div className="app-card p-4 sm:p-5 bg-white border border-slate-200 shadow-sm space-y-4">
+          
+          {/* Baris Atas: Judul, Selector Game & Quick Action */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center shrink-0">
+                <ShoppingBag className="w-5 h-5 text-orange-600" />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-                Pusat Eksekusi Produk Shopee dalam Satu Layar
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-                Dapatkan Cover HD 1080x1080, Judul SEO, Deskripsi Lengkap, dan Kalkulasi Laba Bersih secara bersamaan siap copy-paste langsung ke Shopee Seller Center.
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
+                    Shopee Listing Wizard
+                  </h1>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold">
+                    4-STEP FLOW
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Eksekusi satu alur cover, judul SEO, SOP deskripsi, hingga penetapan harga.
+                </p>
+              </div>
             </div>
 
-            {/* Quick Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-              <button
-                onClick={() => handleCopyText(`${seoTitle}\n\n${generatedDesc}`, "all")}
-                className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
-              >
-                <Copy className="w-4 h-4 text-emerald-600" />
-                <span>{copiedAll ? "Semua Disalin!" : "Salin Judul + Deskripsi"}</span>
-              </button>
+            {/* Catalog Selector Combobox */}
+            <div className="flex items-center gap-2.5 w-full md:w-auto">
+              <div className="relative flex-1 md:w-[420px]">
+                <GameSelectorCombobox
+                  games={catalog}
+                  selectedGameId={selectedGameId}
+                  selectedGameTitle={gameTitle}
+                  showCustomOption={true}
+                  onSelectCustom={() => handleSelectGame("custom")}
+                  onSelect={(g) => handleSelectGame(g.id)}
+                  placeholder="Pilih game dari katalog atau input manual..."
+                />
+              </div>
 
               <a
                 href="https://seller.shopee.co.id/portal/product/new"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-colors"
+                title="Buka Shopee Seller Center"
+                className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 btn-tactile"
               >
-                <span>Buka Shopee Seller Center</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                <span className="hidden sm:inline">Seller Center</span>
               </a>
             </div>
           </div>
 
-          {/* Interactive Checklist Tracker */}
-          <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { key: "cover", label: "1. Cover HD 1:1", done: checklist.cover },
-              { key: "title", label: "2. Judul Shopee", done: checklist.title },
-              { key: "desc", label: "3. Deskripsi Lengkap", done: checklist.desc },
-              { key: "price", label: "4. Harga & Laba", done: checklist.price },
-            ].map((step) => (
-              <div
-                key={step.key}
-                className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all ${
-                  step.done
-                    ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-                    : "bg-slate-50 border-slate-200 text-slate-500"
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
-                    step.done
-                      ? "bg-emerald-600 text-white font-bold"
-                      : "border border-slate-300 text-slate-400"
-                  }`}
+          {/* Baris Bawah: 4-Step Interactive Horizontal Stepper */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+            {STEPS.map((s) => {
+              const Icon = s.icon;
+              const isActive = activeStep === s.id;
+              const isDone = checklist[s.key];
+
+              let stepStyle = "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100";
+              if (isActive) {
+                stepStyle = "bg-emerald-600 border-emerald-600 text-white shadow-xs ring-2 ring-emerald-500/20";
+              } else if (isDone) {
+                stepStyle = "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/70";
+              }
+
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setActiveStep(s.id)}
+                  className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${stepStyle}`}
                 >
-                  {step.done ? <Check className="w-3 h-3 stroke-[3]" /> : "•"}
-                </div>
-                <span className="text-xs font-mono font-semibold">{step.label}</span>
+                  <div
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold transition-colors ${
+                      isActive
+                        ? "bg-white/20 text-white"
+                        : isDone
+                        ? "bg-emerald-600 text-white"
+                        : "bg-white border border-slate-300 text-slate-500"
+                    }`}
+                  >
+                    {isDone ? (
+                      <Check className="w-4 h-4 stroke-[2.5]" />
+                    ) : (
+                      <span>{s.id}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : isDone ? "text-emerald-700" : "text-slate-400"}`} />
+                      <span className="text-xs font-bold truncate">{s.title}</span>
+                    </div>
+                    <span className={`text-[10px] block truncate ${isActive ? "text-emerald-100" : "text-slate-400"}`}>
+                      {isDone ? "Sudah Siap ✓" : s.description}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* 2. KONTEN WIZARD (HANYA 1 STEP AKTIF PER LAYAR - PERSISTENT STATE) */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+
+        {/* ── STEP 1: COVER 1080x1080 (CSS block/hidden agar state studio awet) ── */}
+        <div className={activeStep === 1 ? "block animate-fade-up" : "hidden"}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  Langkah 1: Studio Cover Otentik 1080x1080
+                </h2>
               </div>
-            ))}
+              <span className="text-xs font-mono text-slate-500">
+                Slide 1 (Cover Utama) &amp; Slide 2 (Rules &amp; Terms)
+              </span>
+            </div>
+
+            {/* Thumbnail Studio Compact */}
+            <ThumbnailStudio
+              compact
+              externalGameTitle={gameTitle}
+              externalPlatform={platform}
+              externalCategory={category}
+              externalPrice={`Rp ${Math.round(price).toLocaleString("id-ID")}`}
+              onCoverDownloaded={() => setChecklist((prev) => ({ ...prev, cover: true }))}
+            />
           </div>
         </div>
 
-        {/* ── 2-COLUMN SPLIT SCREEN WORKSPACE ───────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* ══ LEFT COLUMN: CUSTOMIZER & CONTROLS (5 COLS) ═══════════ */}
-          <div className="lg:col-span-5 space-y-6">
+        {/* ── STEP 2: JUDUL SEO (CSS block/hidden) ────────────────────────── */}
+        <div className={activeStep === 2 ? "block animate-fade-up" : "hidden"}>
+          <div className="app-card p-5 sm:p-6 bg-white border border-slate-200 shadow-sm space-y-6">
             
-            {/* Box 1: Game & Catalog Selector */}
-            <div className="app-card p-5 bg-white border border-slate-200 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-2">
-                  <Tag className="w-3.5 h-3.5 text-emerald-600" />
-                  Pilih Produk Katalog / Custom
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">1-KLIK AUTOFILL</span>
+            {/* Header Step 2 */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-emerald-600" />
+                  <h2 className="text-base font-bold text-slate-900">
+                    Langkah 2: Optimasi Judul Produk Shopee (SEO)
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Judul maksimal 120 karakter dengan susunan kata kunci yang sering dicari pembeli game di Shopee.
+                </p>
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1.5">
-                  Ambil Data dari Katalog Aktif:
-                </label>
-                <select
-                  value={selectedGameId}
-                  onChange={(e) => handleSelectGame(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all cursor-pointer"
+              {/* Character Counter Badge */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRebuildTitle}
+                  className="px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Kembalikan judul ke template default"
                 >
-                  <option value="custom">-- Input Manual (Game Baru / Custom) --</option>
-                  {catalog.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.title} ({g.platform}) &bull; Rp {Math.round(g.selling_price_shopee_idr).toLocaleString("id-ID")}
-                    </option>
-                  ))}
-                </select>
+                  <RotateCcw className="w-3 h-3 text-slate-500" />
+                  <span>Reset Default</span>
+                </button>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
+                    seoTitle.length <= 120
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                      : "bg-rose-50 border-rose-200 text-rose-700"
+                  }`}
+                >
+                  {seoTitle.length} / 120 Karakter
+                </span>
               </div>
+            </div>
 
-              <div className="space-y-3 pt-1">
+            {/* Quick Metadata Inputs */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                Metadata Inti Produk
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">
-                    Nama Game / Produk:
+                  <label className="text-[11px] font-medium text-slate-500 block mb-1">
+                    Nama Game:
                   </label>
                   <input
                     type="text"
                     value={gameTitle}
                     onChange={(e) => setGameTitle(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-slate-500 block mb-1">
+                    Platform:
+                  </label>
+                  <input
+                    type="text"
+                    value={platform}
+                    onChange={(e) => setPlatform(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-slate-500 block mb-1">
+                    Format / Tipe Lisensi:
+                  </label>
+                  <input
+                    type="text"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Main Title Editor */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                <span>Editor Judul Shopee:</span>
+                <span className="text-[11px] font-normal text-slate-400">
+                  Dapat diedit bebas langsung di bawah ini
+                </span>
+              </label>
+              <textarea
+                rows={2}
+                value={seoTitle}
+                onChange={(e) => setSeoTitle(e.target.value)}
+                placeholder="Masukkan judul listing Shopee..."
+                className="w-full bg-white border-2 border-slate-200 focus:border-emerald-500 rounded-xl p-3.5 text-xs sm:text-sm text-slate-900 font-mono font-bold leading-relaxed focus:outline-none transition-colors shadow-2xs"
+              />
+            </div>
+
+            {/* Quick Keyword Chips */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  Quick Keyword Chips (1-Klik Tambah / Hapus):
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Klik chip untuk menyelipkan kata kunci
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {KEYWORD_CHIPS.map((chip) => {
+                  const isPresent = seoTitle.toUpperCase().includes(chip.toUpperCase());
+                  return (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => handleToggleKeyword(chip)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                        isPresent
+                          ? "bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300"
+                      }`}
+                    >
+                      <span>{chip}</span>
+                      {isPresent ? (
+                        <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                      ) : (
+                        <span className="text-slate-400 text-xs">+</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Mobile Search Result Preview */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Smartphone className="w-3.5 h-3.5 text-slate-600" />
+                Simulasi Tampilan di Hasil Pencarian Mobile Shopee:
+              </span>
+              <div className="max-w-sm bg-white border border-slate-200 rounded-xl p-3 shadow-2xs space-y-2">
+                <div className="flex gap-3">
+                  <div className="w-16 h-16 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-slate-400">
+                    <ImageIcon className="w-6 h-6" />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-1">
+                      <span className="bg-[#EE4D2D] text-white text-[9px] font-bold px-1 py-0.5 rounded">
+                        Star+
+                      </span>
+                      <span className="text-[10px] text-slate-400">Garansi Shopee</span>
+                    </div>
+                    <p className="text-xs font-medium text-slate-900 line-clamp-2 leading-snug">
+                      {seoTitle || "Judul produk akan muncul di sini..."}
+                    </p>
+                    <div className="text-sm font-bold text-[#EE4D2D] font-mono tabular-nums">
+                      Rp {Math.round(price).toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Bar Step 2 */}
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => handleCopyText(seoTitle, "title")}
+                className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
+              >
+                {copiedTitle ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedTitle ? "Judul Berhasil Disalin!" : "Salin Judul Produk"}</span>
+              </button>
+
+              <span className="text-xs text-slate-500 text-center sm:text-right">
+                Klik tombol di atas untuk menandai checklist judul selesai.
+              </span>
+            </div>
+
+          </div>
+        </div>
+
+        {/* ── STEP 3: DESKRIPSI & SOP (CSS block/hidden) ─────────────────── */}
+        <div className={activeStep === 3 ? "block animate-fade-up" : "hidden"}>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            
+            {/* Kiri: Toggle Opsi Struktur SOP (4 Cols) */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="app-card p-5 bg-white border border-slate-200 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-2">
+                    <Sliders className="w-3.5 h-3.5 text-purple-600" />
+                    Modul Struktur SOP
+                  </span>
+                  <span className="text-[10px] font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded font-semibold">
+                    ANTI-KOMPLAIN
+                  </span>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <label className="flex items-start gap-2.5 text-slate-700 cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={includeActivationGuide}
+                      onChange={(e) => {
+                        setIncludeActivationGuide(e.target.checked);
+                      }}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="font-semibold block text-slate-900">Panduan Klaim Brankas</span>
+                      <span className="text-[11px] text-slate-500">Instruksi 4 langkah buka brankas digital</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 text-slate-700 cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={includeSopUnboxing}
+                      onChange={(e) => {
+                        setIncludeSopUnboxing(e.target.checked);
+                      }}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="font-semibold block text-slate-900">SOP Video Layar No-Cut</span>
+                      <span className="text-[11px] text-slate-500">Syarat klaim garansi anti-fraud pembeli</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 text-slate-700 cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={includeFaq}
+                      onChange={(e) => {
+                        setIncludeFaq(e.target.checked);
+                      }}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="font-semibold block text-slate-900">FAQ Anti-Komplain</span>
+                      <span className="text-[11px] text-slate-500">Jawaban status permanen &amp; lisensi</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 text-slate-700 cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={includeVipPromo}
+                      onChange={(e) => {
+                        setIncludeVipPromo(e.target.checked);
+                      }}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <span className="font-semibold block text-slate-900">Voucher VIP Repeat Order</span>
+                      <span className="text-[11px] text-slate-500">Kupon potongan Rp 15.000 pesanan kedua</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <label className="text-xs font-semibold text-slate-700 block">
+                    Catatan Tambahan / Bonus Khusus:
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={customBonusNotes}
+                    onChange={(e) => setCustomBonusNotes(e.target.value)}
+                    placeholder="Contoh: Bonus mod pack installer atau save file 100%..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 focus:bg-white"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-slate-600 block mb-1">
-                      Platform:
-                    </label>
-                    <input
-                      type="text"
-                      value={platform}
-                      onChange={(e) => setPlatform(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white font-mono"
-                    />
+                <button
+                  type="button"
+                  onClick={handleRebuildDesc}
+                  className="w-full py-2 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Terapkan Modul ke Deskripsi</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Kanan: Editor Deskripsi Lengkap (8 Cols) */}
+            <div className="lg:col-span-8 space-y-4">
+              <div className="app-card p-5 bg-white border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-purple-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Editor Deskripsi Produk Shopee
+                    </h3>
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-600 block mb-1">
-                      Tipe / Format:
-                    </label>
-                    <input
-                      type="text"
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white font-mono"
-                    />
+                  <span
+                    className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-semibold border ${
+                      generatedDesc.length <= 3000
+                        ? "bg-slate-50 border-slate-200 text-slate-600"
+                        : "bg-rose-50 border-rose-200 text-rose-700"
+                    }`}
+                  >
+                    {generatedDesc.length} / 3000 Karakter
+                  </span>
+                </div>
+
+                <textarea
+                  rows={14}
+                  value={generatedDesc}
+                  onChange={(e) => setGeneratedDesc(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 focus:bg-white rounded-xl p-3.5 text-xs font-mono text-slate-800 leading-relaxed focus:outline-none transition-colors"
+                />
+
+                {/* Action Buttons Step 3 */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(generatedDesc, "desc")}
+                      className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold font-mono text-xs flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
+                    >
+                      {copiedDesc ? <Check className="w-4 h-4 text-white stroke-[2.5]" /> : <Copy className="w-4 h-4" />}
+                      <span>{copiedDesc ? "Deskripsi Disalin!" : "Salin Deskripsi Lengkap"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(seoTags, "tags")}
+                      className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold font-mono text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      {copiedTags ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedTags ? "Hashtags Disalin!" : "Salin Hashtags"}</span>
+                    </button>
                   </div>
+
+                  <span className="text-[11px] text-slate-400">
+                    Disertai 8+ tagar SEO relevan
+                  </span>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* ── STEP 4: HARGA & PUBLISH (CSS block/hidden) ──────────────────── */}
+        <div className={activeStep === 4 ? "block animate-fade-up" : "hidden"}>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            
+            {/* Kiri: Parameter Harga & Kalkulasi Margin (6 Cols) */}
+            <div className="lg:col-span-6 space-y-4">
+              <div className="app-card p-5 bg-white border border-slate-200 shadow-sm space-y-4">
+                
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-emerald-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Parameter Harga &amp; Modal Supplier
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(String(price), "price")}
+                    className="text-xs font-mono text-slate-700 hover:text-emerald-700 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedPrice ? <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedPrice ? "Harga Disalin!" : "Salin Harga"}</span>
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -689,311 +919,246 @@ export default function ShopeeLaunchpadPage() {
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">
+                    Masa Garansi Toko (Hari):
+                  </label>
+                  <input
+                    type="number"
+                    value={warrantyDays}
+                    onChange={(e) => setWarrantyDays(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white font-mono"
+                  />
+                </div>
+
+                {/* Financial Breakdown Grid */}
+                <div className="pt-2 border-t border-slate-100 space-y-3">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    Kalkulasi Laba Bersih Transaksi:
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-mono text-slate-500 block uppercase">Harga Jual:</span>
+                      <span className="text-sm font-bold font-mono text-slate-900 tabular-nums">
+                        Rp {Math.round(price).toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-mono text-slate-500 block uppercase">Fee Shopee (8%+1k):</span>
+                      <span className="text-sm font-bold font-mono text-rose-600 tabular-nums">
+                        -Rp {shopeeFee.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-mono text-slate-500 block uppercase">Modal + QRIS (0.7%):</span>
+                      <span className="text-sm font-bold font-mono text-slate-700 tabular-nums">
+                        -Rp {(cogsEstimate + qrisFee).toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${isLowMargin ? "bg-rose-50 border-rose-200" : "bg-emerald-50 border-emerald-200"}`}>
+                      <span className={`text-[10px] font-mono block uppercase font-bold ${isLowMargin ? "text-rose-800" : "text-emerald-800"}`}>
+                        Kas Bersih Diterima:
+                      </span>
+                      <span className={`text-sm font-bold font-mono tabular-nums ${isLowMargin ? "text-rose-700" : "text-emerald-700"}`}>
+                        Rp {netEarnings.toLocaleString("id-ID")} ({netMarginPct}%)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Warning if Low Margin */}
+                  {isLowMargin && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-xs text-rose-800">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Peringatan Margin Rendah (&lt;15%)!</span>
+                        <span className="text-[11px] leading-relaxed">
+                          Margin bersih berada di bawah ambang batas sehat. Disarankan menaikkan harga jual Shopee atau mencari supplier alternatif yang lebih murah.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-[11px] text-slate-400 font-mono flex items-center justify-between pt-1">
+                    <span>Packaging: Rp 0 (Digital)</span>
+                    <span>Penyelesaian Otomatis: Brankas</span>
+                  </div>
+                </div>
+
               </div>
             </div>
 
-            {/* Box 2: Cover Thumbnail Customizer */}
-            <div className="app-card p-5 bg-white border border-slate-200 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-2">
-                  <Palette className="w-3.5 h-3.5 text-indigo-600" />
-                  Kustomisasi Cover 1080x1080
-                </span>
-                <span className="text-[10px] font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded font-semibold">
-                  LIVE RENDER
-                </span>
-              </div>
+            {/* Kanan: Atribut Shopee & Final Checklist (6 Cols) */}
+            <div className="lg:col-span-6 space-y-4">
+              <div className="app-card p-5 bg-white border border-slate-200 shadow-sm space-y-4">
+                
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-emerald-600" />
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Atribut Shopee Siap Isi
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    KLIK UNTUK SALIN
+                  </span>
+                </div>
 
-              {/* Palette selection */}
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
-                  Tema Warna Frame Cover:
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {COVER_PALETTES.map((pal) => (
-                    <button
-                      key={pal.id}
-                      onClick={() => setCoverPalette(pal.id)}
-                      className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono flex items-center gap-2 transition-all cursor-pointer ${
-                        coverPalette === pal.id
-                          ? "bg-slate-900 border-slate-900 text-white font-bold shadow-xs"
-                          : "bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300"
-                      }`}
+                {/* Attributes Table */}
+                <div className="space-y-2 text-xs font-mono">
+                  {[
+                    { label: "Kategori Shopee", val: "Gaming > Game > Game PC", key: "cat" },
+                    { label: "Merek", val: "Tidak Ada Merek / Original", key: "brand" },
+                    { label: "Tipe Garansi", val: `Garansi Penjual (${warrantyDays} Hari Ganti Baru)`, key: "warranty" },
+                    { label: "Wilayah Lisensi", val: "Global / Region Free", key: "region" },
+                    { label: "Tipe Lisensi", val: category, key: "type" },
+                  ].map((attr) => (
+                    <div
+                      key={attr.key}
+                      onClick={() => handleCopyAttr(attr.key, attr.val)}
+                      className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
                     >
-                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: pal.primary }} />
-                      <span className="truncate">{pal.name.split(" ")[0]}</span>
-                    </button>
+                      <span className="text-slate-500">{attr.label}:</span>
+                      <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+                        <span>{attr.val}</span>
+                        {copiedAttr === attr.key ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-3 h-3 text-slate-400" />
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </div>
 
-              {/* Custom Badges Input */}
-              <div className="space-y-2.5 pt-1">
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">
-                    Headline Badge 1:
-                  </label>
-                  <input
-                    type="text"
-                    value={badgeHeadline}
-                    onChange={(e) => setBadgeHeadline(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500 focus:bg-white"
-                  />
+                {/* Final Checklist Summary */}
+                <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Status Checklist Listing ({completedCount}/4)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setChecklist({ cover: false, title: false, desc: false, price: false })}
+                      className="text-[11px] text-slate-400 hover:text-slate-600 font-mono"
+                    >
+                      Reset Checklist
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: "cover", label: "1. Cover HD 1:1", done: checklist.cover },
+                      { key: "title", label: "2. Judul SEO", done: checklist.title },
+                      { key: "desc", label: "3. Deskripsi SOP", done: checklist.desc },
+                      { key: "price", label: "4. Harga & Laba", done: checklist.price },
+                    ].map((c) => (
+                      <div
+                        key={c.key}
+                        className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-mono font-semibold ${
+                          c.done
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                            : "bg-slate-50 border-slate-200 text-slate-400"
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
+                            c.done ? "bg-emerald-600 text-white" : "border border-slate-300"
+                          }`}
+                        >
+                          {c.done ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : "•"}
+                        </div>
+                        <span>{c.label}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">
-                    Delivery Badge 2:
-                  </label>
-                  <input
-                    type="text"
-                    value={badgeDelivery}
-                    onChange={(e) => setBadgeDelivery(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500 focus:bg-white"
-                  />
+
+                {/* Final Action Buttons */}
+                <div className="pt-2 space-y-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(`${seoTitle}\n\n${generatedDesc}`, "all")}
+                    className="w-full py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Copy className="w-4 h-4 text-emerald-600" />
+                    <span>{copiedAll ? "Semua Berhasil Disalin!" : "Salin Judul + Deskripsi Sekaligus"}</span>
+                  </button>
+
+                  <a
+                    href="https://seller.shopee.co.id/portal/product/new"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
+                  >
+                    <span>Buka Shopee Seller Center (Tambah Produk)</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
                 </div>
-              </div>
-            </div>
 
-            {/* Box 3: Description Copywriting Options */}
-            <div className="app-card p-5 bg-white border border-slate-200 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900 uppercase flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5 text-purple-600" />
-                  Opsi Modul Deskripsi Shopee
-                </span>
-                <span className="text-[10px] font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded font-semibold">
-                  SOP COMPLIANT
-                </span>
-              </div>
-
-              <div className="space-y-2.5 text-xs">
-                <label className="flex items-center gap-2.5 text-slate-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeActivationGuide}
-                    onChange={(e) => setIncludeActivationGuide(e.target.checked)}
-                    className="rounded text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <span>Sertakan Panduan Klaim Brankas 4 Langkah</span>
-                </label>
-
-                <label className="flex items-center gap-2.5 text-slate-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeSopUnboxing}
-                    onChange={(e) => setIncludeSopUnboxing(e.target.checked)}
-                    className="rounded text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <span>Sertakan SOP Video Rekaman Layar / Unboxing (Anti-Fraud)</span>
-                </label>
-
-                <label className="flex items-center gap-2.5 text-slate-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeFaq}
-                    onChange={(e) => setIncludeFaq(e.target.checked)}
-                    className="rounded text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <span>Sertakan Tanya Jawab (F.A.Q) Umum</span>
-                </label>
-
-                <label className="flex items-center gap-2.5 text-slate-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeVipPromo}
-                    onChange={(e) => setIncludeVipPromo(e.target.checked)}
-                    className="rounded text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <span>Sertakan Voucher Diskon Repeat Order Rp 15.000</span>
-                </label>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100">
-                <label className="text-xs font-medium text-slate-600 block mb-1">
-                  Catatan Tambahan / Bonus Spesial:
-                </label>
-                <textarea
-                  rows={2}
-                  value={customBonusNotes}
-                  onChange={(e) => setCustomBonusNotes(e.target.value)}
-                  placeholder="Contoh: Bonus cheat engine guide atau DLC pack gratis..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 focus:bg-white"
-                />
               </div>
             </div>
 
           </div>
+        </div>
 
-          {/* ══ RIGHT COLUMN: 4 READY-TO-COPY OUTPUT BLOCKS (7 COLS) ══ */}
-          <div className="lg:col-span-7 space-y-6">
-            
-            {/* Output Block 1: Cover HD 1080x1080 */}
-            <div className="app-card p-5 bg-white border border-slate-200 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    1. Cover Produk Utama (1080x1080 HD)
-                  </h3>
-                </div>
-                <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-semibold">
-                  RASIO 1:1 SHOPEE
-                </span>
-              </div>
-
-              {/* Canvas Preview Container */}
-              <div className="relative w-full aspect-square max-w-[420px] mx-auto rounded-2xl overflow-hidden border border-slate-200 shadow-md bg-black">
-                <canvas
-                  ref={canvasRef}
-                  className="w-full h-full object-contain block"
-                  width={1080}
-                  height={1080}
-                />
-              </div>
-
-              {/* Cover Action Buttons */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleCopyImageToClipboard}
-                  className="w-full py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold font-mono text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
-                >
-                  <Copy className="w-4 h-4 text-emerald-600" />
-                  <span>{copiedCover ? "Gambar Disalin!" : "Salin Gambar (Clipboard)"}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDownloadCover}
-                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold font-mono text-xs flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
-                >
-                  <Download className="w-4 h-4 text-emerald-400" />
-                  <span>Download Cover HD (.PNG)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Output Block 2: SEO Title */}
-            <div className="app-card p-5 bg-white border border-slate-200 space-y-3 shadow-sm">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-cyan-500" />
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    2. Judul Produk Shopee (SEO Optimized)
-                  </h3>
-                </div>
-                <span className="text-[10px] font-mono text-slate-400">
-                  {seoTitle.length}/120 Karakter
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-slate-900 font-bold select-all leading-relaxed">
-                {seoTitle}
-              </div>
-
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* 3. STICKY / BOTTOM WIZARD NAVIGATION BAR                          */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div className="app-card p-4 bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          
+          {/* Kiri: Tombol Back */}
+          <div className="w-full sm:w-auto">
+            {activeStep > 1 ? (
               <button
                 type="button"
-                onClick={() => handleCopyText(seoTitle, "title")}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold font-mono text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                onClick={() => setActiveStep((prev) => Math.max(1, prev - 1))}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
-                {copiedTitle ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedTitle ? "Judul Berhasil Disalin!" : "Salin Judul Shopee"}</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Kembali: {STEPS[activeStep - 2]?.title}</span>
               </button>
-            </div>
-
-            {/* Output Block 3: Description */}
-            <div className="app-card p-5 bg-white border border-slate-200 space-y-3 shadow-sm">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-purple-500" />
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    3. Deskripsi Produk Shopee Lengkap
-                  </h3>
-                </div>
-                <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-semibold border border-emerald-200">
-                  SIAP PUBLISH
-                </span>
+            ) : (
+              <div className="hidden sm:block text-xs font-mono text-slate-400">
+                Langkah 1 dari 4: Cover Produk
               </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 leading-relaxed max-h-72 overflow-y-auto whitespace-pre-wrap select-all">
-                {generatedDesc}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleCopyText(generatedDesc, "desc")}
-                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold font-mono text-xs flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
-              >
-                {copiedDesc ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedDesc ? "Deskripsi Berhasil Disalin!" : "Salin Deskripsi Lengkap"}</span>
-              </button>
-            </div>
-
-            {/* Output Block 4: Attributes & Net Earnings (Synchronized formula) */}
-            <div className="app-card p-5 bg-white border border-slate-200 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    4. Atribut &amp; Estimasi Kas Bersih Shopee
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopyText(String(price), "price")}
-                  className="text-xs font-mono text-slate-700 hover:text-emerald-700 font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  {copiedPrice ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>Salin Harga</span>
-                </button>
-              </div>
-
-              {/* Financial Breakdown Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase">Harga Jual:</span>
-                  <span className="text-sm font-bold font-mono text-slate-900 tabular-nums">
-                    Rp {Math.round(price).toLocaleString("id-ID")}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase">Fee Shopee (8%+1k):</span>
-                  <span className="text-sm font-bold font-mono text-rose-600 tabular-nums">
-                    -Rp {shopeeFee.toLocaleString("id-ID")}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase">Modal + QRIS (0.7%):</span>
-                  <span className="text-sm font-bold font-mono text-slate-700 tabular-nums">
-                    Rp {(cogsEstimate + qrisFee).toLocaleString("id-ID")}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                  <span className="text-[10px] font-mono text-emerald-800 block uppercase font-bold">Laba Bersih:</span>
-                  <span className="text-sm font-bold font-mono text-emerald-700 tabular-nums">
-                    Rp {netEarnings.toLocaleString("id-ID")} ({netMarginPct}%)
-                  </span>
-                </div>
-              </div>
-
-              {/* Quick Shopee Attributes Copy Table */}
-              <div className="pt-2 border-t border-slate-100 space-y-2 text-xs font-mono">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
-                  <span className="text-slate-500">Kategori Shopee:</span>
-                  <span className="text-slate-900 font-semibold">Gaming &gt; Game &gt; Game PC</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
-                  <span className="text-slate-500">Merek:</span>
-                  <span className="text-slate-900 font-semibold">Tidak Ada Merek / Original</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
-                  <span className="text-slate-500">Tipe Garansi:</span>
-                  <span className="text-slate-900 font-semibold">Garansi Toko (30 Hari Ganti Baru)</span>
-                </div>
-              </div>
-            </div>
-
+            )}
           </div>
+
+          {/* Tengah: Indikator Progress Langkah */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold text-slate-700">
+              Langkah {activeStep} dari 4:
+            </span>
+            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+              {STEPS[activeStep - 1]?.title}
+            </span>
+          </div>
+
+          {/* Kanan: Tombol Lanjut / Publish */}
+          <div className="w-full sm:w-auto flex items-center gap-2">
+            {activeStep < 4 ? (
+              <button
+                type="button"
+                onClick={() => setActiveStep((prev) => Math.min(4, prev + 1))}
+                className="w-full sm:w-auto px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              >
+                <span>Lanjut: {STEPS[activeStep]?.title}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <a
+                href="https://seller.shopee.co.id/portal/product/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              >
+                <span>Buka Shopee Seller Center ↗</span>
+              </a>
+            )}
+          </div>
+
         </div>
 
       </div>

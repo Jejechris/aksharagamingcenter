@@ -3,9 +3,12 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { getDbCatalog } from "@/lib/db";
+import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
 import { VERIFIED_ENEBA_CATALOG, getEnebaSearchUrl } from "@/lib/eneba";
+import { fetchUsdToIdrRate } from "@/lib/g2gStock";
 import {
   getG2GGameCategoryUrl,
+  getG2GDirectOfferUrl,
   getG2GSellerUrl,
   extractG2GOfferId,
   G2G_CATEGORY_SLUGS,
@@ -159,30 +162,40 @@ export async function POST(req: Request) {
           break;
         }
       }
-      const cleanTitle = cleanGameTitle(detectedTitle);
+      let cleanTitle = cleanGameTitle(detectedTitle);
+
+      // Real Steam ID retail lookup
+      const realSteam = await fetchRealSteamIndonesiaPrice(cleanTitle);
+      if (realSteam?.official_title) {
+        cleanTitle = realSteam.official_title;
+      }
+      const steamRetailPrice = realSteam?.price_idr || 0;
+
       const platform = detectPlatform(cleanTitle, catSlug);
       const category = detectCategory(cleanTitle);
       const safeUrl = catSlug
-        ? `https://www.g2g.com/categories/${catSlug}${searchQ ? `?q=${encodeURIComponent(searchQ)}` : ""}`
-        : `https://www.g2g.com/search?q=${encodeURIComponent(cleanTitle)}`;
+        ? `https://www.g2g.com/categories/${catSlug}`
+        : getG2GGameCategoryUrl(cleanTitle);
 
       return NextResponse.json({
         status: "success",
         marketplace: "G2G",
+        warning: "Ini adalah link kategori G2G (bukan link 1 offer spesifik). Klik salah satu produk di G2G lalu paste link /offer/G... untuk menarik stok & harga modal live 100% faktual.",
         data: {
           offer_id: null,
           raw_title: detectedTitle,
           clean_title: cleanTitle,
           platform,
           category,
-          seller_name: searchQ || "G2G Verified Sellers",
-          real_stock: 100,
-          actual_qty: 100,
+          seller_name: "G2G Category Pool",
+          real_stock: 0,
+          actual_qty: 0,
           is_sold_out: false,
-          status: "live",
-          price_usd: 10.0,
-          price_idr: 160000,
-          recommended_shopee_price_idr: 219900,
+          status: "category_preview",
+          price_usd: 0,
+          price_idr: 0,
+          steam_indo_price_idr: steamRetailPrice,
+          recommended_shopee_price_idr: steamRetailPrice > 0 ? Math.round((steamRetailPrice * 0.7) / 1000) * 1000 : 0,
           is_online: true,
           rating_pct: 99.8,
           reviews_count: 5000,
@@ -191,6 +204,7 @@ export async function POST(req: Request) {
           profile_url: safeUrl,
           fallback_search_url: safeUrl,
           is_category_link: true,
+          is_live_offer: false,
         },
       });
     }
@@ -214,7 +228,7 @@ export async function POST(req: Request) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6000);
 
-      const slsRes = await fetch(`https://sls.g2g.com/offer/${offerId}`, {
+      const slsRes = await fetch(`https://sls.g2g.com/offer/${offerId}?currency=IDR&country=ID`, {
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -282,8 +296,12 @@ export async function POST(req: Request) {
     const availableQty = Number(p.available_qty ?? 0);
     const actualQty = Number(p.actual_qty ?? 0);
     const isSoldOut = Boolean(p.is_sold_out || availableQty === 0 || p.status !== "live");
+    const convertedIdr = Number(p.converted_unit_price ?? p.display_price ?? 0);
     const priceUsd = Number(p.unit_price_in_usd ?? 0);
-    const priceIdr = Math.round(priceUsd * USD_TO_IDR_RATE);
+    let priceIdr = convertedIdr > 0 ? Math.round(convertedIdr) : 0;
+    if (priceIdr === 0 && priceUsd > 0) {
+      priceIdr = Math.ceil(priceUsd * 16850 * 1.045);
+    }
     const recommendedShopee = Math.round((priceIdr * 1.3) / 1000) * 1000;
     const sellerName = p.username || "G2G Seller";
     const ratingPct = Math.round((Number(p.satisfaction_rate) || 0) * 1000) / 10;
@@ -292,11 +310,11 @@ export async function POST(req: Request) {
     const isOnline = Boolean(p.is_online);
     const deliverySpeed = p.delivery_speed === "instant" ? "Instant Delivery" : "Fast Delivery (1-10 Menit)";
 
-    // Canonical direct offer URL (NEVER /categories/.../offer/!)
+    // Canonical direct offer URL format Indonesia IDR
     const verifiedUrl = isSoldOut
-      ? getG2GGameCategoryUrl(cleanTitle, sellerName)
-      : `https://www.g2g.com/offer/${offerId}`;
-    const fallbackSearchUrl = getG2GGameCategoryUrl(cleanTitle, sellerName);
+      ? getG2GGameCategoryUrl(cleanTitle)
+      : getG2GDirectOfferUrl(offerId, cleanTitle);
+    const fallbackSearchUrl = getG2GGameCategoryUrl(cleanTitle);
 
     // 6. Cek kecocokan dengan katalog lokal / database
     let matchingGameId: string | null = null;

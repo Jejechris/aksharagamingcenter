@@ -9,7 +9,7 @@ import {
   deleteGameFromCatalog,
 } from "@/lib/catalog";
 import { saveDbGame, deleteDbGame } from "@/lib/db";
-import { resolveG2GProductUrl } from "@/lib/g2g";
+import { resolveG2GProductUrl, extractG2GOfferId } from "@/lib/g2g";
 import { getEnebaProductUrl } from "@/lib/eneba";
 
 async function notifyTelegramNewGame(newItem: any) {
@@ -74,8 +74,8 @@ async function loadCatalog(): Promise<any[]> {
   return readAuthoritativeCatalog();
 }
 
-function saveCatalogData(data: any[]) {
-  writeAuthoritativeCatalog(data);
+async function saveCatalogData(data: any[]): Promise<void> {
+  await writeAuthoritativeCatalog(data);
 }
 
 
@@ -105,7 +105,7 @@ function findGameIndex(catalog: any[], game_id?: string, title?: string): number
   const combined = `${game_id || ""} ${title || ""}`.toLowerCase();
 
   // Minecraft
-  if (combined.includes("mc") || combined.includes("minecraft")) {
+  if (/\bmc\b/.test(combined) || combined.includes("game-mc") || combined.includes("minecraft")) {
     const idx = catalog.findIndex((g) => g.id === "game-mc-01" || g.title.toLowerCase().includes("minecraft"));
     if (idx !== -1) return idx;
   }
@@ -203,10 +203,7 @@ export async function POST(req: Request) {
 
     // Direct whole catalog replacement
     if (Array.isArray(body)) {
-      saveCatalogData(body);
-      Promise.all(body.map((g: any) => saveDbGame(g))).catch((e) =>
-        console.warn("Supabase bulk save warning:", e)
-      );
+      await saveCatalogData(body);
       return NextResponse.json({ status: "success", message: "Catalog replaced", count: body.length });
     }
 
@@ -234,6 +231,7 @@ export async function POST(req: Request) {
 
       const targetGame = catalog[itemIndex];
       const sellerId = new_seller.seller_id || `g2g-custom-${Date.now()}`;
+      const resolvedOfferId = new_seller.offer_id || extractG2GOfferId(new_seller.profile_url) || undefined;
       const sellerObj = {
         seller_id: sellerId,
         seller_name: new_seller.seller_name || "New Seller",
@@ -248,6 +246,8 @@ export async function POST(req: Request) {
         risk_score: Number(new_seller.risk_score) || 0,
         is_recommended: Boolean(new_seller.is_recommended),
         profile_url: resolveG2GProductUrl(new_seller.profile_url, new_seller.seller_name, targetGame.title),
+        offer_id: resolvedOfferId,
+        live_status: new_seller.live_status || (resolvedOfferId ? "live" : undefined),
       };
 
       // Check if seller with same seller_name exists
@@ -267,7 +267,7 @@ export async function POST(req: Request) {
         targetGame.selected_seller_id = sellerId;
       }
 
-      saveCatalogData(catalog);
+      await saveCatalogData(catalog);
       await saveDbGame(targetGame);
       return NextResponse.json({
         status: "success",
@@ -314,7 +314,7 @@ export async function POST(req: Request) {
         targetGame.selected_seller_id = targetSellerId;
       }
 
-      saveCatalogData(catalog);
+      await saveCatalogData(catalog);
       await saveDbGame(targetGame);
       return NextResponse.json({
         status: "success",
@@ -377,7 +377,7 @@ export async function POST(req: Request) {
           existing.sellers = mergedSellers;
         }
 
-        saveCatalogData(catalog);
+        await saveCatalogData(catalog);
         await saveDbGame(existing);
         return NextResponse.json({
           status: "success",
@@ -416,7 +416,7 @@ export async function POST(req: Request) {
         };
 
         catalog.unshift(newItem);
-        saveCatalogData(catalog);
+        await saveCatalogData(catalog);
         await saveDbGame(newItem);
         notifyTelegramNewGame(newItem).catch(() => {});
         return NextResponse.json({
@@ -483,10 +483,14 @@ export async function PATCH(req: Request) {
     if (target_margin_pct !== undefined) {
       game.target_margin_pct = Number(target_margin_pct);
     }
+    if (body.status !== undefined) {
+      game.status = body.status;
+    }
 
     // Append new seller if provided
     if (new_seller) {
       const sellerId = new_seller.seller_id || `g2g-custom-${Date.now()}`;
+      const resolvedOfferId = new_seller.offer_id || extractG2GOfferId(new_seller.profile_url) || undefined;
       const sellerObj = {
         seller_id: sellerId,
         seller_name: new_seller.seller_name || "New Seller",
@@ -501,6 +505,8 @@ export async function PATCH(req: Request) {
         risk_score: Number(new_seller.risk_score) || 0,
         is_recommended: Boolean(new_seller.is_recommended),
         profile_url: resolveG2GProductUrl(new_seller.profile_url, new_seller.seller_name, game.title),
+        offer_id: resolvedOfferId,
+        live_status: new_seller.live_status || (resolvedOfferId ? "live" : undefined),
       };
 
       const existingSellerIdx = game.sellers.findIndex(
@@ -580,7 +586,7 @@ export async function PATCH(req: Request) {
       }
     }
 
-    saveCatalogData(catalog);
+    await saveCatalogData(catalog);
     await saveDbGame(game);
 
     return NextResponse.json({
@@ -607,7 +613,7 @@ export async function DELETE(req: Request) {
 
     const catalog = await loadCatalog();
     const nextCatalog = catalog.filter((g) => g.id !== gameId);
-    saveCatalogData(nextCatalog);
+    await saveCatalogData(nextCatalog);
 
     return NextResponse.json({ status: "success", message: `Game "${gameId}" deleted successfully` });
   } catch (error: any) {

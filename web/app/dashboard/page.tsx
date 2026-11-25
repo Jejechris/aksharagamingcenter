@@ -169,7 +169,7 @@ export default function AdminDashboardPage() {
       {/* ─── 2. 4 KPI Cards ─── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: GMV */}
-        <div className="app-card p-5 flex flex-col justify-between">
+        <div className="app-card card-interactive animate-fade-up stagger-1 p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
               Total Omzet (GMV)
@@ -189,7 +189,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* KPI 2: Net Profit */}
-        <div className="app-card p-5 flex flex-col justify-between border-emerald-200/80">
+        <div className="app-card card-interactive animate-fade-up stagger-2 p-5 flex flex-col justify-between border-emerald-200/80">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-medium text-emerald-800 uppercase tracking-wider">
               Profit Bersih
@@ -212,7 +212,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* KPI 3: Avg Margin */}
-        <div className="app-card p-5 flex flex-col justify-between">
+        <div className="app-card card-interactive animate-fade-up stagger-3 p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
               Rata-rata Margin
@@ -239,7 +239,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* KPI 4: Total Transactions */}
-        <div className="app-card p-5 flex flex-col justify-between">
+        <div className="app-card card-interactive animate-fade-up stagger-4 p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
               Total Transaksi
@@ -261,7 +261,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ─── 3. Target Bulanan Card (Compact & Actionable) ─── */}
-      <div className="app-card p-5 sm:p-6">
+      <div className="app-card animate-fade-up p-5 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <Target className="w-4 h-4 text-emerald-600" />

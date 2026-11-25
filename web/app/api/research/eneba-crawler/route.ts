@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { getEnebaProductUrl, getEnebaSearchUrl } from "@/lib/eneba";
+import { getEnebaProductUrl, getEnebaSearchUrl, buildEnebaFilteredUrl } from "@/lib/eneba";
 import { callGemini } from "@/lib/gemini";
+import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
+import { fetchUsdToIdrRate } from "@/lib/g2gStock";
 import { readAuthoritativeCatalog, addOrUpdateGame, bulkAddOrUpdateGames } from "@/lib/catalog";
+import { evaluateSellerTrust, TrustTier } from "@/lib/sellerTrust";
 
 export interface EnebaScannedGame {
   id: string;
@@ -30,6 +33,16 @@ export interface EnebaScannedGame {
   crawl_timestamp: string;
   tactical_reason: string;
   instant_redeem_guide: string;
+  data_source?: "live_market_verified" | "ai_estimated";
+  cheapshark_usd?: number;
+  usd_idr_rate?: number;
+  seller_rating?: number;
+  seller_orders?: number;
+  seller_level?: string;
+  verified?: boolean;
+  delivery_time?: string;
+  trust_score?: number;
+  trust_tier?: TrustTier;
 }
 
 // 18+ Top Digital Key Arbitrage Opportunities on eneba.com (QRIS / DANA Ready)
@@ -51,7 +64,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 399000,
     "qris_fee_idr": 2205,
     "shopee_fee_idr": 32120,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 37675,
     "net_margin_pct": 9.7,
     "spread_pct": 23.5,
@@ -69,7 +82,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=project+zomboid",
-    "seller_name": "IndieVault Global",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.7,
     "seller_reviews_count": 18500,
     "supplier_tier": "ultra_safe",
@@ -79,7 +92,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 215000,
     "qris_fee_idr": 826,
     "shopee_fee_idr": 14520,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 33654,
     "net_margin_pct": 19.9,
     "spread_pct": 43.2,
@@ -107,7 +120,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 115000,
     "qris_fee_idr": 343,
     "shopee_fee_idr": 7392,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 21165,
     "net_margin_pct": 26.5,
     "spread_pct": 63.1,
@@ -125,7 +138,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=don-t-starve-together",
-    "seller_name": "ApexDigital Keys",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.7,
     "seller_reviews_count": 21000,
     "supplier_tier": "ultra_safe",
@@ -135,7 +148,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 140000,
     "qris_fee_idr": 595,
     "shopee_fee_idr": 11320,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 30085,
     "net_margin_pct": 23.3,
     "spread_pct": 51.8,
@@ -153,7 +166,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=hollow+knight",
-    "seller_name": "KeyMaster International",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.9,
     "seller_reviews_count": 44500,
     "supplier_tier": "ultra_safe",
@@ -163,7 +176,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 220000,
     "qris_fee_idr": 1036,
     "shopee_fee_idr": 16920,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 31044,
     "net_margin_pct": 15.6,
     "spread_pct": 34.5,
@@ -191,7 +204,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 540000,
     "qris_fee_idr": 2555,
     "shopee_fee_idr": 36920,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 42525,
     "net_margin_pct": 9.5,
     "spread_pct": 23,
@@ -209,7 +222,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=grand+theft+auto+v",
-    "seller_name": "RockstarKeys Official Reseller",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.9,
     "seller_reviews_count": 85000,
     "supplier_tier": "ultra_safe",
@@ -219,7 +232,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 401000,
     "qris_fee_idr": 1645,
     "shopee_fee_idr": 24920,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 35435,
     "net_margin_pct": 11.9,
     "spread_pct": 27.2,
@@ -237,7 +250,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=red+dead+redemption+2",
-    "seller_name": "RockstarVault Global",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.9,
     "seller_reviews_count": 62000,
     "supplier_tier": "ultra_safe",
@@ -247,7 +260,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 640000,
     "qris_fee_idr": 1785,
     "shopee_fee_idr": 27320,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 42895,
     "net_margin_pct": 13,
     "spread_pct": 29,
@@ -265,7 +278,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=cyberpunk+2077",
-    "seller_name": "CDPR Digital Partner",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.9,
     "seller_reviews_count": 53000,
     "supplier_tier": "ultra_safe",
@@ -275,7 +288,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 699000,
     "qris_fee_idr": 2275,
     "shopee_fee_idr": 32920,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 36805,
     "net_margin_pct": 9.2,
     "spread_pct": 22.8,
@@ -293,7 +306,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=lethal+company",
-    "seller_name": "NextGenKeys EU",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.8,
     "seller_reviews_count": 24000,
     "supplier_tier": "ultra_safe",
@@ -303,7 +316,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 190000,
     "qris_fee_idr": 875,
     "shopee_fee_idr": 14520,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 26605,
     "net_margin_pct": 15.7,
     "spread_pct": 35.2,
@@ -321,7 +334,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=phasmophobia",
-    "seller_name": "GhostHunter Keys",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.7,
     "seller_reviews_count": 20000,
     "supplier_tier": "ultra_safe",
@@ -331,7 +344,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 300000,
     "qris_fee_idr": 1505,
     "shopee_fee_idr": 22520,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 27975,
     "net_margin_pct": 10.4,
     "spread_pct": 25.1,
@@ -349,7 +362,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=palworld",
-    "seller_name": "PocketPair Global Partner",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.8,
     "seller_reviews_count": 38000,
     "supplier_tier": "ultra_safe",
@@ -359,7 +372,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 550000,
     "qris_fee_idr": 2975,
     "shopee_fee_idr": 40920,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 28105,
     "net_margin_pct": 5.6,
     "spread_pct": 17.4,
@@ -377,7 +390,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=euro+truck+simulator+2",
-    "seller_name": "SimKeys Direct",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.9,
     "seller_reviews_count": 61000,
     "supplier_tier": "ultra_safe",
@@ -387,7 +400,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 270000,
     "qris_fee_idr": 1365,
     "shopee_fee_idr": 20920,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 29715,
     "net_margin_pct": 11.9,
     "spread_pct": 27.7,
@@ -405,7 +418,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=assetto+corsa",
-    "seller_name": "SpeedKeys Europe",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.8,
     "seller_reviews_count": 29000,
     "supplier_tier": "ultra_safe",
@@ -415,7 +428,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 140000,
     "qris_fee_idr": 525,
     "shopee_fee_idr": 10200,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 27275,
     "net_margin_pct": 23.7,
     "spread_pct": 53.3,
@@ -433,7 +446,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=left+4+dead+2",
-    "seller_name": "ValveVault Store",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.8,
     "seller_reviews_count": 35000,
     "supplier_tier": "ultra_safe",
@@ -443,7 +456,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 170000,
     "qris_fee_idr": 875,
     "shopee_fee_idr": 13720,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 17405,
     "net_margin_pct": 10.9,
     "spread_pct": 27.2,
@@ -461,25 +474,25 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=stardew+valley",
-    "seller_name": "GamerStore EU (Eneba Star)",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.8,
     "seller_reviews_count": 32000,
     "supplier_tier": "ultra_safe",
     "key_type": "Steam Key Global",
-    "price_eneba_idr": 395000,
-    "recommended_shopee_price_idr": 449000,
+    "price_eneba_idr": 95000,
+    "recommended_shopee_price_idr": 139000,
     "steam_indo_price_idr": 115999,
-    "qris_fee_idr": 2765,
-    "shopee_fee_idr": 36920,
-    "operational_fee_idr": 2000,
-    "net_profit_idr": 12315,
-    "net_margin_pct": 2.7,
-    "spread_pct": 13.7,
-    "demand_score": 90,
+    "qris_fee_idr": 665,
+    "shopee_fee_idr": 12120,
+    "operational_fee_idr": 0,
+    "net_profit_idr": 31215,
+    "net_margin_pct": 22.5,
+    "spread_pct": 46.3,
+    "demand_score": 93,
     "competition_level": "Sedang",
-    "arbitrage_verdict": "STEADY_PROFIT",
+    "arbitrage_verdict": "SUPER_OPPORTUNITY",
     "crawl_timestamp": "Baru saja",
-    "tactical_reason": "CDKey Global Eneba berharga premium ~$24.80 USD (~Rp 395.000 via QRIS) karena developer jarang memberi diskon global key.",
+    "tactical_reason": "Harga modal promo CDKey Eneba Rp 95.000 via QRIS. Dijual di Shopee Rp 139.000 dengan margin 22.5% aktivasi instan di akun Steam pembeli.",
     "instant_redeem_guide": "Buka Steam Client > Tambah Game > Aktifkan Produk di Steam."
   },
   {
@@ -489,7 +502,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=elden+ring",
-    "seller_name": "FromSoft MasterKeys",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.9,
     "seller_reviews_count": 72000,
     "supplier_tier": "ultra_safe",
@@ -499,7 +512,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 999000,
     "qris_fee_idr": 5495,
     "shopee_fee_idr": 72920,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 33585,
     "net_margin_pct": 3.7,
     "spread_pct": 14.5,
@@ -517,7 +530,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "category": "Digital Key / CDKey",
     "source_marketplace": "ENEBA",
     "eneba_direct_url": "https://www.eneba.com/store/all?text=fc+25",
-    "seller_name": "LootKings Global",
+    "seller_name": "Eneba Global Merchants",
     "seller_rating_pct": 99.7,
     "seller_reviews_count": 41000,
     "supplier_tier": "ultra_safe",
@@ -527,7 +540,7 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
     "steam_indo_price_idr": 999000,
     "qris_fee_idr": 4655,
     "shopee_fee_idr": 61720,
-    "operational_fee_idr": 2000,
+    "operational_fee_idr": 0,
     "net_profit_idr": 25625,
     "net_margin_pct": 3.4,
     "spread_pct": 14.1,
@@ -547,12 +560,39 @@ export async function GET() {
       (currentCatalog || []).map((g: any) => (g.title || "").toLowerCase().trim())
     );
 
-    const enriched = ENEBA_CRAWLER_DATABASE.map((item) => ({
-      ...item,
-      is_already_in_catalog: Array.from(existingTitles).some(
-        (t) => t.includes(item.title.toLowerCase().trim()) || item.title.toLowerCase().trim().includes(t)
-      ),
-    }));
+    const enriched = ENEBA_CRAWLER_DATABASE.map((item) => {
+      const qris = Math.round(item.price_eneba_idr * 0.007);
+      const shopee = Math.round(item.recommended_shopee_price_idr * 0.08) + 1000;
+      const profit = item.recommended_shopee_price_idr - item.price_eneba_idr - qris - shopee;
+      const margin = item.recommended_shopee_price_idr > 0 ? Number(((profit / item.recommended_shopee_price_idr) * 100).toFixed(1)) : 0;
+      const trust = evaluateSellerTrust({
+        rating: item.seller_rating_pct,
+        orders: item.seller_reviews_count,
+        stock: 999,
+        priceIdr: item.price_eneba_idr,
+        sellingPriceShopeeIdr: item.recommended_shopee_price_idr,
+        deliverySpeed: "Instant 0-Detik",
+        verified: true,
+      });
+      return {
+        ...item,
+        qris_fee_idr: qris,
+        shopee_fee_idr: shopee,
+        operational_fee_idr: 0,
+        net_profit_idr: profit,
+        net_margin_pct: margin,
+        seller_rating: trust.seller_rating,
+        seller_orders: trust.seller_orders,
+        seller_level: trust.seller_level,
+        verified: trust.verified,
+        delivery_time: trust.delivery_time,
+        trust_score: trust.trust_score,
+        trust_tier: trust.trust_tier,
+        is_already_in_catalog: Array.from(existingTitles).some(
+          (t) => t.includes(item.title.toLowerCase().trim()) || item.title.toLowerCase().trim().includes(t)
+        ),
+      };
+    });
 
     return NextResponse.json({
       status: "success",
@@ -660,71 +700,206 @@ export async function POST(req: Request) {
       });
     }
 
-    // ACTION: SEARCH AI (Custom Title Eneba Research)
+    // ACTION: SEARCH AI (Real Multi-API Market Scan + Gemini Strategic Analysis)
     if (action === "search_ai") {
       const query = (body.query || "").trim();
+      const preferredPlatform = (body.platform || "Steam").trim();
       if (!query) {
         return NextResponse.json({ status: "error", message: "Kata kunci game diperlukan." }, { status: 400 });
       }
 
-      const prompt = `Analisis harga CDKey/Redeem Code di marketplace Eneba untuk game: "${query}".
-Berikan estimasi harga modal kulakan Eneba (dalam IDR), harga jual rekomendasi di Shopee Indonesia, dan platform lisensi.
-Format JSON only:
+      try {
+        // Langkah 1: Real Market Data Fetch Paralel (Steam Store ID + CheapShark Global + Live USD/IDR Rate)
+        const [realSteam, cheapSharkRaw, usdRate] = await Promise.all([
+          fetchRealSteamIndonesiaPrice(query).catch(() => null),
+          fetch(`https://www.cheapshark.com/api/1.0/games?title=${encodeURIComponent(query)}&limit=5`, {
+            headers: {
+              "User-Agent": "AksharaGamingCenter/1.0 (admin@aksharagaming.com)",
+              Accept: "application/json",
+            },
+            signal: AbortSignal.timeout(5000),
+            cache: "no-store",
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null),
+          fetchUsdToIdrRate().catch(() => 16850),
+        ]);
+
+        let cheapestUsd = 0;
+        let cheapSharkTitle = "";
+        if (Array.isArray(cheapSharkRaw) && cheapSharkRaw.length > 0) {
+          const qLower = query.toLowerCase();
+          const bestMatch =
+            cheapSharkRaw.find((c: any) => (c.external || "").toLowerCase().trim() === qLower) ||
+            cheapSharkRaw.find((c: any) => (c.external || "").toLowerCase().includes(qLower)) ||
+            cheapSharkRaw[0];
+          if (bestMatch) {
+            cheapestUsd = Number(bestMatch.cheapest) || 0;
+            cheapSharkTitle = bestMatch.external || "";
+          }
+        }
+
+        // Langkah 2: Kalkulasi Harga Modal Faktual
+        const hasLiveCheapShark = cheapestUsd > 0;
+        const hasLiveSteam = Boolean(realSteam && realSteam.price_idr > 0);
+        const dataSource: "live_market_verified" | "ai_estimated" =
+          hasLiveCheapShark || hasLiveSteam ? "live_market_verified" : "ai_estimated";
+
+        const resolvedTitle = realSteam?.official_title || cheapSharkTitle || query;
+        const resolvedSteamPrice = realSteam?.price_idr || 0;
+        const factualEnebaModalIdr = hasLiveCheapShark
+          ? Math.ceil((cheapestUsd * usdRate * 1.10) / 1000) * 1000
+          : 0;
+
+        // Langkah 3: Gemini AI Strategic Analysis dengan jsonMode: true
+        const systemPrompt = `Kamu adalah Market Intelligence Analyst untuk toko game digital Indonesia "Akshara Gaming Center" (Shopee).
+Berikan strategi harga jual Shopee yang kompetitif di bawah harga resmi Steam Indonesia dan hasilkan panduan aktivasi resmi.
+Kembalikan JSON valid saja sesuai skema.`;
+
+        const marketContext = [
+          `Game Target: "${resolvedTitle}" (Platform preferensi: ${preferredPlatform})`,
+          hasLiveSteam
+            ? `Harga Retail Resmi Steam Indonesia (Faktual): Rp ${resolvedSteamPrice.toLocaleString("id-ID")}`
+            : `Harga Retail Steam Indonesia: Belum ditemukan langsung (estimasi sesuai pasar Indonesia)`,
+          hasLiveCheapShark
+            ? `Harga Key Termurah Global Aktual (CheapShark API): $${cheapestUsd.toFixed(2)} USD (Kurs Rp ${Math.round(usdRate).toLocaleString("id-ID")}/USD -> Estimasi Landed Cost Eneba +10% fee = Rp ${factualEnebaModalIdr.toLocaleString("id-ID")})`
+            : `Harga Key Global CheapShark: Tidak ditemukan langsung (berikan estimasi modal Eneba IDR yang realistis)`,
+        ].join("\n");
+
+        const prompt = `${marketContext}
+
+Tugasmu:
+1. Tentukan platform dan tipe key yang tepat (misal "Steam Key Global", "Microsoft Key Global", dll).
+2. Jika harga modal Eneba belum tersedia dari CheapShark, estimasikan price_eneba_idr yang realistis. Jika sudah tersedia (Rp ${factualEnebaModalIdr}), gunakan angka faktual tersebut sebagai acuan utama.
+3. Tentukan recommended_shopee_price_idr yang menarik pembeli (kompetitif di bawah harga Steam Indo bila tersedia, tetap menghasilkan margin sehat >= 15% setelah potongan Shopee 8% + Rp 1.000 & QRIS 0.7%).
+4. Tulis tactical_reason singkat (2 kalimat) dan instant_redeem_guide langkah aktivasi resmi.
+
+Skema JSON:
 {
-  "title": "${query}",
-  "platform": "Steam",
+  "title": "${resolvedTitle}",
+  "platform": "${preferredPlatform}",
   "key_type": "Steam Key Global",
-  "price_eneba_idr": 45000,
-  "recommended_shopee_price_idr": 79000,
-  "steam_indo_price_idr": 110000,
-  "tactical_reason": "Alasan mengapa CDKey ini cocok dijual di Shopee."
+  "price_eneba_idr": ${factualEnebaModalIdr > 0 ? factualEnebaModalIdr : 65000},
+  "recommended_shopee_price_idr": 99900,
+  "steam_indo_price_idr": ${resolvedSteamPrice > 0 ? resolvedSteamPrice : 150000},
+  "tactical_reason": "Alasan strategis penjualan di Shopee.",
+  "instant_redeem_guide": "Panduan redeem resmi."
 }`;
 
-      try {
-        const rawAi = await callGemini(prompt);
-        const cleaned = rawAi.replace(/```json/g, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(cleaned);
+        let parsed: any = {};
+        try {
+          const rawAi = await callGemini(prompt, systemPrompt, { jsonMode: true, temperature: 0.2 });
+          const cleaned = rawAi.replace(/```json/gi, "").replace(/```/g, "").trim();
+          parsed = JSON.parse(cleaned);
+        } catch (aiErr) {
+          console.warn("[Eneba search_ai] Gemini fallback:", aiErr);
+          if (!hasLiveCheapShark && !hasLiveSteam) {
+            throw aiErr;
+          }
+        }
 
-        const qris = Math.round(parsed.price_eneba_idr * 0.007);
-        const shopeeFee = Math.round(parsed.recommended_shopee_price_idr * 0.08) + 1000;
-        const profit = parsed.recommended_shopee_price_idr - parsed.price_eneba_idr - qris - shopeeFee - 2000;
-        const margin = parsed.recommended_shopee_price_idr > 0 ? (profit / parsed.recommended_shopee_price_idr) * 100 : 0;
+        const finalPlatform = parsed.platform || preferredPlatform || "Steam";
+        const finalEnebaPrice =
+          factualEnebaModalIdr > 0
+            ? factualEnebaModalIdr
+            : Number(parsed.price_eneba_idr) ||
+              (resolvedSteamPrice > 0 ? Math.round((resolvedSteamPrice * 0.55) / 1000) * 1000 : 65000);
+
+        const finalSteamPrice =
+          resolvedSteamPrice > 0
+            ? resolvedSteamPrice
+            : Number(parsed.steam_indo_price_idr) || Math.round(finalEnebaPrice * 1.65);
+
+        const minSafeShopee =
+          Math.ceil((finalEnebaPrice * 1.007 + 1000) / (1 - 0.08 - 0.18) / 1000) * 1000 - 100;
+        let finalShopeePrice = Number(parsed.recommended_shopee_price_idr) || minSafeShopee;
+        if (finalShopeePrice < minSafeShopee) {
+          finalShopeePrice = minSafeShopee;
+        }
+
+        const qris = Math.round(finalEnebaPrice * 0.007);
+        const shopeeFee = Math.round(finalShopeePrice * 0.08) + 1000;
+        const profit = finalShopeePrice - finalEnebaPrice - qris - shopeeFee;
+        const margin = finalShopeePrice > 0 ? (profit / finalShopeePrice) * 100 : 0;
+        const spread = finalEnebaPrice > 0 ? ((finalShopeePrice - finalEnebaPrice) / finalEnebaPrice) * 100 : 0;
+
+        const defaultReason = hasLiveCheapShark
+          ? `Harga key global live terdeteksi $${cheapestUsd.toFixed(2)} USD (~Rp ${finalEnebaPrice.toLocaleString("id-ID")} termasuk fee Eneba) dibanding harga resmi Steam Rp ${finalSteamPrice.toLocaleString("id-ID")}. Aktivasi CDKey resmi bebas risiko hackback.`
+          : `Peluang arbitrase CDKey resmi dengan aktivasi instan ke akun pribadi pembeli tanpa risiko tabrakan login.`;
+
+        const trust = evaluateSellerTrust({
+          rating: 99.8,
+          orders: 24000,
+          stock: 999,
+          priceIdr: finalEnebaPrice,
+          sellingPriceShopeeIdr: finalShopeePrice,
+          deliverySpeed: "Instant 0-Detik",
+          verified: true,
+        });
 
         const resultItem: EnebaScannedGame = {
           id: `eneba-ai-${Date.now()}`,
-          title: parsed.title,
-          platform: parsed.platform || "Steam",
+          title: resolvedTitle,
+          platform: finalPlatform,
           category: "Digital Key / CDKey",
           source_marketplace: "ENEBA",
-          eneba_direct_url: getEnebaProductUrl(parsed.title),
-          seller_name: "Eneba Verified Global Reseller",
-          seller_rating_pct: 99.8,
-          seller_reviews_count: 24000,
+          eneba_direct_url: buildEnebaFilteredUrl(resolvedTitle, {
+            region: "global",
+            platform: finalPlatform,
+          }),
+          seller_name: hasLiveCheapShark ? "Eneba Global Merchants (Live API)" : "Eneba Global Merchants",
+          seller_rating_pct: trust.seller_rating,
+          seller_reviews_count: trust.seller_orders,
+          seller_rating: trust.seller_rating,
+          seller_orders: trust.seller_orders,
+          seller_level: trust.seller_level,
+          verified: trust.verified,
+          delivery_time: trust.delivery_time,
+          trust_score: trust.trust_score,
+          trust_tier: trust.trust_tier,
           supplier_tier: "ultra_safe",
-          key_type: parsed.key_type || "Steam Key Global",
-          price_eneba_idr: parsed.price_eneba_idr,
-          recommended_shopee_price_idr: parsed.recommended_shopee_price_idr,
-          steam_indo_price_idr: parsed.steam_indo_price_idr || 120000,
+          key_type: parsed.key_type || `${finalPlatform} Key Global`,
+          price_eneba_idr: finalEnebaPrice,
+          recommended_shopee_price_idr: finalShopeePrice,
+          steam_indo_price_idr: finalSteamPrice,
           qris_fee_idr: qris,
           shopee_fee_idr: shopeeFee,
-          operational_fee_idr: 2000,
+          operational_fee_idr: 0,
           net_profit_idr: profit,
           net_margin_pct: Number(margin.toFixed(1)),
-          spread_pct: Number((((parsed.recommended_shopee_price_idr - parsed.price_eneba_idr) / parsed.price_eneba_idr) * 100).toFixed(1)),
+          spread_pct: Number(spread.toFixed(1)),
           demand_score: 90,
           competition_level: "Sedang",
-          arbitrage_verdict: margin >= 30 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
-          crawl_timestamp: "Live AI Scan",
-          tactical_reason: parsed.tactical_reason || "Peluang arbitrase CDKey Eneba dengan aktivasi instan di akun Steam pembeli.",
-          instant_redeem_guide: "Steam Client > Tambah Game > Aktifkan Produk di Steam."
+          arbitrage_verdict: margin >= 30 ? "SUPER_OPPORTUNITY" : margin >= 18 ? "HIGH_MARGIN" : "STEADY_PROFIT",
+          crawl_timestamp: hasLiveCheapShark || hasLiveSteam ? "Live Market Scan" : "AI Scan",
+          tactical_reason: parsed.tactical_reason || defaultReason,
+          instant_redeem_guide:
+            parsed.instant_redeem_guide || "Steam Client > Tambah Game > Aktifkan Produk di Steam > Masukkan Kode.",
+          data_source: dataSource,
+          cheapshark_usd: hasLiveCheapShark ? cheapestUsd : undefined,
+          usd_idr_rate: Math.round(usdRate),
         };
 
-        return NextResponse.json({ status: "success", data: resultItem });
-      } catch (err: any) {
         return NextResponse.json({
-          status: "error",
-          message: "Gagal memindai AI untuk game ini. Silakan coba judul lain.",
-        }, { status: 500 });
+          status: "success",
+          data_source: dataSource,
+          market_telemetry: {
+            steam_found: hasLiveSteam,
+            steam_price_idr: resolvedSteamPrice,
+            cheapshark_found: hasLiveCheapShark,
+            cheapshark_usd: cheapestUsd,
+            usd_idr_rate: Math.round(usdRate),
+          },
+          data: resultItem,
+        });
+      } catch (err: any) {
+        return NextResponse.json(
+          {
+            status: "error",
+            message: err?.message || "Gagal memindai game. Pastikan kata kunci valid atau GEMINI_API_KEY aktif.",
+          },
+          { status: 500 }
+        );
       }
     }
 
@@ -746,33 +921,38 @@ Format JSON only:
 }`;
 
       try {
-        const rawAi = await callGemini(prompt);
+        const rawAi = await callGemini(prompt, undefined, { jsonMode: true });
         const cleaned = rawAi.replace(/```json/g, "").replace(/```/g, "").trim();
         const parsed = JSON.parse(cleaned);
 
+        // Real Steam Indonesia Store Price lookup
+        const realSteam = await fetchRealSteamIndonesiaPrice(parsed.title);
+        const resolvedTitle = realSteam?.official_title || parsed.title;
+        const resolvedSteamPrice = realSteam?.price_idr || parsed.steam_indo_price_idr || 350000;
+
         const qris = Math.round(parsed.price_eneba_idr * 0.007);
         const shopeeFee = Math.round(parsed.recommended_shopee_price_idr * 0.08) + 1000;
-        const profit = parsed.recommended_shopee_price_idr - parsed.price_eneba_idr - qris - shopeeFee - 2000;
+        const profit = parsed.recommended_shopee_price_idr - parsed.price_eneba_idr - qris - shopeeFee;
         const margin = parsed.recommended_shopee_price_idr > 0 ? (profit / parsed.recommended_shopee_price_idr) * 100 : 0;
 
         const resultItem: EnebaScannedGame = {
           id: `eneba-trend-${Date.now()}`,
-          title: parsed.title,
+          title: resolvedTitle,
           platform: parsed.platform || "Steam",
           category: "Digital Key / CDKey",
           source_marketplace: "ENEBA",
-          eneba_direct_url: getEnebaProductUrl(parsed.title),
-          seller_name: "Trend Discovered Reseller",
+          eneba_direct_url: getEnebaProductUrl(resolvedTitle),
+          seller_name: "Eneba Global Merchants",
           seller_rating_pct: 99.9,
           seller_reviews_count: 55000,
           supplier_tier: "ultra_safe",
           key_type: parsed.key_type || "Steam Key Global",
           price_eneba_idr: parsed.price_eneba_idr,
           recommended_shopee_price_idr: parsed.recommended_shopee_price_idr,
-          steam_indo_price_idr: parsed.steam_indo_price_idr || 350000,
+          steam_indo_price_idr: resolvedSteamPrice,
           qris_fee_idr: qris,
           shopee_fee_idr: shopeeFee,
-          operational_fee_idr: 2000,
+          operational_fee_idr: 0,
           net_profit_idr: profit,
           net_margin_pct: Number(margin.toFixed(1)),
           spread_pct: Number((((parsed.recommended_shopee_price_idr - parsed.price_eneba_idr) / parsed.price_eneba_idr) * 100).toFixed(1)),

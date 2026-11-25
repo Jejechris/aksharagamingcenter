@@ -54,6 +54,9 @@ interface CompetitorData {
     spread_vs_min_pct: number;
   };
   shopee_search_url: string;
+  shopee_bestseller_url?: string;
+  data_source?: "manual_verified" | "ai_benchmark";
+  manual_competitor_price_idr?: number;
 }
 
 interface ShopeeCompetitorModalProps {
@@ -84,6 +87,7 @@ export default function ShopeeCompetitorModal({
   const [inputQuestion, setInputQuestion] = useState("");
   const [isAnswering, setIsAnswering] = useState(false);
   const [appliedSuccess, setAppliedSuccess] = useState(false);
+  const [manualPriceInput, setManualPriceInput] = useState<string>("");
 
   const formatRp = (num: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -93,11 +97,15 @@ export default function ShopeeCompetitorModal({
     }).format(num || 0);
   };
 
-  const fetchCompetitors = async () => {
+  const fetchCompetitors = async (customManualPrice?: number) => {
     if (!gameTitle) return;
     setIsLoading(true);
     setError("");
     setAppliedSuccess(false);
+
+    const targetManualPrice = customManualPrice !== undefined 
+      ? customManualPrice 
+      : (manualPriceInput ? Number(manualPriceInput.replace(/\D/g, "")) : 0);
 
     try {
       const res = await fetch("/api/ai/shopee-competitors", {
@@ -109,6 +117,7 @@ export default function ShopeeCompetitorModal({
           platform,
           current_price_idr: currentPriceIdr,
           cost_g2g_idr: costG2gIdr,
+          manual_competitor_price_idr: targetManualPrice,
         }),
       });
 
@@ -212,9 +221,15 @@ export default function ShopeeCompetitorModal({
                 <h2 className="text-base font-bold text-slate-900 tracking-tight">
                   Radar Kompetitor Shopee &amp; AI Pricing Advisor
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-orange-50 text-orange-700 border border-orange-200 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                  LIVE SHOPEE BOT
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 ${
+                  data?.data_source === "manual_verified"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-300"
+                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    data?.data_source === "manual_verified" ? "bg-emerald-500" : "bg-blue-500"
+                  }`} />
+                  {data?.data_source === "manual_verified" ? "VERIFIED INPUT" : "AI PRICING ADVISOR"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-mono mt-0.5">
@@ -245,6 +260,64 @@ export default function ShopeeCompetitorModal({
             </div>
           ) : data ? (
             <>
+              {/* Manual Competitor Input Card */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 font-mono flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-orange-600" />
+                      Cek &amp; Input Harga Kompetitor Riil di Shopee (Opsional)
+                    </span>
+                    <p className="text-[11px] text-slate-500 font-sans mt-0.5">
+                      Ketik harga toko termurah/terlaris yang kamu temukan di Shopee untuk simulasi margin &amp; harga undercut otomatis.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={data.shopee_bestseller_url || data.shopee_search_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-mono font-bold flex items-center gap-1.5 transition-colors shadow-xs"
+                    >
+                      <span>Cek Terlaris di Shopee</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const parsedNum = Number(manualPriceInput.replace(/\D/g, ""));
+                    if (parsedNum > 0) {
+                      fetchCompetitors(parsedNum);
+                    }
+                  }}
+                  className="flex flex-col sm:flex-row gap-2 pt-1"
+                >
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400 font-semibold">
+                      Rp
+                    </span>
+                    <input
+                      type="text"
+                      value={manualPriceInput}
+                      onChange={(e) => setManualPriceInput(e.target.value)}
+                      placeholder="Masukkan harga kompetitor riil (contoh: 48900)..."
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading || !manualPriceInput}
+                    className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 cursor-pointer shadow-xs"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                    <span>Hitung Ulang Margin</span>
+                  </button>
+                </form>
+              </div>
+
               {/* Benchmark Summary 3-Col KPI */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* 1. Lowest Competitor */}
@@ -341,7 +414,9 @@ export default function ShopeeCompetitorModal({
                     <ShoppingBag className="w-3.5 h-3.5 text-orange-600" />
                     Daftar Kompetitor Terpantau di Shopee:
                   </span>
-                  <span className="text-[11px] text-slate-400">3 Toko Teratas</span>
+                  <span className="text-[11px] text-slate-400">
+                    {data.data_source === "manual_verified" ? "Input Riil Terverifikasi" : "Estimasi Benchmark Pasar"}
+                  </span>
                 </div>
 
                 <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-xs">
@@ -410,8 +485,8 @@ export default function ShopeeCompetitorModal({
                     <span className="text-slate-900 font-bold tabular-nums">{formatRp(data.economics.qris_fee_idr)}</span>
                   </div>
                   <div>
-                    <span className="block text-slate-400 text-[10px]">Biaya Operasional / Pack:</span>
-                    <span className="text-slate-900 font-bold tabular-nums">{formatRp(data.economics.packaging_cost_idr || 0)}</span>
+                    <span className="block text-slate-400 text-[10px]">Biaya Operasional (Digital):</span>
+                    <span className="text-slate-900 font-bold tabular-nums">Rp 0 (Full Digital)</span>
                   </div>
                 </div>
               </div>

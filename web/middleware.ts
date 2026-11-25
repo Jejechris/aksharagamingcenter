@@ -56,8 +56,11 @@ export function middleware(request: NextRequest) {
     "/api/claim/manage",
     "/api/inventory/vault",
     "/api/inventory/live-sync",
+    "/api/inventory/detect-link",
     "/api/orders/autonomous",
     "/api/orders/auto-fulfill",
+    "/api/ai/",
+    "/api/research/",
   ];
 
   const isSensitiveApi = sensitiveApiPrefixes.some((p) => pathname.startsWith(p));

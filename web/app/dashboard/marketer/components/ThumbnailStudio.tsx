@@ -8,8 +8,27 @@ import {
   Image as ImageIcon, Search, CheckCircle2, Sliders, 
   ChevronDown, FileText, Palette, Wand2, Maximize2, 
   Focus, MoveVertical, HelpCircle, Shield, Lock, 
-  Fingerprint, Award
+  Fingerprint, Award, Upload
 } from "lucide-react";
+
+/**
+ * Auto-proxy URL eksternal agar aman dari CORS di <canvas>
+ */
+export function autoProxyUrl(url: string): string {
+  if (!url) return "";
+  if (
+    url.startsWith("data:") ||
+    url.startsWith("blob:") ||
+    url.startsWith("/api/image-proxy") ||
+    url.startsWith("/")
+  ) {
+    return url;
+  }
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
 
 export interface AuthenticPalette {
   name: string;
@@ -98,7 +117,7 @@ export const GAME_PRESETS: GamePreset[] = [
     frameColor: "#1897fe",
     platformBadge: "steam",
     accessType: "Private",
-    bgUrl: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=80&w=1200&auto=format&fit=crop"
+    bgUrl: "/api/image-proxy?url=https%3A%2F%2Fshared.akamai.steamstatic.com%2Fstore_item_assets%2Fsteam%2Fapps%2F2456740%2Flibrary_hero.jpg"
   },
   {
     id: "forest",
@@ -110,7 +129,7 @@ export const GAME_PRESETS: GamePreset[] = [
     frameColor: "#2a4034",
     platformBadge: "steam",
     accessType: "Private",
-    bgUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop"
+    bgUrl: "/api/image-proxy?url=https%3A%2F%2Fshared.akamai.steamstatic.com%2Fstore_item_assets%2Fsteam%2Fapps%2F1326470%2Flibrary_hero.jpg"
   },
   {
     id: "gtav",
@@ -122,7 +141,7 @@ export const GAME_PRESETS: GamePreset[] = [
     frameColor: "#191013",
     platformBadge: "rockstar",
     accessType: "Rockstar Key | Full Access",
-    bgUrl: "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1200&auto=format&fit=crop"
+    bgUrl: "/api/image-proxy?url=https%3A%2F%2Fshared.akamai.steamstatic.com%2Fstore_item_assets%2Fsteam%2Fapps%2F271590%2Flibrary_hero.jpg"
   },
   {
     id: "spiderman",
@@ -134,7 +153,7 @@ export const GAME_PRESETS: GamePreset[] = [
     frameColor: "#3d1a1a",
     platformBadge: "steam",
     accessType: "Private",
-    bgUrl: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=1200&auto=format&fit=crop"
+    bgUrl: "/api/image-proxy?url=https%3A%2F%2Fshared.akamai.steamstatic.com%2Fstore_item_assets%2Fsteam%2Fapps%2F1817070%2Flibrary_hero.jpg"
   },
   {
     id: "helldivers",
@@ -146,7 +165,7 @@ export const GAME_PRESETS: GamePreset[] = [
     frameColor: "#1f607e",
     platformBadge: "steam",
     accessType: "Private",
-    bgUrl: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1200&auto=format&fit=crop"
+    bgUrl: "/api/image-proxy?url=https%3A%2F%2Fshared.akamai.steamstatic.com%2Fstore_item_assets%2Fsteam%2Fapps%2F553850%2Flibrary_hero.jpg"
   },
   {
     id: "minecraft",
@@ -158,7 +177,7 @@ export const GAME_PRESETS: GamePreset[] = [
     frameColor: "#10b981",
     platformBadge: "mojang",
     accessType: "Full Access",
-    bgUrl: "https://images.unsplash.com/photo-1627856013091-fed6e4e30025?q=80&w=1200&auto=format&fit=crop"
+    bgUrl: "/api/image-proxy?url=https%3A%2F%2Fstore-images.s-microsoft.com%2Fimage%2Fapps.54465.14492077886571533.be42f4bd-887b-4430-8ed0-622341b4d2b0.5054cf02-8b0f-47e2-9d15-7ddc81f63638"
   },
   {
     id: "wukong",
@@ -170,11 +189,20 @@ export const GAME_PRESETS: GamePreset[] = [
     frameColor: "#26211c",
     platformBadge: "steam",
     accessType: "Private",
-    bgUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop"
+    bgUrl: "/api/image-proxy?url=https%3A%2F%2Fshared.akamai.steamstatic.com%2Fstore_item_assets%2Fsteam%2Fapps%2F2358720%2Flibrary_hero.jpg"
   }
 ];
 
-export default function ThumbnailStudio() {
+export interface ThumbnailStudioProps {
+  externalGameTitle?: string;
+  externalPlatform?: string;
+  externalCategory?: string;
+  externalPrice?: string;
+  compact?: boolean;
+  onCoverDownloaded?: () => void;
+}
+
+export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
   const [activePreset, setActivePreset] = useState<string>("inzoi");
   const [gameTitle, setGameTitle] = useState("inZOI");
   const [platform, setPlatform] = useState("Steam");
@@ -187,7 +215,9 @@ export default function ThumbnailStudio() {
   const [frameColor, setFrameColor] = useState("#1897fe");
   const [platformBadge, setPlatformBadge] = useState("steam");
   const [accessType, setAccessType] = useState("Private");
-  const [bgUrl, setBgUrl] = useState("https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=80&w=1200&auto=format&fit=crop");
+  const [bgUrl, setBgUrl] = useState<string>(
+    "/api/image-proxy?url=https%3A%2F%2Fshared.akamai.steamstatic.com%2Fstore_item_assets%2Fsteam%2Fapps%2F2456740%2Flibrary_hero.jpg"
+  );
   const [aiReasoning, setAiReasoning] = useState<string | null>(
     "Signature Minimalist SMA: Frame Biru Langit (#1897fe) harmonis dengan poster inZOI, judul bersih di atas, dan emblem Steam resmi di pojok kanan bawah."
   );
@@ -202,7 +232,7 @@ export default function ThumbnailStudio() {
   // Official Artwork Auto-Search State (Strict Non-AI)
   const [availableArtworks, setAvailableArtworks] = useState<ArtworkOption[]>([]);
   const [isSearchingArt, setIsSearchingArt] = useState(false);
-  const [artSource, setArtSource] = useState<string | null>("Valve Steam CDN");
+  const [artSource, setArtSource] = useState<string | null>("Multi-Source Official");
 
   // Anti-Theft Combined Defense Suite (4-in-1 Protection)
   const [antiTheftMode, setAntiTheftMode] = useState<"full" | "subtle" | "off">("full");
@@ -212,9 +242,62 @@ export default function ThumbnailStudio() {
   // UI state
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isCopyingImage, setIsCopyingImage] = useState(false);
   const [viewMode, setViewMode] = useState<"canvas" | "shopee_app">("canvas");
   const [showSampleModal, setShowSampleModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // File Upload Handler (JPG / PNG / WebP -> Data URL bebas CORS)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setToastMessage("File yang diunggah harus berupa gambar (JPG, PNG, WebP).");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setBgUrl(reader.result);
+        setArtSource("Local File Upload");
+        setToastMessage("✅ Gambar berhasil diunggah langsung ke kanvas!");
+        setTimeout(() => setToastMessage(null), 3500);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Global Clipboard Paste Listener (Ctrl+V)
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (!file) continue;
+
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === "string") {
+              setBgUrl(reader.result);
+              setArtSource("Pasted from Clipboard");
+              setToastMessage("📋 Gambar dari clipboard berhasil ditempel ke cover!");
+              setTimeout(() => setToastMessage(null), 3500);
+            }
+          };
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, []);
 
   // Autonomous 1-Input AI Studio States
   const [aiSearchInput, setAiSearchInput] = useState("");
@@ -262,7 +345,7 @@ export default function ThumbnailStudio() {
       }
       setTimeout(() => setToastMessage(null), 4500);
     };
-    img.src = url;
+    img.src = autoProxyUrl(url);
   };
 
   // Run aspect detection when background changes
@@ -270,7 +353,7 @@ export default function ThumbnailStudio() {
     detectImageAspectAndAutoFit(bgUrl);
   }, [bgUrl]);
 
-  // Auto-fetch real official artwork from Steam Store CDN or Developer Press Kit
+  // Auto-fetch real official artwork from Multi-Source Official Engine
   const handleFetchOfficialArtwork = async (titleToSearch?: string, autoSelectPrimary: boolean = true) => {
     const query = titleToSearch || gameTitle;
     if (!query || !query.trim()) return;
@@ -284,14 +367,18 @@ export default function ThumbnailStudio() {
       const json = await res.json();
       if (json.status === "success" && Array.isArray(json.artworks) && json.artworks.length > 0) {
         setAvailableArtworks(json.artworks);
-        const sourceLabel = json.source === "steam_official_cdn" 
+        const sourceLabel = json.source_label || (json.source === "steam_official_cdn" 
           ? "Valve Steam Store CDN" 
-          : "Official Developer Press Kit";
+          : "Official Developer Press Kit");
         setArtSource(sourceLabel);
         if (autoSelectPrimary && json.primary_bg) {
           setBgUrl(json.primary_bg);
         }
         setToastMessage(`🎮 Ditemukan ${json.artworks.length} artwork resmi untuk "${json.official_title || query}" (${sourceLabel})!`);
+        setTimeout(() => setToastMessage(null), 4000);
+      } else {
+        setAvailableArtworks([]);
+        setToastMessage(json.message || "Artwork otomatis belum tersedia. Silakan upload gambar atau tekan Ctrl+V.");
         setTimeout(() => setToastMessage(null), 4000);
       }
     } catch (err) {
@@ -301,10 +388,91 @@ export default function ThumbnailStudio() {
     }
   };
 
-  // Populate initial artwork on mount
+  // Populate initial artwork on mount if no external game title is provided
   useEffect(() => {
-    handleFetchOfficialArtwork("inZOI", false);
+    if (!props.externalGameTitle) {
+      handleFetchOfficialArtwork("inZOI", false);
+    }
   }, []);
+
+  // Synchronize with external props (e.g. from Shopee Launchpad)
+  useEffect(() => {
+    if (!props.externalGameTitle) return;
+
+    const title = props.externalGameTitle.trim();
+    setGameTitle(title);
+
+    const rawPlat = (props.externalPlatform || "").toLowerCase();
+    const rawCat = props.externalCategory || "";
+    const rawTitle = title.toLowerCase();
+
+    // Auto-detect platform badge & frame color
+    let detectedBadge = "steam";
+    let detectedFrame = "#1897fe"; // Sky Blue default
+
+    if (rawPlat.includes("mojang") || rawTitle.includes("minecraft")) {
+      detectedBadge = "mojang";
+      detectedFrame = "#10b981"; // Emerald
+    } else if (rawPlat.includes("rockstar") || rawTitle.includes("grand theft auto") || rawTitle.includes("gta") || rawTitle.includes("red dead")) {
+      detectedBadge = "rockstar";
+      detectedFrame = "#191013"; // Dark Graphite
+    } else if (rawPlat.includes("ea") || rawTitle.includes("fifa") || rawTitle.includes("fc 25") || rawTitle.includes("fc25") || rawTitle.includes("origin")) {
+      detectedBadge = "ea";
+      detectedFrame = "#1e3a8a"; // EA FC Blue
+    } else if (rawPlat.includes("xbox") || rawPlat.includes("microsoft")) {
+      detectedBadge = "xbox";
+      detectedFrame = "#107c10"; // Xbox Green
+    } else if (rawPlat.includes("playstation") || rawPlat.includes("psn") || rawPlat.includes("ps4") || rawPlat.includes("ps5")) {
+      detectedBadge = "playstation";
+      detectedFrame = "#003791"; // PlayStation Blue
+    } else if (rawPlat.includes("epic")) {
+      detectedBadge = "epic";
+      detectedFrame = "#191013";
+    } else if (rawPlat.includes("ubisoft")) {
+      detectedBadge = "ubisoft";
+      detectedFrame = "#0055ff";
+    } else if (rawPlat.includes("battle") || rawPlat.includes("blizzard")) {
+      detectedBadge = "battlenet";
+      detectedFrame = "#002244";
+    } else if (rawPlat.includes("netflix") || rawTitle.includes("netflix")) {
+      detectedBadge = "netflix";
+      detectedFrame = "#e50914";
+    } else if (rawPlat.includes("capcut") || rawTitle.includes("capcut")) {
+      detectedBadge = "capcut";
+      detectedFrame = "#000000";
+    } else if (rawTitle.includes("wukong")) {
+      detectedBadge = "steam";
+      detectedFrame = "#26211c";
+    } else if (rawTitle.includes("forest")) {
+      detectedBadge = "steam";
+      detectedFrame = "#2a4034";
+    } else if (rawTitle.includes("spider-man")) {
+      detectedBadge = "steam";
+      detectedFrame = "#3d1a1a";
+    } else if (rawTitle.includes("helldivers")) {
+      detectedBadge = "steam";
+      detectedFrame = "#1f607e";
+    }
+
+    setPlatformBadge(detectedBadge);
+    setFrameColor(detectedFrame);
+    setSuggestedPalettes([detectedFrame, "#141414", "#0f1e36", "#a82020"]);
+
+    if (props.externalPlatform) {
+      setPlatform(props.externalPlatform);
+    }
+    if (rawCat) {
+      setCategory(rawCat);
+    }
+    if (props.externalPrice) {
+      setPrice(props.externalPrice);
+    }
+
+    const accessLabel = rawCat.toLowerCase().includes("key") ? "Key | Full Access" : "Private";
+    setCleanTitle(`${title} (${props.externalPlatform || "Steam"}) - ${accessLabel}`);
+
+    handleFetchOfficialArtwork(title, true);
+  }, [props.externalGameTitle, props.externalPlatform, props.externalCategory, props.externalPrice]);
 
   // =========================================================================
   // UNIFIED AUTONOMOUS 1-INPUT AI RESEARCH & DESIGN ENGINE
@@ -347,9 +515,9 @@ export default function ThumbnailStudio() {
         if (artJson.primary_bg) {
           setBgUrl(artJson.primary_bg);
         }
-        const sourceLabel = artJson.source === "steam_official_cdn" 
-          ? "Valve Steam CDN" 
-          : "Official Developer Press Kit";
+        const sourceLabel = artJson.source_label || (artJson.source === "steam_official_cdn"
+          ? "Valve Steam CDN"
+          : "Official Developer Press Kit");
         setArtSource(sourceLabel);
       }
 
@@ -445,352 +613,364 @@ export default function ThumbnailStudio() {
   };
 
   // =========================================================================
-  // HIGH-RESOLUTION 1080x1080 CANVAS DOWNLOAD HANDLER
+  // HIGH-RESOLUTION 1080x1080 CANVAS ENGINE & EXPORT SUITE
+  // =========================================================================
+  const renderSlideCanvas = async (slideTarget?: "cover" | "rules"): Promise<HTMLCanvasElement | null> => {
+    const currentSlide = slideTarget || activeSlide;
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080;
+    canvas.height = 1080;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    // 1. Base Solid Frame Color
+    ctx.fillStyle = frameColor;
+    ctx.fillRect(0, 0, 1080, 1080);
+
+    // 2. Header Title at Top Margin (x=54, y=64)
+    const topTitle = currentSlide === "rules" ? "RULES & TERMS" : cleanTitle;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 36px 'Inter', system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(topTitle, 54, 64);
+
+    // 3. Inner Card Clipping Path with Corner Cut (Harmonized to 54,100 -> 1026,1026)
+    // Box: x=54, y=100, w=972, h=926 (Right: 1026, Bottom: 1026)
+    // Crease: (1026, 860) to (860, 1026)
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(54, 100);
+    ctx.lineTo(1026, 100);
+    ctx.lineTo(1026, 860);
+    ctx.lineTo(860, 1026);
+    ctx.lineTo(54, 1026);
+    ctx.closePath();
+    ctx.clip();
+
+    if (currentSlide === "cover") {
+      // Draw Game Artwork with AI Smart Fit Engine
+      await new Promise<void>((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const boxW = 972;
+          const boxH = 926;
+          const imgW = img.width;
+          const imgH = img.height;
+
+          if (fitMode === "ambient_blur") {
+            // --- SMART AMBIENT BLUR FIT (Zero Cropping, 100% Poster Intact) ---
+            // Layer 1: Ambient Blurred Backdrop
+            const bgScale = Math.max(boxW / imgW, boxH / imgH) * 1.2;
+            const bgW = imgW * bgScale;
+            const bgH = imgH * bgScale;
+            const bgX = 54 + (boxW - bgW) / 2;
+            const bgY = 100 + (boxH - bgH) / 2;
+
+            ctx.save();
+            ctx.filter = "blur(28px) brightness(0.6)";
+            ctx.drawImage(img, bgX, bgY, bgW, bgH);
+            ctx.restore();
+
+            // Subtle dark tint over blur
+            ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+            ctx.fillRect(54, 100, boxW, boxH);
+
+            // Layer 2: Center Crisp Poster at Natural Aspect Ratio
+            const scale = Math.min(boxW / imgW, boxH / imgH);
+            const cw = imgW * scale;
+            const ch = imgH * scale;
+            const cx = 54 + (boxW - cw) / 2;
+            const cy = 100 + (boxH - ch) / 2;
+
+            // Soft Drop Shadow behind Center Poster
+            ctx.save();
+            ctx.shadowColor = "rgba(0, 0, 0, 0.65)";
+            ctx.shadowBlur = 24;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 8;
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(cx, cy, cw, ch);
+            ctx.restore();
+
+            // Draw Center Poster Crisp
+            ctx.drawImage(img, cx, cy, cw, ch);
+
+          } else {
+            // --- FOCAL CROP MODE (Full Container Fit with Custom Zoom & Pan) ---
+            const baseScale = Math.max(boxW / imgW, boxH / imgH);
+            const effectiveScale = baseScale * (zoomLevel / 100);
+            const scaledW = imgW * effectiveScale;
+            const scaledH = imgH * effectiveScale;
+
+            let posX = 54 + (boxW - scaledW) / 2;
+            let posY = 100 + (boxH - scaledH) / 2;
+
+            if (focalPosition === "top") {
+              posY = 100;
+            } else if (focalPosition === "bottom") {
+              posY = 100 + (boxH - scaledH);
+            }
+
+            // Apply manual vertical pan offset
+            posY += (panY / 100) * (boxH * 0.3);
+
+            ctx.drawImage(img, posX, posY, scaledW, scaledH);
+          }
+          resolve();
+        };
+        img.onerror = () => {
+          const bgGrad = ctx.createLinearGradient(54, 100, 1026, 1026);
+          bgGrad.addColorStop(0, "#18181b");
+          bgGrad.addColorStop(1, "#09090b");
+          ctx.fillStyle = bgGrad;
+          ctx.fillRect(54, 100, 972, 926);
+          resolve();
+        };
+        img.src = autoProxyUrl(bgUrl);
+      });
+
+    } else {
+      // Slide 2: Rules & Terms White Card
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(54, 100, 972, 926);
+
+      // Draw Typography
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 23px 'Inter', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("1. Ketentuan Garansi", 540, 155);
+
+      ctx.font = "500 17px 'Inter', sans-serif";
+      ctx.fillStyle = "#1f2937";
+      let y = 195;
+      y = drawCanvasWrappedText(ctx, "• Garansi berlaku selama 1 bulan sejak tanggal pembelian.", 540, y, 820, 26, "center");
+      y = drawCanvasWrappedText(ctx, "• Garansi hanya berlaku jika pembeli mematuhi seluruh aturan yang ditetapkan penjual.", 540, y, 820, 26, "center");
+      y = drawCanvasWrappedText(ctx, "• Garansi hangus jika pembeli melakukan pelanggaran terhadap aturan berikut:", 540, y, 820, 26, "center");
+      ctx.font = "500 16px 'Inter', sans-serif";
+      ctx.fillStyle = "#374151";
+      y = drawCanvasWrappedText(ctx, "1. Mengubah negara akun dalam waktu 2-4 minggu setelah pembelian.", 540, y, 820, 24, "center");
+      y = drawCanvasWrappedText(ctx, "2. Melakukan perubahan data penting pada akun tanpa izin penjual.", 540, y, 820, 24, "center");
+      y = drawCanvasWrappedText(ctx, "3. Melakukan tindakan yang dilarang oleh developer game atau marketplace.", 540, y, 820, 24, "center");
+
+      // Section 2
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 23px 'Inter', sans-serif";
+      ctx.fillText("2. Aturan Khusus Akun Game", 540, 420);
+
+      ctx.font = "500 17px 'Inter', sans-serif";
+      ctx.fillStyle = "#1f2937";
+      y = 460;
+      y = drawCanvasWrappedText(ctx, "• Dilarang mengubah negara akun selama minimal 2-4 minggu setelah pembelian. Jika aturan ini dilanggar, garansi otomatis hangus.", 540, y, 820, 26, "center");
+      y = drawCanvasWrappedText(ctx, "• Segala bentuk perubahan data akun (email, password, negara, dsb.) tanpa konfirmasi penjual dapat menyebabkan garansi tidak berlaku.", 540, y, 820, 26, "center");
+      y = drawCanvasWrappedText(ctx, "• Penjual tidak bertanggung jawab atas kerusakan atau kehilangan akses akun akibat pelanggaran aturan ini.", 540, y, 820, 26, "center");
+
+      // Section 3
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 23px 'Inter', sans-serif";
+      ctx.fillText("4. Proses Transaksi & Pengiriman", 540, 645);
+
+      ctx.font = "500 17px 'Inter', sans-serif";
+      ctx.fillStyle = "#1f2937";
+      y = 685;
+      y = drawCanvasWrappedText(ctx, "• Semua transaksi dan komunikasi dilakukan melalui fitur chat resmi marketplace.", 540, y, 820, 26, "center");
+      y = drawCanvasWrappedText(ctx, "• Penjual wajib mengirimkan akun sesuai dengan pesanan dan dalam kondisi sesuai deskripsi.", 540, y, 820, 26, "center");
+      y = drawCanvasWrappedText(ctx, "• Pembeli disarankan segera mengamankan akun setelah menerima data dari penjual", 540, y, 820, 26, "center");
+
+      // Section 4
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 23px 'Inter', sans-serif";
+      ctx.fillText("5. Lain-lain", 540, 810);
+
+      ctx.font = "500 17px 'Inter', sans-serif";
+      ctx.fillStyle = "#1f2937";
+      y = 850;
+      drawCanvasWrappedText(ctx, "Penjual dan pembeli wajib mematuhi seluruh kebijakan marketplace terkait penjualan produk digital dan akun game.", 540, y, 820, 26, "center");
+    }
+
+    // --- COMBINED ANTI-THEFT: INNER OVERLAYS (INSIDE POSTER CLIP) ---
+    if (antiTheftMode !== "off") {
+      // Layer 1: Micro-Security Nano-Text Guilloche Border (Banknote-style microprint)
+      ctx.save();
+      ctx.font = "600 10px 'Courier New', monospace";
+      ctx.fillStyle = currentSlide === "rules" ? "rgba(0, 0, 0, 0.28)" : "rgba(255, 255, 255, 0.35)";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      const microTop = `• ${storeBrandName.toUpperCase()} OFFICIAL LICENSED STORE • AUTHENTIC PRODUCT • DO NOT COPY • `.repeat(4);
+      ctx.fillText(microTop, 62, 106);
+
+      const microBottom = `• SECURED FOR ${storeBrandName.toUpperCase()} • ANTI-FRAUD VERIFIED • ALL RIGHTS RESERVED • `.repeat(3);
+      ctx.fillText(microBottom, 62, 1012);
+      ctx.restore();
+
+      // Layer 3: Anti-AI Watermark Removal Poisoning (Disrupts inpainting AI)
+      if (antiTheftMode === "full") {
+        ctx.save();
+        ctx.translate(540, 560);
+        ctx.rotate((-35 * Math.PI) / 180);
+        const poisonAlpha = (watermarkOpacity / 100) * 0.35;
+        ctx.fillStyle = currentSlide === "rules" ? `rgba(0, 0, 0, ${poisonAlpha * 0.65})` : `rgba(255, 255, 255, ${poisonAlpha})`;
+        ctx.font = "bold 32px 'Inter', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`${storeBrandName.toUpperCase()} • ORIGINAL`, 0, -90);
+        ctx.fillText(`AUTHENTIC PRODUCT • ${storeBrandName.toUpperCase()}`, 0, 90);
+        ctx.restore();
+      }
+    }
+
+    ctx.restore(); // Restore clip from inner card
+
+    // 4. Soft Drop Shadow behind Curled Flap (Fold from 1026,860 to 860,1026 with tip at 860,860)
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetX = -4;
+    ctx.shadowOffsetY = -4;
+    ctx.beginPath();
+    ctx.moveTo(860, 1026);
+    ctx.lineTo(860, 860);
+    ctx.lineTo(1026, 860);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+    ctx.fill();
+    ctx.restore();
+
+    // 5. Curled Fold Flap (Seamless Connection with Poster Cutout)
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(860, 1026);
+    ctx.lineTo(860, 860);
+    ctx.lineTo(1026, 860);
+    ctx.closePath();
+    const flapGrad = ctx.createLinearGradient(940, 940, 860, 860);
+    flapGrad.addColorStop(0, "#d5d5d5");
+    flapGrad.addColorStop(0.35, "#f0f0f0");
+    flapGrad.addColorStop(1, "#ffffff");
+    ctx.fillStyle = flapGrad;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+
+    // 6. Shape-Aware Platform Emblem in Revealed Corner (DRAWN ON TOP OF EVERYTHING!)
+    // Centered at (988, 988), size 92x92 -> (942, 942)
+    const currentBadgeOption = PLATFORM_BADGE_OPTIONS.find(b => b.id === platformBadge) || PLATFORM_BADGE_OPTIONS[0];
+    await new Promise<void>((resolve) => {
+      const platImg = new Image();
+      platImg.onload = () => {
+        ctx.save();
+        const bx = 942;
+        const by = 942;
+        const bw = 92;
+        const bh = 92;
+
+        if (currentBadgeOption.shape === "circle") {
+          ctx.beginPath();
+          ctx.arc(988, 988, 46, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(platImg, bx, by, bw, bh);
+        } else if (currentBadgeOption.shape === "squircle") {
+          ctx.beginPath();
+          ctx.roundRect(bx, by, bw, bh, currentBadgeOption.rx || 18);
+          ctx.clip();
+          ctx.drawImage(platImg, bx, by, bw, bh);
+        } else {
+          ctx.drawImage(platImg, bx, by, bw, bh);
+        }
+        ctx.restore();
+        resolve();
+      };
+      platImg.onerror = () => resolve();
+      platImg.src = currentBadgeOption.asset;
+    });
+
+    // --- COMBINED ANTI-THEFT: OUTER OVERLAYS ---
+    if (antiTheftMode !== "off") {
+      // Layer 2: Holographic Store Trust Seal (Pill Badge at Top-Left)
+      ctx.save();
+      const sealX = 66;
+      const sealY = 114;
+      const sealW = 216;
+      const sealH = 34;
+      const sealAlpha = Math.min(Math.max(watermarkOpacity / 100, 0.3), 0.9);
+
+      ctx.globalAlpha = sealAlpha;
+      // Dark glassy backing
+      ctx.fillStyle = "rgba(10, 15, 29, 0.88)";
+      ctx.beginPath();
+      ctx.roundRect(sealX, sealY, sealW, sealH, 8);
+      ctx.fill();
+
+      // Holographic dynamic stroke
+      const holoGrad = ctx.createLinearGradient(sealX, sealY, sealX + sealW, sealY + sealH);
+      holoGrad.addColorStop(0, "#06b6d4");
+      holoGrad.addColorStop(0.33, "#a855f7");
+      holoGrad.addColorStop(0.66, "#ec4899");
+      holoGrad.addColorStop(1, "#3b82f6");
+      ctx.strokeStyle = holoGrad;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Seal brand name
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 11px 'Inter', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`🛡️ ${storeBrandName.slice(0, 17).toUpperCase()}`, sealX + 10, sealY + sealH / 2);
+
+      // Official tag
+      ctx.fillStyle = "#10b981";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "right";
+      ctx.fillText("VERIFIED", sealX + sealW - 8, sealY + sealH / 2);
+      ctx.restore();
+
+      // Layer 4: Cryptographic Watermark & Digital Fingerprint
+      ctx.save();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.font = "500 10px 'Courier New', monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      const certId = `AUTH-SIG: [${storeBrandName.replace(/\s+/g, '-').toUpperCase()}] • CERT-ID: AKSHARA-1080P-SECURED`;
+      ctx.fillText(certId, 54, 1054);
+      ctx.restore();
+
+      // Steganographic Invisible LSB watermark on 8x8 corner pixels
+      try {
+        const imgData = ctx.getImageData(0, 0, 8, 8);
+        for (let i = 0; i < imgData.data.length; i += 4) {
+          imgData.data[i] = (imgData.data[i] & ~1) | ((i % 2 === 0) ? 1 : 0);
+        }
+        ctx.putImageData(imgData, 0, 0);
+      } catch {
+        // Safe fallback
+      }
+    }
+
+    return canvas;
+  };
+
+  // =========================================================================
+  // DOWNLOAD & CLIPBOARD HANDLERS
   // =========================================================================
   const handleDownloadThumbnail = async (slideTarget?: "cover" | "rules") => {
     const currentSlide = slideTarget || activeSlide;
     setIsDownloading(true);
     try {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1080;
-      canvas.height = 1080;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      const canvas = await renderSlideCanvas(currentSlide);
+      if (!canvas) return;
 
-      // 1. Base Solid Frame Color
-      ctx.fillStyle = frameColor;
-      ctx.fillRect(0, 0, 1080, 1080);
-
-      // 2. Header Title at Top Margin (x=54, y=64)
-      const topTitle = currentSlide === "rules" ? "RULES & TERMS" : cleanTitle;
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 36px 'Inter', system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(topTitle, 54, 64);
-
-      // 3. Inner Card Clipping Path with Corner Cut (Harmonized to 54,100 -> 1026,1026)
-      // Box: x=54, y=100, w=972, h=926 (Right: 1026, Bottom: 1026)
-      // Crease: (1026, 860) to (860, 1026)
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(54, 100);
-      ctx.lineTo(1026, 100);
-      ctx.lineTo(1026, 860);
-      ctx.lineTo(860, 1026);
-      ctx.lineTo(54, 1026);
-      ctx.closePath();
-      ctx.clip();
-
-      if (currentSlide === "cover") {
-        // Draw Game Artwork with AI Smart Fit Engine
-        await new Promise<void>((resolve) => {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => {
-            const boxW = 972;
-            const boxH = 926;
-            const imgW = img.width;
-            const imgH = img.height;
-
-            if (fitMode === "ambient_blur") {
-              // --- SMART AMBIENT BLUR FIT (Zero Cropping, 100% Poster Intact) ---
-              // Layer 1: Ambient Blurred Backdrop
-              const bgScale = Math.max(boxW / imgW, boxH / imgH) * 1.2;
-              const bgW = imgW * bgScale;
-              const bgH = imgH * bgScale;
-              const bgX = 54 + (boxW - bgW) / 2;
-              const bgY = 100 + (boxH - bgH) / 2;
-
-              ctx.save();
-              ctx.filter = "blur(28px) brightness(0.6)";
-              ctx.drawImage(img, bgX, bgY, bgW, bgH);
-              ctx.restore();
-
-              // Subtle dark tint over blur
-              ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
-              ctx.fillRect(54, 100, boxW, boxH);
-
-              // Layer 2: Center Crisp Poster at Natural Aspect Ratio
-              const scale = Math.min(boxW / imgW, boxH / imgH);
-              const cw = imgW * scale;
-              const ch = imgH * scale;
-              const cx = 54 + (boxW - cw) / 2;
-              const cy = 100 + (boxH - ch) / 2;
-
-              // Soft Drop Shadow behind Center Poster
-              ctx.save();
-              ctx.shadowColor = "rgba(0, 0, 0, 0.65)";
-              ctx.shadowBlur = 24;
-              ctx.shadowOffsetX = 0;
-              ctx.shadowOffsetY = 8;
-              ctx.fillStyle = "#000000";
-              ctx.fillRect(cx, cy, cw, ch);
-              ctx.restore();
-
-              // Draw Center Poster Crisp
-              ctx.drawImage(img, cx, cy, cw, ch);
-
-            } else {
-              // --- FOCAL CROP MODE (Full Container Fit with Custom Zoom & Pan) ---
-              const baseScale = Math.max(boxW / imgW, boxH / imgH);
-              const effectiveScale = baseScale * (zoomLevel / 100);
-              const scaledW = imgW * effectiveScale;
-              const scaledH = imgH * effectiveScale;
-
-              let posX = 54 + (boxW - scaledW) / 2;
-              let posY = 100 + (boxH - scaledH) / 2;
-
-              if (focalPosition === "top") {
-                posY = 100;
-              } else if (focalPosition === "bottom") {
-                posY = 100 + (boxH - scaledH);
-              }
-
-              // Apply manual vertical pan offset
-              posY += (panY / 100) * (boxH * 0.3);
-
-              ctx.drawImage(img, posX, posY, scaledW, scaledH);
-            }
-            resolve();
-          };
-          img.onerror = () => {
-            const bgGrad = ctx.createLinearGradient(54, 100, 1026, 1026);
-            bgGrad.addColorStop(0, "#18181b");
-            bgGrad.addColorStop(1, "#09090b");
-            ctx.fillStyle = bgGrad;
-            ctx.fillRect(54, 100, 972, 926);
-            resolve();
-          };
-          img.src = bgUrl;
-        });
-
-      } else {
-        // Slide 2: Rules & Terms White Card
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(54, 100, 972, 926);
-
-        // Draw Typography
-        ctx.fillStyle = "#111827";
-        ctx.font = "bold 23px 'Inter', sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("1. Ketentuan Garansi", 540, 155);
-
-        ctx.font = "500 17px 'Inter', sans-serif";
-        ctx.fillStyle = "#1f2937";
-        let y = 195;
-        y = drawCanvasWrappedText(ctx, "• Garansi berlaku selama 1 bulan sejak tanggal pembelian.", 540, y, 820, 26, "center");
-        y = drawCanvasWrappedText(ctx, "• Garansi hanya berlaku jika pembeli mematuhi seluruh aturan yang ditetapkan penjual.", 540, y, 820, 26, "center");
-        y = drawCanvasWrappedText(ctx, "• Garansi hangus jika pembeli melakukan pelanggaran terhadap aturan berikut:", 540, y, 820, 26, "center");
-        ctx.font = "500 16px 'Inter', sans-serif";
-        ctx.fillStyle = "#374151";
-        y = drawCanvasWrappedText(ctx, "1. Mengubah negara akun dalam waktu 2-4 minggu setelah pembelian.", 540, y, 820, 24, "center");
-        y = drawCanvasWrappedText(ctx, "2. Melakukan perubahan data penting pada akun tanpa izin penjual.", 540, y, 820, 24, "center");
-        y = drawCanvasWrappedText(ctx, "3. Melakukan tindakan yang dilarang oleh developer game atau marketplace.", 540, y, 820, 24, "center");
-
-        // Section 2
-        ctx.fillStyle = "#111827";
-        ctx.font = "bold 23px 'Inter', sans-serif";
-        ctx.fillText("2. Aturan Khusus Akun Game", 540, 420);
-
-        ctx.font = "500 17px 'Inter', sans-serif";
-        ctx.fillStyle = "#1f2937";
-        y = 460;
-        y = drawCanvasWrappedText(ctx, "• Dilarang mengubah negara akun selama minimal 2-4 minggu setelah pembelian. Jika aturan ini dilanggar, garansi otomatis hangus.", 540, y, 820, 26, "center");
-        y = drawCanvasWrappedText(ctx, "• Segala bentuk perubahan data akun (email, password, negara, dsb.) tanpa konfirmasi penjual dapat menyebabkan garansi tidak berlaku.", 540, y, 820, 26, "center");
-        y = drawCanvasWrappedText(ctx, "• Penjual tidak bertanggung jawab atas kerusakan atau kehilangan akses akun akibat pelanggaran aturan ini.", 540, y, 820, 26, "center");
-
-        // Section 3
-        ctx.fillStyle = "#111827";
-        ctx.font = "bold 23px 'Inter', sans-serif";
-        ctx.fillText("4. Proses Transaksi & Pengiriman", 540, 645);
-
-        ctx.font = "500 17px 'Inter', sans-serif";
-        ctx.fillStyle = "#1f2937";
-        y = 685;
-        y = drawCanvasWrappedText(ctx, "• Semua transaksi dan komunikasi dilakukan melalui fitur chat resmi marketplace.", 540, y, 820, 26, "center");
-        y = drawCanvasWrappedText(ctx, "• Penjual wajib mengirimkan akun sesuai dengan pesanan dan dalam kondisi sesuai deskripsi.", 540, y, 820, 26, "center");
-        y = drawCanvasWrappedText(ctx, "• Pembeli disarankan segera mengamankan akun setelah menerima data dari penjual", 540, y, 820, 26, "center");
-
-        // Section 4
-        ctx.fillStyle = "#111827";
-        ctx.font = "bold 23px 'Inter', sans-serif";
-        ctx.fillText("5. Lain-lain", 540, 810);
-
-        ctx.font = "500 17px 'Inter', sans-serif";
-        ctx.fillStyle = "#1f2937";
-        y = 850;
-        drawCanvasWrappedText(ctx, "Penjual dan pembeli wajib mematuhi seluruh kebijakan marketplace terkait penjualan produk digital dan akun game.", 540, y, 820, 26, "center");
-      }
-
-      // --- COMBINED ANTI-THEFT: INNER OVERLAYS (INSIDE POSTER CLIP) ---
-      if (antiTheftMode !== "off") {
-        // Layer 1: Micro-Security Nano-Text Guilloche Border (Banknote-style microprint)
-        ctx.save();
-        ctx.font = "600 10px 'Courier New', monospace";
-        ctx.fillStyle = currentSlide === "rules" ? "rgba(0, 0, 0, 0.28)" : "rgba(255, 255, 255, 0.35)";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "top";
-        const microTop = `• ${storeBrandName.toUpperCase()} OFFICIAL LICENSED STORE • AUTHENTIC PRODUCT • DO NOT COPY • `.repeat(4);
-        ctx.fillText(microTop, 62, 106);
-
-        const microBottom = `• SECURED FOR ${storeBrandName.toUpperCase()} • ANTI-FRAUD VERIFIED • ALL RIGHTS RESERVED • `.repeat(3);
-        ctx.fillText(microBottom, 62, 1012);
-        ctx.restore();
-
-        // Layer 3: Anti-AI Watermark Removal Poisoning (Disrupts inpainting AI)
-        if (antiTheftMode === "full") {
-          ctx.save();
-          ctx.translate(540, 560);
-          ctx.rotate((-35 * Math.PI) / 180);
-          const poisonAlpha = (watermarkOpacity / 100) * 0.35;
-          ctx.fillStyle = currentSlide === "rules" ? `rgba(0, 0, 0, ${poisonAlpha * 0.65})` : `rgba(255, 255, 255, ${poisonAlpha})`;
-          ctx.font = "bold 32px 'Inter', sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText(`${storeBrandName.toUpperCase()} • ORIGINAL`, 0, -90);
-          ctx.fillText(`AUTHENTIC PRODUCT • ${storeBrandName.toUpperCase()}`, 0, 90);
-          ctx.restore();
-        }
-      }
-
-      ctx.restore(); // Restore clip from inner card
-
-      // 4. Soft Drop Shadow behind Curled Flap (Fold from 1026,860 to 860,1026 with tip at 860,860)
-      ctx.save();
-      ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
-      ctx.shadowBlur = 14;
-      ctx.shadowOffsetX = -4;
-      ctx.shadowOffsetY = -4;
-      ctx.beginPath();
-      ctx.moveTo(860, 1026);
-      ctx.lineTo(860, 860);
-      ctx.lineTo(1026, 860);
-      ctx.closePath();
-      ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
-      ctx.fill();
-      ctx.restore();
-
-      // 5. Curled Fold Flap (Seamless Connection with Poster Cutout)
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(860, 1026);
-      ctx.lineTo(860, 860);
-      ctx.lineTo(1026, 860);
-      ctx.closePath();
-      const flapGrad = ctx.createLinearGradient(940, 940, 860, 860);
-      flapGrad.addColorStop(0, "#d5d5d5");
-      flapGrad.addColorStop(0.35, "#f0f0f0");
-      flapGrad.addColorStop(1, "#ffffff");
-      ctx.fillStyle = flapGrad;
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.restore();
-
-      // 6. Shape-Aware Platform Emblem in Revealed Corner (DRAWN ON TOP OF EVERYTHING!)
-      // Centered at (988, 988), size 92x92 -> (942, 942)
-      const currentBadgeOption = PLATFORM_BADGE_OPTIONS.find(b => b.id === platformBadge) || PLATFORM_BADGE_OPTIONS[0];
-      await new Promise<void>((resolve) => {
-        const platImg = new Image();
-        platImg.onload = () => {
-          ctx.save();
-          const bx = 942;
-          const by = 942;
-          const bw = 92;
-          const bh = 92;
-
-          if (currentBadgeOption.shape === "circle") {
-            ctx.beginPath();
-            ctx.arc(988, 988, 46, 0, Math.PI * 2);
-            ctx.clip();
-            ctx.drawImage(platImg, bx, by, bw, bh);
-          } else if (currentBadgeOption.shape === "squircle") {
-            ctx.beginPath();
-            ctx.roundRect(bx, by, bw, bh, currentBadgeOption.rx || 18);
-            ctx.clip();
-            ctx.drawImage(platImg, bx, by, bw, bh);
-          } else {
-            ctx.drawImage(platImg, bx, by, bw, bh);
-          }
-          ctx.restore();
-          resolve();
-        };
-        platImg.onerror = () => resolve();
-        platImg.src = currentBadgeOption.asset;
-      });
-
-      // --- COMBINED ANTI-THEFT: OUTER OVERLAYS ---
-      if (antiTheftMode !== "off") {
-        // Layer 2: Holographic Store Trust Seal (Pill Badge at Top-Left)
-        ctx.save();
-        const sealX = 66;
-        const sealY = 114;
-        const sealW = 216;
-        const sealH = 34;
-        const sealAlpha = Math.min(Math.max(watermarkOpacity / 100, 0.3), 0.9);
-
-        ctx.globalAlpha = sealAlpha;
-        // Dark glassy backing
-        ctx.fillStyle = "rgba(10, 15, 29, 0.88)";
-        ctx.beginPath();
-        ctx.roundRect(sealX, sealY, sealW, sealH, 8);
-        ctx.fill();
-
-        // Holographic dynamic stroke
-        const holoGrad = ctx.createLinearGradient(sealX, sealY, sealX + sealW, sealY + sealH);
-        holoGrad.addColorStop(0, "#06b6d4");
-        holoGrad.addColorStop(0.33, "#a855f7");
-        holoGrad.addColorStop(0.66, "#ec4899");
-        holoGrad.addColorStop(1, "#3b82f6");
-        ctx.strokeStyle = holoGrad;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Seal brand name
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 11px 'Inter', sans-serif";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.fillText(`🛡️ ${storeBrandName.slice(0, 17).toUpperCase()}`, sealX + 10, sealY + sealH / 2);
-
-        // Official tag
-        ctx.fillStyle = "#10b981";
-        ctx.font = "bold 9px monospace";
-        ctx.textAlign = "right";
-        ctx.fillText("VERIFIED", sealX + sealW - 8, sealY + sealH / 2);
-        ctx.restore();
-
-        // Layer 4: Cryptographic Watermark & Digital Fingerprint
-        ctx.save();
-        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-        ctx.font = "500 10px 'Courier New', monospace";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        const certId = `AUTH-SIG: [${storeBrandName.replace(/\s+/g, '-').toUpperCase()}] • CERT-ID: AKSHARA-1080P-SECURED`;
-        ctx.fillText(certId, 54, 1054);
-        ctx.restore();
-
-        // Steganographic Invisible LSB watermark on 8x8 corner pixels
-        try {
-          const imgData = ctx.getImageData(0, 0, 8, 8);
-          for (let i = 0; i < imgData.data.length; i += 4) {
-            imgData.data[i] = (imgData.data[i] & ~1) | ((i % 2 === 0) ? 1 : 0);
-          }
-          ctx.putImageData(imgData, 0, 0);
-        } catch {
-          // Safe fallback
-        }
-      }
-
-      // Download PNG
       const dataUrl = canvas.toDataURL("image/png");
       const a = document.createElement("a");
       a.href = dataUrl;
-      const fileSlug = activePreset || "game";
+      const fileSlug = (activePreset || gameTitle || "game").toLowerCase().replace(/[^a-z0-9]+/g, "-");
       const slideSlug = currentSlide === "rules" ? "slide2-rules-garansi" : "slide1-cover-utama";
       a.download = `akshara-${fileSlug}-${slideSlug}-1080x1080.png`;
       a.click();
+
+      props.onCoverDownloaded?.();
 
       setToastMessage(`✅ Berhasil mengunduh ${currentSlide === "rules" ? "Slide 2 (Rules & Terms)" : "Slide 1 (Cover Game)"} 1080x1080 PNG!`);
       setTimeout(() => setToastMessage(null), 4000);
@@ -801,11 +981,68 @@ export default function ThumbnailStudio() {
     }
   };
 
+  const handleCopyImageToClipboard = async () => {
+    setIsCopyingImage(true);
+    try {
+      const canvas = await renderSlideCanvas(activeSlide);
+      if (!canvas) throw new Error("Gagal merender canvas");
+
+      await new Promise<void>((resolve, reject) => {
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            reject(new Error("Gagal mengekspor gambar ke blob"));
+            return;
+          }
+          try {
+            if (navigator.clipboard && typeof ClipboardItem !== "undefined") {
+              await navigator.clipboard.write([
+                new ClipboardItem({ "image/png": blob })
+              ]);
+              props.onCoverDownloaded?.();
+              setToastMessage("📋 Cover berhasil disalin ke clipboard! Siap dipaste (Ctrl+V) ke Shopee Seller Center.");
+              setTimeout(() => setToastMessage(null), 4000);
+              resolve();
+            } else {
+              // Fallback jika ClipboardItem tidak didukung browser
+              const dataUrl = canvas.toDataURL("image/png");
+              const a = document.createElement("a");
+              a.href = dataUrl;
+              a.download = `akshara-${(gameTitle || "game").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-cover.png`;
+              a.click();
+              props.onCoverDownloaded?.();
+              setToastMessage("📋 Fitur salin gambar langsung tidak didukung browser. Cover otomatis diunduh!");
+              setTimeout(() => setToastMessage(null), 4000);
+              resolve();
+            }
+          } catch (clipErr) {
+            console.warn("ClipboardItem write failed, fallback download:", clipErr);
+            const dataUrl = canvas.toDataURL("image/png");
+            const a = document.createElement("a");
+            a.href = dataUrl;
+            a.download = `akshara-${(gameTitle || "game").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-cover.png`;
+            a.click();
+            props.onCoverDownloaded?.();
+            setToastMessage("📋 Cover otomatis diunduh sebagai alternatif clipboard!");
+            setTimeout(() => setToastMessage(null), 4000);
+            resolve();
+          }
+        }, "image/png");
+      });
+    } catch (err) {
+      console.error("Gagal menyalin gambar:", err);
+      setToastMessage("Gagal menyalin gambar ke clipboard.");
+      setTimeout(() => setToastMessage(null), 3000);
+    } finally {
+      setIsCopyingImage(false);
+    }
+  };
+
   // Download both slides sequentially
   const handleDownloadBothSlides = async () => {
     await handleDownloadThumbnail("cover");
     setTimeout(async () => {
       await handleDownloadThumbnail("rules");
+      props.onCoverDownloaded?.();
     }, 1200);
   };
 
@@ -827,51 +1064,96 @@ export default function ThumbnailStudio() {
       )}
 
       {/* ========================================================================= */}
-      {/* INNOVATIVE AUTONOMOUS AI DESIGN COMMAND BAR (1-INPUT STUDIO)              */}
-      {/* User types any game/product -> AI handles research, artwork, palette,    */}
-      {/* platform emblem, title formatting, and rules automatically.              */}
+      {/* AUTONOMOUS AI DESIGN COMMAND BAR / COMPACT LAUNCHPAD STRIP                */}
       {/* ========================================================================= */}
-      <div className="app-card p-6 space-y-4">
-        {/* Header bar with Quick Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+      {props.compact ? (
+        <div className="app-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm">
-              <Wand2 className="w-4 h-4" />
-            </div>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <div>
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <span>AI Thumbnail Studio</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
-                  Autonomous 1-Input Engine
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500">
-                Ketik nama game / produk apa saja. AI otomatis meriset cover resmi, warna bingkai, logo brand, dan aturan garansi.
-              </p>
+              <span className="font-bold text-slate-900">
+                Studio Cover 1080x1080: <strong className="text-emerald-700">{gameTitle}</strong>
+              </span>
+              <span className="text-slate-500 text-[11px] ml-2 font-mono">
+                [{platformBadge.toUpperCase()} • {availableArtworks.length} {artSource || "Official Artwork"}]
+              </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <button
               type="button"
-              onClick={() => setShowSampleModal(true)}
-              className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors"
+              onClick={() => handleCopyImageToClipboard()}
+              disabled={isDownloading || isCopyingImage}
+              className="px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
             >
-              <Eye className="w-3.5 h-3.5 text-slate-600" />
-              <span>Sampel Asli SMA</span>
+              <Copy className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{isCopyingImage ? "Menyalin..." : "Salin Gambar"}</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleDownloadThumbnail()}
-              disabled={isDownloading}
+              disabled={isDownloading || isCopyingImage}
               className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{isDownloading ? "Merender..." : "Download 1080x1080 PNG"}</span>
+              <span>{isDownloading ? "Merender..." : "Download PNG"}</span>
             </button>
           </div>
         </div>
+      ) : (
+        <div className="app-card p-6 space-y-4">
+          {/* Header bar with Quick Actions */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm">
+                <Wand2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>AI Thumbnail Studio</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                    Autonomous 1-Input Engine
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Ketik nama game / produk apa saja. AI otomatis meriset cover resmi, warna bingkai, logo brand, dan aturan garansi.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setShowSampleModal(true)}
+                className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors"
+              >
+                <Eye className="w-3.5 h-3.5 text-slate-600" />
+                <span>Sampel Asli SMA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleCopyImageToClipboard()}
+                disabled={isDownloading || isCopyingImage}
+                className="px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
+              >
+                <Copy className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{isCopyingImage ? "Menyalin..." : "Salin Gambar"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDownloadThumbnail()}
+                disabled={isDownloading || isCopyingImage}
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{isDownloading ? "Merender..." : "Download 1080x1080 PNG"}</span>
+              </button>
+            </div>
+          </div>
 
         {/* Command Search Input Bar */}
         <div className="space-y-3">
@@ -1014,6 +1296,7 @@ export default function ThumbnailStudio() {
           </div>
         )}
       </div>
+      )}
 
       {/* ========================================================================= */}
       {/* SLIDE SWITCHER TABS: SLIDE 1 (COVER GAME) vs SLIDE 2 (RULES & TERMS)       */}
@@ -1085,7 +1368,7 @@ export default function ThumbnailStudio() {
                   className="text-[10px] font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 transition-colors"
                 >
                   <Search className="w-2.5 h-2.5" />
-                  <span>{isSearchingArt ? "Mencari..." : "Cari Steam CDN"}</span>
+                  <span>{isSearchingArt ? "Mencari..." : "Cari Cover Resmi"}</span>
                 </button>
               </div>
               <input
@@ -1105,10 +1388,10 @@ export default function ThumbnailStudio() {
               <div className="flex items-center justify-between">
                 <label className="text-slate-800 font-semibold flex items-center gap-1.5">
                   <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px] font-bold">2</span>
-                  Pilih Cover Resmi (Non-AI)
+                  Pilih Cover Resmi (Multi-Sumber)
                 </label>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="w-2.5 h-2.5" /> 100% Asli Steam
+                  <CheckCircle2 className="w-2.5 h-2.5" /> {artSource || "Official Artwork"}
                 </span>
               </div>
 
@@ -1117,7 +1400,7 @@ export default function ThumbnailStudio() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
                     <span>{availableArtworks.length} Pilihan Artwork Resmi:</span>
-                    <span className="text-emerald-700 font-bold">{artSource || "Steam Store CDN"}</span>
+                    <span className="text-emerald-700 font-bold">{artSource || "Multi-Source Official"}</span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
@@ -1169,19 +1452,39 @@ export default function ThumbnailStudio() {
                   className="w-full py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-200 shadow-sm"
                 >
                   <Search className={`w-3.5 h-3.5 text-emerald-600 ${isSearchingArt ? "animate-spin" : ""}`} />
-                  <span>Ambil Poster Resmi dari Steam CDN</span>
+                  <span>Ambil Cover Resmi (Multi-Sumber)</span>
                 </button>
               )}
 
-              {/* Custom Image URL / Upload input */}
-              <div className="pt-1">
-                <input
-                  type="text"
-                  value={bgUrl}
-                  onChange={(e) => setBgUrl(e.target.value)}
-                  placeholder="Atau tempel URL gambar custom (JPG / PNG)"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 text-[11px] text-slate-700 focus:outline-none focus:border-emerald-500"
-                />
+              {/* Custom Image URL / Upload / Paste Controls */}
+              <div className="pt-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={bgUrl}
+                    onChange={(e) => {
+                      const val = e.target.value.trim();
+                      setBgUrl(val);
+                      if (val) setArtSource("Custom Image URL");
+                    }}
+                    placeholder="Atau tempel URL gambar custom (JPG / PNG / WebP)"
+                    className="flex-1 bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-700 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                  <label className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-medium text-[11px] flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0">
+                    <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Upload File</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-slate-500 px-1">
+                  <span>💡 Tips: Anda juga bisa copy gambar dari web lalu tekan <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 font-mono font-bold">Ctrl+V</kbd> untuk paste instan!</span>
+                </div>
               </div>
             </div>
 
@@ -1672,7 +1975,7 @@ export default function ThumbnailStudio() {
                       <>
                         {/* Layer 1: Ambient Blurred Background */}
                         <image 
-                          href={bgUrl} 
+                          href={autoProxyUrl(bgUrl)} 
                           x="54" 
                           y="100" 
                           width="972" 
@@ -1684,7 +1987,7 @@ export default function ThumbnailStudio() {
 
                         {/* Layer 2: Center Crisp Artwork at Natural Aspect Ratio */}
                         <image 
-                          href={bgUrl} 
+                          href={autoProxyUrl(bgUrl)} 
                           x="54" 
                           y="100" 
                           width="972" 
@@ -1696,7 +1999,7 @@ export default function ThumbnailStudio() {
                     ) : (
                       /* Focal Crop Mode */
                       <image 
-                        href={bgUrl} 
+                        href={autoProxyUrl(bgUrl)} 
                         x="54" 
                         y={100 + (panY * 2)} 
                         width="972" 
@@ -1925,8 +2228,19 @@ export default function ThumbnailStudio() {
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
+                  onClick={() => handleCopyImageToClipboard()}
+                  disabled={isDownloading || isCopyingImage}
+                  className="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
+                  title="Salin gambar langsung ke clipboard"
+                >
+                  <Copy className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{isCopyingImage ? "Menyalin..." : "Salin Gambar"}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleDownloadThumbnail()}
-                  disabled={isDownloading}
+                  disabled={isDownloading || isCopyingImage}
                   className="flex-1 sm:flex-initial px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-50"
                 >
                   <Download className="w-4 h-4" />
@@ -1938,36 +2252,38 @@ export default function ThumbnailStudio() {
           </div>
 
           {/* Quick Showcase Card: Compare with Original High School Sample */}
-          <div className="app-card p-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 flex-shrink-0 shadow-xs">
-                <img 
-                  src="/samples/test_recreated_sample.png" 
-                  alt="Sample Mockup" 
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div>
-                <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                  <span>Reinkarnasi Edisi SMA Otentik</span>
-                  <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    Signature
-                  </span>
+          {!props.compact && (
+            <div className="app-card p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 flex-shrink-0 shadow-xs">
+                  <img 
+                    src="/samples/test_recreated_sample.png" 
+                    alt="Sample Mockup" 
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Desain bersih, minimalis, dan elegan. Tidak ada stiker atau pita neon yang mengganggu artwork game.
-                </p>
+                <div>
+                  <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>Reinkarnasi Edisi SMA Otentik</span>
+                    <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      Signature
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Desain bersih, minimalis, dan elegan. Tidak ada stiker atau pita neon yang mengganggu artwork game.
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={() => setShowSampleModal(true)}
-              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium whitespace-nowrap transition-colors"
-            >
-              Perbesar
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => setShowSampleModal(true)}
+                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium whitespace-nowrap transition-colors"
+              >
+                Perbesar
+              </button>
+            </div>
+          )}
 
         </div>
 

@@ -115,7 +115,7 @@ Format Output Wajib JSON Murni:
 
     try {
       const userPrompt = `Daftar ${orderCount} Pesanan Shopee Digital:\n${JSON.stringify(orders, null, 2)}`;
-      const aiResponse = await callGemini(userPrompt, systemPrompt);
+      const aiResponse = await callGemini(userPrompt, systemPrompt, { jsonMode: true });
 
       let cleaned = aiResponse.trim();
       if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);

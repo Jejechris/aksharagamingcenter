@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getG2GSellerUrl } from '@/lib/g2g';
 import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
+import GameSelectorCombobox from '@/app/components/GameSelectorCombobox';
 
 interface SellerOption {
   id: string;
@@ -723,52 +724,37 @@ function QuantCalculatorContent() {
           </div>
         </div>
 
-        {/* Horizontal Game Presets Bar */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-emerald-600" /> Presets Game Portofolio:
-            </span>
-            <Link href="/dashboard/catalog" className="text-xs font-semibold text-emerald-700 hover:text-emerald-800">
-              + Tambah di Katalog &rarr;
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {presets.length === 0 ? (
-              <div className="app-card p-3 bg-white text-xs text-slate-500 w-full flex items-center justify-between">
-                <span>Portofolio katalog masih kosong.</span>
-                <Link href="/dashboard/catalog" className="text-xs font-semibold text-emerald-700 underline">
-                  Buka Radar Katalog
-                </Link>
-              </div>
-            ) : (
-              presets.map((p) => {
-                const live = catalogGames.find(g => g.id === p.catalogId || g.title.toLowerCase().includes(p.id));
-                const displayPrice = live ? live.selling_price_shopee_idr : p.price;
-                const displayMargin = live ? live.target_margin_pct : p.margin;
-                const isSelected = activePreset === p.id || currentGameId === p.catalogId;
-
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => handlePreset(p)}
-                    className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-xs transition-all border text-left cursor-pointer ${
-                      isSelected
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold shadow-xs'
-                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="truncate max-w-[160px] font-semibold">{p.title.split(':')[0]}</div>
-                    <div className="flex items-center gap-2 mt-0.5 font-mono text-[11px] tabular-nums">
-                      <span className={isSelected ? 'text-emerald-700' : 'text-slate-500'}>{formatRp(displayPrice)}</span>
-                      <span className={isSelected ? 'text-emerald-800 font-bold' : 'text-slate-400'}>{displayMargin}%</span>
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
+        {/* Smart Searchable Game Portfolio Selector */}
+        <div className="animate-fade-up">
+          {catalogGames.length === 0 ? (
+            <div className="app-card p-3 bg-white text-xs text-slate-500 w-full flex items-center justify-between">
+              <span>Portofolio katalog masih kosong.</span>
+              <Link href="/dashboard/catalog" className="text-xs font-semibold text-emerald-700 underline">
+                Buka Radar Katalog
+              </Link>
+            </div>
+          ) : (
+            <GameSelectorCombobox
+              label="Pilih Game Portofolio"
+              actionLink={{ label: "+ Tambah di Katalog →", href: "/dashboard/catalog" }}
+              games={catalogGames}
+              selectedGameId={currentGameId}
+              selectedGameTitle={gameTitle}
+              onSelect={(selected) => {
+                const p = presets.find((pr) => pr.catalogId === selected.id) || {
+                  id: selected.id,
+                  catalogId: selected.id,
+                  title: selected.title,
+                  platform: selected.platform,
+                  category: selected.category,
+                  price: selected.selling_price_shopee_idr,
+                  margin: selected.target_margin_pct,
+                  sellers: selected.sellers,
+                };
+                handlePreset(p);
+              }}
+            />
+          )}
         </div>
 
         {/* Mode Switcher */}
@@ -802,41 +788,12 @@ function QuantCalculatorContent() {
           <div className="lg:col-span-8 space-y-6">
             
             {/* Card 1: Identitas Game & Lisensi */}
-            <div className="app-card p-5 space-y-4 bg-white">
+            <div className="app-card animate-fade-up p-5 space-y-4 bg-white">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                 <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <Tag className="w-4 h-4 text-emerald-600" /> Identitas Game & Lisensi
                 </h2>
                 <div className="flex items-center gap-2">
-                  {catalogGames.length > 0 && (
-                    <select
-                      value={currentGameId}
-                      onChange={(e) => {
-                        const selected = catalogGames.find(g => g.id === e.target.value);
-                        if (selected) {
-                          const p = presets.find(pr => pr.catalogId === selected.id) || {
-                            id: selected.id,
-                            catalogId: selected.id,
-                            title: selected.title,
-                            platform: selected.platform,
-                            category: selected.category,
-                            price: selected.selling_price_shopee_idr,
-                            margin: selected.target_margin_pct,
-                            sellers: selected.sellers
-                          };
-                          handlePreset(p);
-                        }
-                      }}
-                      className="text-xs font-medium bg-slate-50 border border-slate-200 text-slate-800 px-2.5 py-1 rounded-lg focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="" disabled>-- Pilih Game dari Portofolio --</option>
-                      {catalogGames.map(g => (
-                        <option key={g.id} value={g.id}>
-                          {g.title} ({formatRp(g.selling_price_shopee_idr)})
-                        </option>
-                      ))}
-                    </select>
-                  )}
                   <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                     ID: {currentGameId || 'NEW'}
                   </span>
@@ -1136,7 +1093,7 @@ function QuantCalculatorContent() {
                               {s.tier === 'ultra_safe' ? 'Tier 1' : s.tier === 'lowest_price' ? 'Tier 2' : 'Tier 3'}
                             </span>
                             <span className="text-[11px] text-slate-500 font-mono">
-                              ⭐ {s.rating_pct}% ({s.reviews.toLocaleString()} ulasan)
+                              ⭐ {s.rating_pct}% ({s.reviews.toLocaleString("id-ID")} ulasan)
                             </span>
                           </div>
                           <div className="text-[11px] text-slate-500 font-mono flex items-center gap-3">
@@ -1311,7 +1268,7 @@ function QuantCalculatorContent() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight tabular-nums">
-                    {neededTx.toLocaleString()}
+                    {neededTx.toLocaleString("id-ID")}
                   </div>
                   <div className="text-[11px] text-slate-400 font-sans">Total Transaksi</div>
                 </div>

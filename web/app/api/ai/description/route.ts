@@ -81,7 +81,7 @@ KEUNGGULAN BELI DI AKSHARA GAMING:
 - ONLINE MULTIPLAYER RESMI: Bebas main online di seluruh server resmi publik & private.
 - PERMANEN MILIK ANDA: Akun/Lisensi aktif selamanya, bukan sewa bulanan.
 - PENGIRIMAN KILAT: Detail akun/lisensi dikirimkan secara cepat & aman via chat setelah order.
-${includePhysicalCard ? "- BONUS KARTU GARANSI FISIK: Dilengkapi Kartu Garansi Resmi A6 (Art Carton 260gsm) berpita hologram & QR Code verifikasi serial terdaftar!\n" : ""}${customNotes ? `CATATAN TAMBAHAN: ${customNotes}\n` : ""}
+${includePhysicalCard ? "- BONUS SERTIFIKAT GARANSI DIGITAL: Dilengkapi Kartu Garansi Digital Resmi dengan kode QR verifikasi serial terdaftar!\n" : ""}${customNotes ? `CATATAN TAMBAHAN: ${customNotes}\n` : ""}
 ==================================================
 ${includeActivationSteps ? `3 LANGKAH MUDAH AKTIVASI:
 1. Selesaikan pembayaran di Shopee dan cek chat Shopee Anda.
@@ -269,7 +269,7 @@ ${customNotes ? `- Catatan Khusus Seller: ${customNotes}` : ""}
 Pastikan formatnya sangat rapi dan siap langsung di-paste ke Seller Centre Shopee!`;
 
     try {
-      const rawAiText = await callGemini(userPrompt, systemPrompt);
+      const rawAiText = await callGemini(userPrompt, systemPrompt, { jsonMode: true });
       const cleanJson = rawAiText.replace(/^```json/g, "").replace(/^```/g, "").replace(/```$/g, "").trim();
       const parsed = JSON.parse(cleanJson);
 

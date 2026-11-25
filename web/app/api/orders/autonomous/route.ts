@@ -58,7 +58,7 @@ function getOrders(): any[] {
   return inMemoryOrdersCache;
 }
 
-function saveOrders(orders: any[]) {
+async function saveOrders(orders: any[]): Promise<void> {
   inMemoryOrdersCache = orders;
   const content = JSON.stringify(orders, null, 2);
   try {
@@ -79,7 +79,29 @@ function saveOrders(orders: any[]) {
   } catch (e) {
     // best-effort for local output
   }
-  setKV("autonomous_orders", orders).catch(() => {});
+  try {
+    await setKV("autonomous_orders", orders);
+  } catch (e) {
+    console.warn("KV saveOrders warning:", e);
+  }
+}
+
+async function loadOrdersAuthoritative(): Promise<any[]> {
+  try {
+    const dbOrders = await getDbOrders();
+    if (dbOrders !== null && dbOrders.length > 0) {
+      inMemoryOrdersCache = dbOrders;
+      return dbOrders;
+    }
+    const kvOrders = await getKV("autonomous_orders");
+    if (kvOrders && Array.isArray(kvOrders) && kvOrders.length > 0) {
+      inMemoryOrdersCache = kvOrders;
+      return kvOrders;
+    }
+  } catch (e) {
+    console.warn("loadOrdersAuthoritative DB/KV notice:", e);
+  }
+  return getOrders();
 }
 
 function generateAutonomousMessages(params: {
@@ -117,11 +139,11 @@ Halo *${buyer_name}*! Terima kasih banyak sudah order di Akshara Gaming Center. 
 2. Login menggunakan data akun yang tertera di atas.
 3. Segera ubah email pemulihan & password ke milik pribadi Anda agar 100% aman permanen!
 
-📦 *Pemberitahuan garansi digital:*
-garansi digital resmi bersegel berisi *garansi digital (Art Carton 260gsm)* berpita hologram sedang dalam proses pengiriman via kurir pilihan Anda.
+🛡️ *Pemberitahuan Layanan Digital:*
+Seluruh produk dikirimkan 100% secara digital & instan tanpa pengiriman paket fisik. Garansi toko resmi aktif otomatis sejak data lisensi Anda terima.
 
 ⚠️ *SOP Garansi Toko:*
-Mohon rekam screenshot kendala garansi digital tanpa jeda (no-cut & unedited) saat paket tiba untuk keperluan validasi klaim jika ada kendala.
+Mohon rekam video layar (*screen recording*) tanpa jeda (no-cut & unedited) mulai dari saat membuka data kredensial hingga proses login pertama kali untuk keperluan validasi klaim jika ada kendala.
 
 Ada kendala login? Silakan balas chat ini, Customer Care Akshara siap mendampingi 24/7.
 Selamat bermain! 🔥🎮`;
@@ -151,11 +173,11 @@ PANDUAN SINGKAT SETUP:
 2. Masuk ke pengaturan akun dan ubah email serta password ke data pribadi Anda.
 3. Game langsung siap diunduh dan dimainkan.
 
-
-garansi digital resmi berisi garansi digital berpita hologram saat ini sedang diproses oleh ekspedisi pilihan Anda di Shopee.
+LAYANAN FULL DIGITAL:
+Produk lisensi ini dikirimkan 100% secara digital (instant digital delivery) tanpa pengiriman paket fisik. Garansi resmi toko aktif otomatis sejak kredensial Anda terima.
 
 SOP KLAIM GARANSI:
-Untuk kenyamanan bersama, harap merekam screenshot kendala garansi digital tanpa terputus (no-cut) saat paket tiba.
+Untuk kenyamanan bersama, harap merekam video layar (screen recording) tanpa terputus (no-cut) mulai dari saat membuka data kredensial hingga mencoba login pertama kali di launcher resmi.
 
 Jika membutuhkan bantuan teknis, silakan balas email ini atau hubungi WhatsApp Customer Care Akshara Gaming.
 
@@ -169,20 +191,7 @@ Akshara Gaming Center Official`;
 
 export async function GET() {
   try {
-    const dbOrders = await getDbOrders();
-    let orders: any[];
-    if (dbOrders !== null && dbOrders.length > 0) {
-      orders = dbOrders;
-      inMemoryOrdersCache = dbOrders;
-    } else {
-      const kvOrders = await getKV("autonomous_orders");
-      if (kvOrders && Array.isArray(kvOrders) && kvOrders.length > 0) {
-        orders = kvOrders;
-        inMemoryOrdersCache = kvOrders;
-      } else {
-        orders = getOrders();
-      }
-    }
+    const orders = await loadOrdersAuthoritative();
     const totalOrders = orders.length;
     const dispatchedWA = orders.filter((o: any) => o.dispatched_channels?.includes("WhatsApp")).length;
     const dispatchedGmail = orders.filter((o: any) => o.dispatched_channels?.includes("Gmail")).length;
@@ -256,7 +265,7 @@ async function claimFromVaultUnified(gameTitle: string, orderId: string): Promis
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const orders = getOrders();
+    const orders = await loadOrdersAuthoritative();
 
     const timestamp = new Date();
     const dateFormatted = timestamp.toISOString().replace("T", " ").substring(0, 19);
@@ -335,8 +344,8 @@ export async function POST(req: Request) {
 
     // Prepend new order to list
     orders.unshift(newOrder);
-    saveOrders(orders);
     await saveDbOrder(newOrder);
+    await saveOrders(orders);
 
     return NextResponse.json({
       status: "success",
@@ -353,7 +362,7 @@ export async function PATCH(req: Request) {
     const body = await req.json();
     const { id, action, channel } = body;
 
-    const orders = getOrders();
+    const orders = await loadOrdersAuthoritative();
     const targetIdx = orders.findIndex((o: any) => o.id === id || o.order_id === id);
 
     if (targetIdx === -1) {
@@ -376,8 +385,8 @@ export async function PATCH(req: Request) {
       order.status = "PROCESSED";
     }
 
-    saveOrders(orders);
     await saveDbOrder(order);
+    await saveOrders(orders);
 
     return NextResponse.json({
       status: "success",
@@ -398,10 +407,10 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ status: "error", message: "ID order dibutuhkan" }, { status: 400 });
     }
 
-    let orders = getOrders();
+    let orders = await loadOrdersAuthoritative();
     orders = orders.filter((o: any) => o.id !== id && o.order_id !== id);
-    saveOrders(orders);
     await deleteDbOrder(id);
+    await saveOrders(orders);
 
     return NextResponse.json({
       status: "success",

@@ -4,7 +4,7 @@
  * 100% Real, Faktual, dan Live Time tanpa data fiktif atau perkiraan.
  */
 
-import { resolveG2GProductUrl } from "@/lib/g2g";
+import { resolveG2GProductUrl, getG2GDirectOfferUrl, getG2GGameCategoryUrl } from "@/lib/g2g";
 
 export interface G2GLiveOfferResult {
   offer_id: string;
@@ -15,6 +15,7 @@ export interface G2GLiveOfferResult {
   available_qty: number;
   actual_qty: number;
   price_usd: number;
+  price_idr: number;
   is_online: boolean;
   rating_pct: number;
   success_orders: number;
@@ -50,8 +51,34 @@ export function extractG2GOfferId(urlOrId?: string): string | null {
   return match ? match[1] : null;
 }
 
+let cachedUsdRate: { rate: number; timestamp: number } | null = null;
+
 /**
- * Mengambil data offer real-time langsung dari server SLS G2G
+ * Mengambil kurs USD ke IDR terkini dengan fallback 16.850 & cache 1 jam
+ */
+export async function fetchUsdToIdrRate(): Promise<number> {
+  const now = Date.now();
+  if (cachedUsdRate && now - cachedUsdRate.timestamp < 3600000) {
+    return cachedUsdRate.rate;
+  }
+  try {
+    const res = await fetch("https://open.er-api.com/v6/latest/USD", {
+      next: { revalidate: 3600 },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const rate = data?.rates?.IDR;
+      if (typeof rate === "number" && rate > 10000) {
+        cachedUsdRate = { rate, timestamp: now };
+        return rate;
+      }
+    }
+  } catch {}
+  return 16850;
+}
+
+/**
+ * Mengambil data offer real-time langsung dari server SLS G2G (dengan currency=IDR&country=ID)
  */
 export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOfferResult> {
   const offerId = extractG2GOfferId(offerIdOrUrl);
@@ -69,6 +96,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
       available_qty: 0,
       actual_qty: 0,
       price_usd: 0,
+      price_idr: 0,
       is_online: false,
       rating_pct: 0,
       success_orders: 0,
@@ -82,7 +110,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 7000);
 
-    const res = await fetch(`https://sls.g2g.com/offer/${offerId}`, {
+    const res = await fetch(`https://sls.g2g.com/offer/${offerId}?currency=IDR&country=ID`, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -106,6 +134,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
         available_qty: 0,
         actual_qty: 0,
         price_usd: 0,
+        price_idr: 0,
         is_online: false,
         rating_pct: 0,
         success_orders: 0,
@@ -128,6 +157,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
         available_qty: 0,
         actual_qty: 0,
         price_usd: 0,
+        price_idr: 0,
         is_online: false,
         rating_pct: 0,
         success_orders: 0,
@@ -142,6 +172,15 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
     const isSoldOut = Boolean(payload.is_sold_out || availableQty === 0 || payload.status !== "live");
     const status = payload.status === "live" ? (isSoldOut ? "sold_out" : "live") : "delisted";
 
+    // 100% Real IDR Price dari G2G SLS
+    const convertedIdr = Number(payload.converted_unit_price ?? payload.display_price ?? 0);
+    const priceUsd = Number(payload.unit_price_in_usd ?? 0);
+    let priceIdr = convertedIdr > 0 ? Math.round(convertedIdr) : 0;
+    if (priceIdr === 0 && priceUsd > 0) {
+      // Fallback jika SLS tidak mengonversi IDR secara langsung
+      priceIdr = Math.ceil(priceUsd * 16850 * 1.045);
+    }
+
     return {
       offer_id: payload.offer_id || offerId,
       product_url: resolveG2GProductUrl(payload.offer_id || offerId, payload.username),
@@ -150,7 +189,8 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
       is_sold_out: isSoldOut,
       available_qty: availableQty,
       actual_qty: actualQty,
-      price_usd: Number(payload.unit_price_in_usd ?? 0),
+      price_usd: priceUsd,
+      price_idr: priceIdr,
       is_online: Boolean(payload.is_online),
       rating_pct: Math.round((Number(payload.satisfaction_rate) || 0) * 1000) / 10,
       success_orders: Number(payload.total_success_order ?? 0),
@@ -167,6 +207,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
       available_qty: 0,
       actual_qty: 0,
       price_usd: 0,
+      price_idr: 0,
       is_online: false,
       rating_pct: 0,
       success_orders: 0,
@@ -238,20 +279,64 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
       const seller = game.sellers[task.sellerIndex];
 
       if (!liveData.error && liveData.status === "live") {
-        const resolvedUrl = resolveG2GProductUrl(task.offerId, task.sellerName, task.gameTitle, false);
+        const directOfferUrl = getG2GDirectOfferUrl(task.offerId, task.gameTitle);
+        const categoryUrl = getG2GGameCategoryUrl(task.gameTitle);
 
-        // Perbarui data real live
+        // WAJIB update harga modal riil IDR langsung dari G2G SLS
+        let livePriceIdr = seller.price_g2g_idr || 0;
+        if (liveData.price_idr > 0) {
+          livePriceIdr = liveData.price_idr;
+          seller.price_g2g_idr = livePriceIdr;
+          seller.price_usd = liveData.price_usd;
+        } else if (liveData.price_usd > 0) {
+          livePriceIdr = Math.ceil(liveData.price_usd * 16850 * 1.045);
+          seller.price_g2g_idr = livePriceIdr;
+          seller.price_usd = liveData.price_usd;
+        }
+
+        if (liveData.seller_name && liveData.seller_name !== "Unknown") {
+          seller.seller_name = liveData.seller_name;
+        }
         seller.offer_id = task.offerId;
         seller.stock = liveData.available_qty;
         seller.is_sold_out = liveData.is_sold_out;
         seller.is_online = liveData.is_online;
-        seller.live_status = liveData.status;
+        seller.live_status = "live";
         seller.live_synced_at = liveData.synced_at;
         seller.total_success_order = liveData.success_orders;
-        seller.profile_url = resolvedUrl;
-        seller.fallback_search_url = resolvedUrl;
+        seller.profile_url = directOfferUrl;
+        seller.fallback_search_url = categoryUrl;
         if (liveData.rating_pct > 0) {
           seller.rating_pct = liveData.rating_pct;
+        }
+
+        // Hitung ulang keuntungan berdasarkan harga riil (full digital packaging = 0)
+        const qrisFee = Math.round(livePriceIdr * 0.007);
+        const cogsNet = livePriceIdr + qrisFee;
+        const sellingPrice = Number(game.selling_price_shopee_idr || 0);
+        const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
+        const netProfit = sellingPrice - cogsNet - shopeeFee;
+        const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+
+        seller.qris_fee_idr = qrisFee;
+        seller.cogs_net_idr = cogsNet;
+        seller.net_profit_idr = netProfit;
+        seller.net_margin_pct = netMargin;
+
+        if (
+          game.selected_seller_id === seller.seller_id ||
+          (game.metrics?.selected_seller &&
+            (game.metrics.selected_seller.seller_id === seller.seller_id ||
+              game.metrics.selected_seller.seller_name === seller.seller_name))
+        ) {
+          if (!game.metrics) game.metrics = {};
+          game.metrics.selected_seller = { ...seller };
+          game.metrics.cogs_g2g_idr = livePriceIdr;
+          game.metrics.qris_fee_idr = qrisFee;
+          game.metrics.cogs_net_idr = cogsNet;
+          game.metrics.shopee_fee_idr = shopeeFee;
+          game.metrics.net_profit_idr = netProfit;
+          game.metrics.net_margin_pct = netMargin;
         }
 
         let health: "CRITICAL" | "WARNING" | "SAFE" = "SAFE";
@@ -263,45 +348,71 @@ export async function syncCatalogWithG2GLive(catalog: any[]): Promise<{
 
         auditLogs.push({
           game_title: task.gameTitle,
-          seller_name: task.sellerName,
+          seller_name: seller.seller_name || task.sellerName,
           offer_id: task.offerId,
-          product_url: resolvedUrl,
+          product_url: directOfferUrl,
           previous_stock: task.previousStock,
           live_stock: liveData.available_qty,
           is_online: liveData.is_online,
-          status: liveData.status,
+          status: "live",
           health,
         });
 
         syncedCount++;
       } else {
-        // Self-Healing Fallback:
-        // Jika SLS API mengembalikan delisted/404/error, JANGAN anggap 0 stok / CRITICAL!
-        // Pertahankan stok tercatat dan gunakan URL Evergreen yang 100% aktif.
-        const evergreenUrl = resolveG2GProductUrl("", task.sellerName, task.gameTitle, false);
-        const fallbackStock = task.previousStock > 0 ? task.previousStock : 25;
-        seller.offer_id = task.offerId;
-        seller.live_status = "EVERGREEN_ACTIVE";
-        seller.is_sold_out = false;
-        seller.is_online = true;
-        seller.stock = fallbackStock;
-        seller.profile_url = evergreenUrl;
-        seller.fallback_search_url = evergreenUrl;
+        const isTimeout =
+          liveData.error &&
+          (liveData.error.includes("Timeout") || liveData.error.includes("AbortError"));
+        const catUrl = getG2GGameCategoryUrl(task.gameTitle);
 
-        const health: "CRITICAL" | "WARNING" | "SAFE" = fallbackStock > 4 ? "SAFE" : "WARNING";
+        if (isTimeout) {
+          // Timeout jaringan: pertahankan data lama dengan status sync_timeout
+          seller.live_status = "sync_timeout";
+          auditLogs.push({
+            game_title: task.gameTitle,
+            seller_name: task.sellerName,
+            offer_id: task.offerId,
+            product_url: seller.profile_url || catUrl,
+            previous_stock: task.previousStock,
+            live_stock: task.previousStock,
+            is_online: seller.is_online ?? false,
+            status: "sync_timeout",
+            health: "WARNING",
+          });
+        } else {
+          // Real delisted / sold out / HTTP 404
+          seller.stock = 0;
+          seller.is_sold_out = true;
+          seller.live_status = "delisted";
+          seller.profile_url = catUrl;
+          seller.fallback_search_url = catUrl;
 
-        auditLogs.push({
-          game_title: task.gameTitle,
-          seller_name: task.sellerName,
-          offer_id: task.offerId,
-          product_url: evergreenUrl,
-          previous_stock: task.previousStock,
-          live_stock: fallbackStock,
-          is_online: true,
-          status: "EVERGREEN_ACTIVE",
-          health,
-        });
+          if (
+            game.selected_seller_id === seller.seller_id ||
+            (game.metrics?.selected_seller &&
+              (game.metrics.selected_seller.seller_id === seller.seller_id ||
+                game.metrics.selected_seller.seller_name === seller.seller_name))
+          ) {
+            if (game.metrics?.selected_seller) {
+              game.metrics.selected_seller.stock = 0;
+              game.metrics.selected_seller.is_sold_out = true;
+              game.metrics.selected_seller.live_status = "delisted";
+              game.metrics.selected_seller.profile_url = catUrl;
+            }
+          }
 
+          auditLogs.push({
+            game_title: task.gameTitle,
+            seller_name: task.sellerName,
+            offer_id: task.offerId,
+            product_url: catUrl,
+            previous_stock: task.previousStock,
+            live_stock: 0,
+            is_online: false,
+            status: "delisted",
+            health: "CRITICAL",
+          });
+        }
         syncedCount++;
       }
     }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getG2GSellerUrl } from "@/lib/g2g";
+import { getG2GSellerUrl, resolveG2GProductUrl } from "@/lib/g2g";
+import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
 
 // Comprehensive database of verified G2G top-tier suppliers
 const VERIFIED_SUPPLIER_POOL = [
@@ -109,9 +110,15 @@ export async function POST(req: Request) {
     const lowerQuery = query.toLowerCase();
     
     // Check if query matches or contains any known benchmark
-    let matchedBenchmark = Object.entries(BENCHMARK_GAMES).find(([key]) => lowerQuery.includes(key));
+    // Real Steam Indonesia official store lookup
+    const realSteam = await fetchRealSteamIndonesiaPrice(query);
+    const lookupTitle = realSteam?.official_title || query;
+    const lookupLower = lookupTitle.toLowerCase();
+
+    // Check if query matches or contains any known benchmark
+    let matchedBenchmark = Object.entries(BENCHMARK_GAMES).find(([key]) => lookupLower.includes(key) || lowerQuery.includes(key));
     
-    let detectedTitle = query;
+    let detectedTitle = realSteam?.official_title || query;
     let baseG2gIdr = 150000;
     let detectedPlatform = body.platform || "Steam";
     let detectedCategory = "Digital Key / Full Access";
@@ -119,7 +126,7 @@ export async function POST(req: Request) {
 
     if (matchedBenchmark) {
       const data = matchedBenchmark[1];
-      if (data.title) detectedTitle = data.title;
+      detectedTitle = realSteam?.official_title || data.title || detectedTitle;
       baseG2gIdr = data.base_g2g_idr;
       detectedPlatform = body.platform || data.platform;
       detectedCategory = data.category;
@@ -154,7 +161,7 @@ export async function POST(req: Request) {
     // Minimum Margin Safeguard (>= 25% net profit margin)
     const baseQris = Math.round(baseG2gIdr * 0.007);
     const baseCogs = baseG2gIdr + baseQris;
-    const fixedCosts = 2000 + 1000;
+    const fixedCosts = 1000; // Shopee fixed fee (packaging 0 - Full Digital Mode)
     const minSafePriceRaw = (baseCogs + fixedCosts) / (1 - 0.08 - 0.25);
     const minSafePrice = Math.ceil(minSafePriceRaw / 1000) * 1000 - 100;
     const finalShopeePrice = Math.max(recommendedShopeePrice, minSafePrice);
@@ -170,7 +177,7 @@ export async function POST(req: Request) {
       const qrisFee = Math.round(roundedPrice * 0.007);
       const cogsNet = roundedPrice + qrisFee;
       const shopeeFee = Math.round(finalShopeePrice * 0.08) + 1000;
-      const totalCost = cogsNet + shopeeFee + 2000;
+      const totalCost = cogsNet + shopeeFee;
       const netProfit = finalShopeePrice - totalCost;
       const margin = (netProfit / finalShopeePrice) * 100;
 
@@ -184,7 +191,7 @@ export async function POST(req: Request) {
         stock: Math.floor(Math.random() * 30) + 12,
         risk_score: supp.risk_score,
         is_recommended: idx === 0,
-        profile_url: getG2GSellerUrl(supp.name, detectedTitle),
+        profile_url: resolveG2GProductUrl(undefined, supp.name, detectedTitle),
         qris_fee_idr: qrisFee,
         cogs_net_idr: cogsNet,
         net_profit_idr: netProfit,
@@ -208,7 +215,7 @@ export async function POST(req: Request) {
         target_margin_pct: targetMarginPct,
         selected_seller_id: bestSeller.seller_id,
         sellers: sellers,
-        summary: `Ditemukan ${sellers.length} seller terpercaya di g2g.com/id. Rekomendasi utama: ${bestSeller.seller_name} dengan modal Rp ${bestSeller.price_g2g_idr.toLocaleString('id-ID')} dan proyeksi margin ${bestSeller.net_margin_pct}%.`
+        summary: `Ditemukan ${sellers.length} seller terpercaya di g2g.com/id. Rekomendasi utama: ${bestSeller.seller_name} dengan modal Rp ${bestSeller.price_g2g_idr.toLocaleString('id-ID')} dan proyeksi margin ${bestSeller.net_margin_pct}%. Estimasi benchmark — sambungkan link offer G2G spesifik di Link Inspector untuk verifikasi live.`
       }
     });
 

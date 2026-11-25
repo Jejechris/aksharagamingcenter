@@ -28,7 +28,7 @@ Format output HARUS JSON murni tanpa markdown:
 - Sampel Review Pembeli: ${JSON.stringify(reviews_sample || ["Instant delivery, worked smoothly", "Acc credentials received instantly", "No issues so far"])}`;
 
     try {
-      const raw = await callGemini(prompt, systemPrompt);
+      const raw = await callGemini(prompt, systemPrompt, { jsonMode: true });
       let cleaned = raw.trim();
       if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);
       if (cleaned.endsWith("```")) cleaned = cleaned.slice(0, -3);
@@ -36,7 +36,7 @@ Format output HARUS JSON murni tanpa markdown:
 
       return NextResponse.json({
         status: "success",
-        model: "gemini-3.5-flash-lite",
+        model: "gemini-2.5-flash",
         data: parsed
       });
     } catch (aiErr) {

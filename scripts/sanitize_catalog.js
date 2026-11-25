@@ -79,49 +79,67 @@ function cleanSellerUsername(sellerName) {
   return s;
 }
 
+const KNOWN_DEAD_OFFERS = {
+  "G1737050259610GZ": true,
+  "G1763801186859QT": true,
+};
+
 /**
- * Menghasilkan URL Evergreen G2G (Category + Seller Search)
+ * Menghasilkan URL Evergreen G2G Resmi Indonesia (Category Bersih tanpa ?q=)
  */
-function getEvergreenUrl(catSlug, sellerName) {
-  const clean = cleanSellerUsername(sellerName);
-  if (clean) {
-    return `https://www.g2g.com/categories/${catSlug}?q=${encodeURIComponent(clean)}`;
-  }
-  return `https://www.g2g.com/categories/${catSlug}`;
+function getEvergreenUrl(catSlug) {
+  return `https://www.g2g.com/id/categories/${catSlug}`;
 }
 
-function sanitizeUrl(rawUrl, gameTitle, sellerName) {
-  if (!rawUrl) return "";
-  let url = String(rawUrl).trim();
+function sanitizeUrl(rawUrl, gameTitle, sellerName, existingOid) {
+  if (!rawUrl && !existingOid) return { profile_url: "", offer_id: null, fallback_search_url: "" };
+  let url = String(rawUrl || "").trim();
 
-  // 1. Eneba clean
-  if (url.includes("eneba.com")) {
-    const cleanEneba = url.replace("eneba.com/id/store", "eneba.com/store");
+  // 1. Eneba clean with default filters
+  if (url.includes("eneba.com") || (sellerName && String(sellerName).toLowerCase().includes("eneba"))) {
+    let cleanEneba = url.replace("eneba.com/id/store", "eneba.com/store");
+    let queryText = "";
+    try {
+      const uObj = new URL(cleanEneba.startsWith("http") ? cleanEneba : `https://${cleanEneba}`);
+      queryText = uObj.searchParams.get("text") || "";
+    } catch {}
+    if (!queryText) {
+      queryText = (gameTitle || "game").toLowerCase().trim().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, "+");
+    }
+    const filteredEneba = `https://www.eneba.com/store/all?text=${encodeURIComponent(queryText).replace(/%2B/g, "+")}&regions[]=global&sortBy=PRICE_LOWEST`;
     return {
-      profile_url: cleanEneba,
+      profile_url: filteredEneba,
       offer_id: null,
-      fallback_search_url: cleanEneba,
+      fallback_search_url: filteredEneba,
     };
   }
 
-  // 2. Extract Offer ID if present for inventory tracking, but NEVER as user-facing link
+  // 2. Extract Offer ID
   const offerMatch = url.match(/(?:offer\/|item\/|^)?(G\d{10,}[A-Za-z0-9]*)/i);
-  const oid = offerMatch ? offerMatch[1] : null;
+  const oid = offerMatch ? offerMatch[1] : (existingOid || null);
 
   const catSlug = resolveCategorySlug(gameTitle);
-  const evergreenUrl = getEvergreenUrl(catSlug, sellerName);
+  const categoryUrl = getEvergreenUrl(catSlug);
+
+  if (oid && !KNOWN_DEAD_OFFERS[oid]) {
+    return {
+      profile_url: `https://www.g2g.com/id/categories/${catSlug}/offer/${oid}`,
+      offer_id: oid,
+      fallback_search_url: categoryUrl,
+    };
+  }
 
   return {
-    profile_url: evergreenUrl,
+    profile_url: categoryUrl,
     offer_id: oid,
-    fallback_search_url: evergreenUrl,
+    fallback_search_url: categoryUrl,
   };
 }
 
 function sanitizeSeller(seller, gameTitle) {
   let changed = false;
   const orig = seller.profile_url || "";
-  const result = sanitizeUrl(orig, gameTitle, seller.seller_name);
+  const result = sanitizeUrl(orig, gameTitle, seller.seller_name, seller.offer_id);
 
   if (result.profile_url !== orig) {
     seller.profile_url = result.profile_url;
@@ -135,19 +153,29 @@ function sanitizeSeller(seller, gameTitle) {
     changed = true;
   }
 
-  // Clean /id/ in profile_url or fallback_search_url
-  if (seller.profile_url && seller.profile_url.includes("g2g.com/id/")) {
-    seller.profile_url = seller.profile_url.replace("g2g.com/id/", "g2g.com/");
+  // Ensure G2G categories use /id/
+  if (seller.profile_url && seller.profile_url.startsWith("https://www.g2g.com/categories/")) {
+    seller.profile_url = seller.profile_url.replace("https://www.g2g.com/categories/", "https://www.g2g.com/id/categories/");
     changed = true;
   }
-  if (seller.fallback_search_url && seller.fallback_search_url.includes("g2g.com/id/")) {
-    seller.fallback_search_url = seller.fallback_search_url.replace("g2g.com/id/", "g2g.com/");
+  if (seller.fallback_search_url && seller.fallback_search_url.startsWith("https://www.g2g.com/categories/")) {
+    seller.fallback_search_url = seller.fallback_search_url.replace("https://www.g2g.com/categories/", "https://www.g2g.com/id/categories/");
     changed = true;
   }
 
   // Clean /id/ in Eneba
   if (seller.profile_url && seller.profile_url.includes("eneba.com/id/store")) {
     seller.profile_url = seller.profile_url.replace("eneba.com/id/store", "eneba.com/store");
+    changed = true;
+  }
+
+  // Strip ?q= from g2g category URLs
+  if (seller.profile_url && seller.profile_url.includes("g2g.com") && seller.profile_url.includes("?q=")) {
+    seller.profile_url = seller.profile_url.split("?")[0];
+    changed = true;
+  }
+  if (seller.fallback_search_url && seller.fallback_search_url.includes("g2g.com") && seller.fallback_search_url.includes("?q=")) {
+    seller.fallback_search_url = seller.fallback_search_url.split("?")[0];
     changed = true;
   }
   return changed;

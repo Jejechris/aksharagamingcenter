@@ -83,19 +83,14 @@ const navSections: NavSection[] = [
         icon: <Store className="w-4 h-4 shrink-0" />,
       },
       {
-        label: "Stock Sentry",
-        href: "/dashboard/stock",
+        label: "Sentry & Risk Hub",
+        href: "/dashboard/stock-sentry",
         icon: <PackageSearch className="w-4 h-4 shrink-0" />,
       },
       {
         label: "Kalkulator Profit",
         href: "/dashboard/quant",
         icon: <Calculator className="w-4 h-4 shrink-0" />,
-      },
-      {
-        label: "Risk Officer",
-        href: "/dashboard/risk",
-        icon: <ShieldAlert className="w-4 h-4 shrink-0" />,
       },
     ],
   },
@@ -161,9 +156,11 @@ const routeTitles: Record<string, string> = {
   "/dashboard/formatter": "AI Delivery Formatter",
   "/dashboard/claims": "Brankas Klaim",
   "/dashboard/catalog": "Radar Katalog",
-  "/dashboard/stock": "Stock Sentry",
+  "/dashboard/stock-sentry": "Sentry & Risk Hub",
+  "/dashboard/stock": "Sentry & Risk Hub",
   "/dashboard/quant": "Kalkulator Profit",
-  "/dashboard/risk": "Risk Officer",
+  "/dashboard/risk": "Sentry & Risk Hub",
+  "/dashboard/risk-officer": "Sentry & Risk Hub",
   "/dashboard/shopee-launchpad": "Shopee Launchpad",
   "/dashboard/research": "Research Center",
   "/dashboard/eneba": "Eneba CDKey",
@@ -174,6 +171,36 @@ const routeTitles: Record<string, string> = {
   "/dashboard/health": "System Health",
 };
 
+const LiveClock = React.memo(function LiveClock() {
+  const [clockTime, setClockTime] = useState("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setClockTime(
+        now.toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          timeZone: "Asia/Jakarta",
+        }) + " WIB"
+      );
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!clockTime) return null;
+
+  return (
+    <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 tabular-nums font-mono">
+      <Clock className="w-3.5 h-3.5 text-slate-400" />
+      <span>{clockTime}</span>
+    </div>
+  );
+});
+
 export default function SidebarLayout({
   children,
 }: {
@@ -182,7 +209,6 @@ export default function SidebarLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [clockTime, setClockTime] = useState("");
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     orders: true,
     catalog: true,
@@ -205,24 +231,6 @@ export default function SidebarLayout({
       }
     });
   }, [pathname]);
-
-  // Clean WIB Clock
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setClockTime(
-        now.toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          timeZone: "Asia/Jakarta",
-        }) + " WIB"
-      );
-    };
-    updateTime();
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Prevent background scroll when mobile sidebar is open
   useEffect(() => {
@@ -322,12 +330,15 @@ export default function SidebarLayout({
             <Link
               href="/dashboard"
               className={[
-                "group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors select-none",
+                "relative group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors select-none",
                 isActive("/dashboard")
                   ? "bg-emerald-50 text-emerald-700 font-semibold"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
               ].join(" ")}
             >
+              {isActive("/dashboard") && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-emerald-600" />
+              )}
               <span
                 className={
                   isActive("/dashboard")
@@ -351,63 +362,72 @@ export default function SidebarLayout({
                 <button
                   type="button"
                   onClick={() => toggleSection(section.id)}
-                  className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold tracking-wider text-slate-400 uppercase select-none hover:text-slate-700 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold tracking-wider text-slate-400 uppercase select-none hover:text-slate-700 transition-colors cursor-pointer"
                 >
                   <span className={hasActiveChild ? "text-emerald-700 font-bold" : ""}>
                     {section.title}
                   </span>
                   <ChevronDown
-                    className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
-                      isOpen ? "transform rotate-0" : "transform -rotate-90"
+                    className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ease-out ${
+                      isOpen ? "rotate-0" : "-rotate-90"
                     }`}
                   />
                 </button>
 
-                {isOpen && (
-                  <div className="space-y-0.5 pt-0.5">
-                    {section.items.map((item) => {
-                      const active = isActive(item.href);
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={[
-                            "group flex items-center justify-between px-3 py-2 rounded-lg text-[13px] font-medium transition-colors select-none",
-                            active
-                              ? "bg-emerald-50 text-emerald-700 font-semibold"
-                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
-                          ].join(" ")}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span
-                              className={
-                                active
-                                  ? "text-emerald-600"
-                                  : "text-slate-400 group-hover:text-slate-600"
-                              }
-                            >
-                              {item.icon}
-                            </span>
-                            <span className="truncate">{item.label}</span>
-                          </div>
+                <div
+                  className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                    isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="space-y-0.5 pt-0.5">
+                      {section.items.map((item) => {
+                        const active = isActive(item.href);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={[
+                              "relative group flex items-center justify-between px-3 py-2 rounded-lg text-[13px] font-medium transition-colors select-none",
+                              active
+                                ? "bg-emerald-50 text-emerald-700 font-semibold"
+                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
+                            ].join(" ")}
+                          >
+                            {active && (
+                              <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-emerald-600" />
+                            )}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span
+                                className={
+                                  active
+                                    ? "text-emerald-600"
+                                    : "text-slate-400 group-hover:text-slate-600"
+                                }
+                              >
+                                {item.icon}
+                              </span>
+                              <span className="truncate">{item.label}</span>
+                            </div>
 
-                          {item.badge && (
-                            <span
-                              className={[
-                                "text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider shrink-0",
-                                active
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-slate-100 text-slate-600",
-                              ].join(" ")}
-                            >
-                              {item.badge}
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    })}
+                            {item.badge && (
+                              <span
+                                className={[
+                                  "text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider shrink-0",
+                                  active
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-slate-100 text-slate-600",
+                                ].join(" ")}
+                              >
+                                {item.badge}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
@@ -464,16 +484,11 @@ export default function SidebarLayout({
 
           {/* Right: WIB Clock + Fast Order CTA */}
           <div className="flex items-center gap-3 sm:gap-4">
-            {clockTime && (
-              <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 tabular-nums font-mono">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span>{clockTime}</span>
-              </div>
-            )}
+            <LiveClock />
 
             <Link
               href="/dashboard/autonomous"
-              className="btn-primary-emerald text-xs font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 shadow-sm"
+              className="btn-primary-emerald btn-tactile text-xs font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Proses Order</span>

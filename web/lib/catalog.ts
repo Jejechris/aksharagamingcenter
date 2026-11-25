@@ -179,7 +179,7 @@ export async function readAuthoritativeCatalog(): Promise<any[]> {
   return [];
 }
 
-export function writeAuthoritativeCatalog(catalogList: any[]): void {
+export async function writeAuthoritativeCatalog(catalogList: any[]): Promise<void> {
   inMemoryCatalogCache = catalogList;
   lastCacheTimestamp = Date.now();
 
@@ -201,10 +201,13 @@ export function writeAuthoritativeCatalog(catalogList: any[]): void {
     } catch (err) {}
   }
 
-  // Fire-and-forget async DB sync if configured
   if (isDbConfigured()) {
-    Promise.all(catalogList.map((g) => saveDbGame(g))).catch(() => {});
-    setKV("active_catalog", catalogList).catch(() => {});
+    try {
+      await Promise.all(catalogList.map((g) => saveDbGame(g)));
+      await setKV("active_catalog", catalogList);
+    } catch (err) {
+      console.warn("writeAuthoritativeCatalog DB sync warning:", err);
+    }
   }
 }
 
@@ -343,7 +346,7 @@ export async function addOrUpdateGame(incomingGame: any): Promise<{ item: Catalo
     catalog.unshift(targetItem);
   }
 
-  writeAuthoritativeCatalog(catalog);
+  await writeAuthoritativeCatalog(catalog);
 
   // Send Telegram Bot notification with verified product link
   notifyTelegramCatalogEvent(targetItem).catch(() => {});
@@ -413,17 +416,17 @@ export async function bulkAddOrUpdateGames(incomingGames: any[]): Promise<{ impo
     }
   }
 
-  writeAuthoritativeCatalog(catalog);
+  await writeAuthoritativeCatalog(catalog);
   const enrichedAll = catalog.map(calculateItemMetrics);
   return { importedCount: count, allGames: enrichedAll };
 }
 
 export async function deleteGameFromCatalog(gameId: string): Promise<CatalogGame[]> {
   const catalog = await readAuthoritativeCatalog();
-  const next = catalog.filter((g) => g.id !== gameId && !g.id.includes(gameId));
-  writeAuthoritativeCatalog(next);
+  const next = catalog.filter((g) => g.id !== gameId);
+  await writeAuthoritativeCatalog(next);
   if (isDbConfigured()) {
-    deleteDbGame(gameId).catch(() => {});
+    await deleteDbGame(gameId).catch(() => {});
   }
   return next.map(calculateItemMetrics);
 }

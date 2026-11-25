@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { callGemini } from "@/lib/gemini";
-import { getG2GSellerUrl } from "@/lib/g2g";
+import { getG2GSellerUrl, resolveG2GProductUrl } from "@/lib/g2g";
+import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
 
 const VERIFIED_SUPPLIERS = [
   { name: "HellenWong", rating: 99.8, reviews: 32450, delivery: "Instant Delivery", risk_score: 0 },
@@ -62,9 +63,15 @@ export async function POST(req: Request) {
     const lowerQuery = query.toLowerCase();
 
     // 1. Direct Benchmark Match (Precise Real-World Calibration)
-    let matchedBenchmark = Object.entries(KNOWN_GAME_BENCHMARKS).find(([key]) => lowerQuery.includes(key));
+    // Real Steam Indonesia official store lookup
+    const realSteam = await fetchRealSteamIndonesiaPrice(query);
+    const lookupTitle = realSteam?.official_title || query;
+    const lookupLower = lookupTitle.toLowerCase();
 
-    let detectedTitle = query;
+    // 1. Direct Benchmark Match (Precise Real-World Calibration)
+    let matchedBenchmark = Object.entries(KNOWN_GAME_BENCHMARKS).find(([key]) => lookupLower.includes(key) || lowerQuery.includes(key));
+
+    let detectedTitle = realSteam?.official_title || query;
     let detectedPlatform = body.platform || "Steam";
     let detectedCategory = "Digital Key / CDKey";
     let baseG2gIdr = 140000;
@@ -73,12 +80,12 @@ export async function POST(req: Request) {
 
     if (matchedBenchmark) {
       const b = matchedBenchmark[1];
-      detectedTitle = b.title;
+      detectedTitle = realSteam?.official_title || b.title;
       detectedPlatform = body.platform && body.platform !== "Auto" ? body.platform : b.platform;
       detectedCategory = b.category;
       baseG2gIdr = b.base_g2g_idr;
       recommendedShopeePrice = b.shopee_price_idr;
-      aiReasoning = `${b.title} adalah game dengan daya tarik tinggi. Modal G2G Rp ${baseG2gIdr.toLocaleString('id-ID')} dan harga jual Shopee Rp ${recommendedShopeePrice.toLocaleString('id-ID')} memberikan margin profit optimal.`;
+      aiReasoning = `${detectedTitle} adalah game dengan daya tarik tinggi. Modal G2G Rp ${baseG2gIdr.toLocaleString('id-ID')} dan harga jual Shopee Rp ${recommendedShopeePrice.toLocaleString('id-ID')} memberikan margin profit optimal.`;
     } else {
       // 2. Query Gemini 3.5 Flash Lite with Tier-Aware System Prompt
       const systemPrompt = `Kamu adalah Chief Quant & Gaming Market Analyst profesional untuk Akshara Gaming Center (toko game digital di Indonesia).
@@ -109,13 +116,17 @@ Format output HARUS JSON murni tanpa markdown:
 }`;
 
       try {
-        const rawAi = await callGemini(`Analisis produk game ini: "${query}" (Platform preferensi: ${body.platform || "Auto"})`, systemPrompt);
+        const rawAi = await callGemini(
+          `Analisis produk game ini: "${query}" (Platform preferensi: ${body.platform || "Auto"})`,
+          systemPrompt,
+          { jsonMode: true }
+        );
         let cleaned = rawAi.trim();
         if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);
         if (cleaned.endsWith("```")) cleaned = cleaned.slice(0, -3);
         const parsed = JSON.parse(cleaned.trim());
 
-        if (parsed.corrected_title) detectedTitle = parsed.corrected_title;
+        if (parsed.corrected_title) detectedTitle = realSteam?.official_title || parsed.corrected_title;
         if (parsed.detected_platform) detectedPlatform = parsed.detected_platform;
         if (parsed.category) detectedCategory = parsed.category;
         if (parsed.base_g2g_idr) baseG2gIdr = Number(parsed.base_g2g_idr);
@@ -131,7 +142,7 @@ Format output HARUS JSON murni tanpa markdown:
     // 3. Mathematical Margin Safeguard: Ensure at least 25% net margin
     const qrisFee = Math.round(baseG2gIdr * 0.007);
     const cogsNet = baseG2gIdr + qrisFee;
-    const fixedCosts = 2000 + 1000; // packaging + shopee fixed fee
+    const fixedCosts = 1000; // Shopee fixed fee (packaging 0 - Full Digital Mode)
     const minSafePriceRaw = (cogsNet + fixedCosts) / (1 - 0.08 - 0.25);
     const minSafePrice = Math.ceil(minSafePriceRaw / 1000) * 1000 - 100;
 
@@ -145,7 +156,7 @@ Format output HARUS JSON murni tanpa markdown:
       const sQris = Math.round(priceG2g * 0.007);
       const sCogsNet = priceG2g + sQris;
       const shopeeFee = Math.round(finalSellingPrice * 0.08) + 1000;
-      const totalCost = sCogsNet + shopeeFee + 2000;
+      const totalCost = sCogsNet + shopeeFee;
       const netProfit = finalSellingPrice - totalCost;
       const margin = (netProfit / finalSellingPrice) * 100;
 
@@ -159,7 +170,7 @@ Format output HARUS JSON murni tanpa markdown:
         stock: 25 + (idx * 6),
         risk_score: supp.risk_score,
         is_recommended: idx === 0,
-        profile_url: getG2GSellerUrl(supp.name, detectedTitle),
+        profile_url: resolveG2GProductUrl(undefined, supp.name, detectedTitle),
         qris_fee_idr: sQris,
         cogs_net_idr: sCogsNet,
         net_profit_idr: netProfit,
@@ -171,7 +182,7 @@ Format output HARUS JSON murni tanpa markdown:
 
     return NextResponse.json({
       status: "success",
-      model_used: "gemini-3.5-flash-lite",
+      model_used: "gemini-2.5-flash",
       recommendations: {
         title: detectedTitle,
         platform: detectedPlatform,
@@ -181,7 +192,7 @@ Format output HARUS JSON murni tanpa markdown:
         selected_seller_id: bestSeller.seller_id,
         sellers: sellers,
         ai_reasoning: aiReasoning,
-        summary: `AI Gemini menganalisis pasar: ${detectedTitle} direkomendasikan modal Rp ${bestSeller.price_g2g_idr.toLocaleString('id-ID')} dengan harga jual psikologis Rp ${finalSellingPrice.toLocaleString('id-ID')} (Laba Bersih Rp ${bestSeller.net_profit_idr.toLocaleString('id-ID')} / Margin ${bestSeller.net_margin_pct}%).`
+        summary: `AI Gemini menganalisis pasar: ${detectedTitle} direkomendasikan modal Rp ${bestSeller.price_g2g_idr.toLocaleString('id-ID')} dengan harga jual psikologis Rp ${finalSellingPrice.toLocaleString('id-ID')} (Laba Bersih Rp ${bestSeller.net_profit_idr.toLocaleString('id-ID')} / Margin ${bestSeller.net_margin_pct}%). Estimasi benchmark AI — gunakan Link Inspector untuk verifikasi link offer live G2G faktual.`
       }
     });
 

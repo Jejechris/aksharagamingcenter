@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { getG2GSellerUrl, resolveG2GProductUrl } from "@/lib/g2g";
+import { getG2GSellerUrl, resolveG2GProductUrl, getG2GDirectOfferUrl } from "@/lib/g2g";
+import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { readAuthoritativeCatalog, addOrUpdateGame, bulkAddOrUpdateGames } from "@/lib/catalog";
+import { evaluateSellerTrust, TrustTier } from "@/lib/sellerTrust";
 
 export interface G2GScannedGame {
   id: string;
@@ -12,6 +14,13 @@ export interface G2GScannedGame {
   seller_name: string;
   seller_rating_pct: number;
   seller_reviews_count: number;
+  seller_rating?: number;
+  seller_orders?: number;
+  seller_level?: string;
+  verified?: boolean;
+  delivery_time?: string;
+  trust_score?: number;
+  trust_tier?: TrustTier;
   supplier_tier: "ultra_safe" | "lowest_price" | "mid_level";
   price_g2g_idr: number;
   recommended_shopee_price_idr: number;
@@ -27,6 +36,7 @@ export interface G2GScannedGame {
   arbitrage_verdict: "SUPER_OPPORTUNITY" | "HIGH_MARGIN" | "STEADY_PROFIT" | "FAST_ROTATION";
   crawl_timestamp: string;
   tactical_reason: string;
+  is_live_extracted?: boolean;
 }
 
 // 25+ Comprehensive factual game listings from g2g.com market categories
@@ -47,7 +57,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 89999,
     qris_fee_idr: 126,
     shopee_fee_idr: 4992,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 24782,
     net_margin_pct: 49.7,
     spread_pct: 177.2,
@@ -73,7 +83,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 95999,
     qris_fee_idr: 154,
     shopee_fee_idr: 5792,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 29954,
     net_margin_pct: 50.0,
     spread_pct: 172.3,
@@ -99,7 +109,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 90999,
     qris_fee_idr: 175,
     shopee_fee_idr: 6192,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 31533,
     net_margin_pct: 48.6,
     spread_pct: 159.6,
@@ -125,7 +135,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 115999,
     qris_fee_idr: 210,
     shopee_fee_idr: 6592,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 31098,
     net_margin_pct: 44.5,
     spread_pct: 133.0,
@@ -151,7 +161,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 90999,
     qris_fee_idr: 210,
     shopee_fee_idr: 6192,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 26498,
     net_margin_pct: 40.8,
     spread_pct: 116.3,
@@ -177,7 +187,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 110999,
     qris_fee_idr: 245,
     shopee_fee_idr: 6992,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 30663,
     net_margin_pct: 40.9,
     spread_pct: 114.0,
@@ -203,7 +213,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 115999,
     qris_fee_idr: 245,
     shopee_fee_idr: 6992,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 30663,
     net_margin_pct: 40.9,
     spread_pct: 114.0,
@@ -229,7 +239,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 139999,
     qris_fee_idr: 315,
     shopee_fee_idr: 8592,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 39993,
     net_margin_pct: 42.1,
     spread_pct: 110.9,
@@ -255,7 +265,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 69999,
     qris_fee_idr: 140,
     shopee_fee_idr: 4592,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 18168,
     net_margin_pct: 40.5,
     spread_pct: 124.5,
@@ -281,7 +291,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 59999,
     qris_fee_idr: 105,
     shopee_fee_idr: 4192,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 18603,
     net_margin_pct: 46.6,
     spread_pct: 166.0,
@@ -307,7 +317,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 359999,
     qris_fee_idr: 455,
     shopee_fee_idr: 11320,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 50225,
     net_margin_pct: 38.9,
     spread_pct: 98.5,
@@ -333,7 +343,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 245999,
     qris_fee_idr: 525,
     shopee_fee_idr: 12120,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 49355,
     net_margin_pct: 35.5,
     spread_pct: 85.3,
@@ -359,7 +369,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 759000,
     qris_fee_idr: 613,
     shopee_fee_idr: 13720,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 55067,
     net_margin_pct: 34.6,
     spread_pct: 81.5,
@@ -375,7 +385,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     platform: "Steam",
     category: "Account (Full Access)",
     g2g_category_slug: "rust-accounts-buy",
-    g2g_direct_url: "https://www.g2g.com/categories/rust-accounts-buy?q=madangna",
+    g2g_direct_url: "https://www.g2g.com/categories/rust-accounts-buy",
     seller_name: "madangna",
     seller_rating_pct: 99.4,
     seller_reviews_count: 14200,
@@ -385,7 +395,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 349999,
     qris_fee_idr: 945,
     shopee_fee_idr: 19320,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 71735,
     net_margin_pct: 31.3,
     spread_pct: 69.6,
@@ -411,7 +421,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 401000,
     qris_fee_idr: 1015,
     shopee_fee_idr: 20120,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 70865,
     net_margin_pct: 29.6,
     spread_pct: 64.8,
@@ -437,7 +447,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 640000,
     qris_fee_idr: 1015,
     shopee_fee_idr: 20120,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 70865,
     net_margin_pct: 29.6,
     spread_pct: 64.8,
@@ -463,7 +473,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 450000,
     qris_fee_idr: 1155,
     shopee_fee_idr: 21720,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 69125,
     net_margin_pct: 26.7,
     spread_pct: 57.0,
@@ -489,7 +499,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 349999,
     qris_fee_idr: 840,
     shopee_fee_idr: 16920,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 59240,
     net_margin_pct: 29.8,
     spread_pct: 65.8,
@@ -515,7 +525,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 579000,
     qris_fee_idr: 1470,
     shopee_fee_idr: 27320,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 88210,
     net_margin_pct: 26.8,
     spread_pct: 56.7,
@@ -541,7 +551,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 699000,
     qris_fee_idr: 1225,
     shopee_fee_idr: 23320,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 77455,
     net_margin_pct: 27.8,
     spread_pct: 59.4,
@@ -567,7 +577,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 756000,
     qris_fee_idr: 1680,
     shopee_fee_idr: 30520,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 94800,
     net_margin_pct: 25.7,
     spread_pct: 53.8,
@@ -593,7 +603,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 799000,
     qris_fee_idr: 1855,
     shopee_fee_idr: 32920,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 97225,
     net_margin_pct: 24.4,
     spread_pct: 50.6,
@@ -619,7 +629,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 699000,
     qris_fee_idr: 2022,
     shopee_fee_idr: 32920,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 73258,
     net_margin_pct: 18.4,
     spread_pct: 38.2,
@@ -645,7 +655,7 @@ const G2G_CRAWLER_DATABASE: G2GScannedGame[] = [
     steam_indo_price_idr: 410000,
     qris_fee_idr: 1302,
     shopee_fee_idr: 22520,
-    operational_fee_idr: 2000,
+    operational_fee_idr: 0,
     net_profit_idr: 57178,
     net_margin_pct: 21.3,
     spread_pct: 44.6,
@@ -678,13 +688,39 @@ export async function GET(req: Request) {
       return true;
     });
 
-    // 3. Annotate with catalog presence
-    const enriched = results.map((g) => ({
-      ...g,
-      is_already_in_catalog: Array.from(existingTitles).some(
-        (t) => t.includes(g.title.toLowerCase().trim()) || g.title.toLowerCase().trim().includes(t)
-      ),
-    }));
+    // 3. Annotate with catalog presence, trust score, and accurate zero-packaging profit formulas
+    const enriched = results.map((g) => {
+      const qris = Math.round(g.price_g2g_idr * 0.007);
+      const shopee = Math.round(g.recommended_shopee_price_idr * 0.08) + 1000;
+      const profit = g.recommended_shopee_price_idr - g.price_g2g_idr - qris - shopee;
+      const margin = g.recommended_shopee_price_idr > 0 ? Number(((profit / g.recommended_shopee_price_idr) * 100).toFixed(1)) : 0;
+      const trust = evaluateSellerTrust({
+        rating: g.seller_rating_pct,
+        orders: g.seller_reviews_count,
+        stock: 30,
+        priceIdr: g.price_g2g_idr,
+        sellingPriceShopeeIdr: g.recommended_shopee_price_idr,
+        deliverySpeed: "Instant Delivery",
+      });
+      return {
+        ...g,
+        qris_fee_idr: qris,
+        shopee_fee_idr: shopee,
+        operational_fee_idr: 0,
+        net_profit_idr: profit,
+        net_margin_pct: margin,
+        seller_rating: trust.seller_rating,
+        seller_orders: trust.seller_orders,
+        seller_level: trust.seller_level,
+        verified: trust.verified,
+        delivery_time: trust.delivery_time,
+        trust_score: trust.trust_score,
+        trust_tier: trust.trust_tier,
+        is_already_in_catalog: Array.from(existingTitles).some(
+          (t) => t.includes(g.title.toLowerCase().trim()) || g.title.toLowerCase().trim().includes(t)
+        ),
+      };
+    });
 
     return NextResponse.json({
       status: "success",
@@ -790,21 +826,228 @@ export async function POST(req: Request) {
       });
     }
 
-    // Action "crawl": Live crawler simulator with telemetry logs
+    // Action "crawl": Real live crawler extraction via G2G SLS API
+    const logs: string[] = [];
+    const pushLog = (msg: string) => {
+      const now = new Date().toLocaleTimeString("id-ID");
+      logs.push(`[${now}] ${msg}`);
+    };
+
+    pushLog("[INIT] Memulai live extraction engine ke G2G SLS API (currency=IDR&country=ID)...");
+
+    const targetCategories = [
+      { slug: "minecraft-account", title: "Minecraft: Java & Bedrock Edition", platform: "PC / Microsoft", steamIndo: 399000 },
+      { slug: "terraria-account", title: "Terraria", platform: "Steam", steamIndo: 89999 },
+      { slug: "fc-25-accounts", title: "EA SPORTS FC 25 Standard Edition", platform: "EA App / PC", steamIndo: 759000 },
+      { slug: "black-myth-wukong-accounts", title: "Black Myth: Wukong Standard Edition", platform: "Steam", steamIndo: 699999 },
+      { slug: "steam-global-account", title: "Steam Global Account (Random Tier)", platform: "Steam", steamIndo: 150000 },
+    ];
+
+    const extractedGames: G2GScannedGame[] = [];
+
+    pushLog(`[DISCOVERY] Menjelajahi ${targetCategories.length} kategori utama G2G untuk penawaran live termurah...`);
+
+    const CRAWLER_BLACKLIST = [
+      "shared", "sharing", "offline", "offline only", "offline mode", "rent", "rental", "sewa",
+      "trial", "demo", "tlauncher", "cracked", "crack", "nfa", "sfa", "non-full", "no mail",
+      "no email", "no change", "cant change", "can't change", "cannot change",
+      "save game", "savegame", "mod ", "mods", "dlc only", "expansion only",
+      "cape only", "coin", "coins", "gold", "currency", "boost", "boosting", "coaching",
+      "random", "mystery", "lucky", "empty", "no game", "game pass", "gamepass",
+      "1 month", "3 months", "14 days", "7 days", "1 day", "temporary", "family share",
+      "steam family", "activation", "p2", "p3", "secondary", "guest"
+    ];
+
+    const isCrawlerClickbait = (text: string): boolean => {
+      for (const b of CRAWLER_BLACKLIST) {
+        if (text.includes(b)) return true;
+      }
+      if (text.includes("banned") && !text.includes("unbanned") && !text.includes("no banned") && !text.includes("not banned")) {
+        return true;
+      }
+      if (/(\bban\b|\bhypixel ban\b)/i.test(text)) {
+        if (!/(\bno ban\b|\bnot ban\b|\bnever ban\b|\bunban|\bzero ban\b)/i.test(text)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const getCrawlerPriceFloor = (title: string): number => {
+      const lower = title.toLowerCase();
+      if (lower.includes("minecraft")) return 95000;
+      if (lower.includes("wukong") || lower.includes("black myth")) return 180000;
+      if (lower.includes("fc 25") || lower.includes("fc25")) return 55000;
+      if (lower.includes("terraria")) return 12000;
+      return 15000;
+    };
+
+    for (const cat of targetCategories) {
+      pushLog(`[FETCH] Memindai live offer dari sls.g2g.com untuk kategori ${cat.slug}...`);
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        const searchRes = await fetch(
+          `https://sls.g2g.com/offer/search?seo_term=${cat.slug}&currency=IDR&country=ID&sort=lowest_price&page_size=25`,
+          {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              Accept: "application/json, text/plain, */*",
+              Referer: "https://www.g2g.com/",
+              Origin: "https://www.g2g.com",
+            },
+            signal: controller.signal,
+            cache: "no-store",
+          }
+        );
+        clearTimeout(timeout);
+
+        if (searchRes.ok) {
+          const sJson = await searchRes.json();
+          const results = sJson?.payload?.results;
+          if (Array.isArray(results) && results.length > 0) {
+            const priceFloor = getCrawlerPriceFloor(cat.title);
+            const evaluatedOffers = results
+              .map((r: any) => {
+                const qty = Number(r.available_qty ?? 0);
+                if (qty <= 0 || r.is_sold_out) return null;
+                const textToCheck = `${r.title || ""} ${r.description || ""}`.toLowerCase();
+                if (isCrawlerClickbait(textToCheck)) return null;
+
+                const cIdr = Number(r.converted_unit_price ?? r.display_price ?? 0);
+                const pUsd = Number(r.unit_price_in_usd ?? 0);
+                const estIdr = cIdr > 0 ? Math.round(cIdr) : Math.ceil(pUsd * 16850 * 1.045);
+                if (estIdr < priceFloor) return null;
+
+                const recShopee = Math.round((estIdr * 1.4) / 1000) * 1000;
+                const trust = evaluateSellerTrust({
+                  rating: r.satisfaction_rate,
+                  orders: r.total_success_order ?? r.total_rating,
+                  reviews: r.total_rating,
+                  stock: qty,
+                  priceIdr: estIdr,
+                  sellingPriceShopeeIdr: recShopee,
+                  deliverySpeed: r.delivery_speed,
+                  isOnline: r.is_online,
+                  priceFloorIdr: priceFloor,
+                });
+
+                if (trust.is_hard_rejected) return null;
+
+                return { raw: r, estIdr, recShopee, trust };
+              })
+              .filter(Boolean) as Array<{ raw: any; estIdr: number; recShopee: number; trust: ReturnType<typeof evaluateSellerTrust> }>;
+
+            evaluatedOffers.sort((a, b) => b.trust.trust_score - a.trust.trust_score || a.estIdr - b.estIdr);
+            const best = evaluatedOffers[0];
+
+            if (best) {
+              const bestOffer = best.raw;
+              const offerId = bestOffer.offer_id;
+              const sellerName = bestOffer.username || "G2G Verified Seller";
+              const priceG2gIdr = best.estIdr > 0 ? best.estIdr : 35000;
+              const stock = Number(bestOffer.available_qty ?? 0);
+              const trust = best.trust;
+
+              const recShopee = best.recShopee;
+              const qrisFee = Math.round(priceG2gIdr * 0.007);
+              const shopeeFee = Math.round(recShopee * 0.08) + 1000;
+              const netProfit = recShopee - priceG2gIdr - qrisFee - shopeeFee;
+              const netMargin = recShopee > 0 ? Math.round((netProfit / recShopee) * 1000) / 10 : 0;
+              const spread = priceG2gIdr > 0 ? Math.round(((recShopee - priceG2gIdr) / priceG2gIdr) * 1000) / 10 : 0;
+
+              extractedGames.push({
+                id: `g2g-live-${offerId}`,
+                title: cat.title,
+                platform: cat.platform,
+                category: "Account (Full Access)",
+                g2g_category_slug: cat.slug,
+                g2g_direct_url: getG2GDirectOfferUrl(offerId, cat.title),
+                seller_name: sellerName,
+                seller_rating_pct: trust.seller_rating,
+                seller_reviews_count: trust.seller_orders,
+                seller_rating: trust.seller_rating,
+                seller_orders: trust.seller_orders,
+                seller_level: trust.seller_level,
+                verified: trust.verified,
+                delivery_time: trust.delivery_time,
+                trust_score: trust.trust_score,
+                trust_tier: trust.trust_tier,
+                supplier_tier: trust.trust_tier === "Safe (A+)" ? "ultra_safe" : "lowest_price",
+                price_g2g_idr: priceG2gIdr,
+                recommended_shopee_price_idr: recShopee,
+                steam_indo_price_idr: cat.steamIndo,
+                qris_fee_idr: qrisFee,
+                shopee_fee_idr: shopeeFee,
+                operational_fee_idr: 0,
+                net_profit_idr: netProfit,
+                net_margin_pct: netMargin,
+                spread_pct: spread,
+                demand_score: 92,
+                competition_level: "Sedang",
+                arbitrage_verdict: netMargin >= 25 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
+                crawl_timestamp: "Live Ekstraksi",
+                tactical_reason: `Hasil ekstraksi live SLS: Seller ${sellerName} (${trust.trust_tier}, ★ ${trust.seller_rating}%) menawarkan harga Rp ${priceG2gIdr.toLocaleString("id-ID")} dengan sisa stok ${stock} unit.`,
+                is_live_extracted: true,
+              });
+
+              pushLog(`[EXTRACTED] ${cat.title} -> Seller ${sellerName} [${trust.trust_tier} ${trust.trust_score}/100] (Rp ${priceG2gIdr.toLocaleString("id-ID")}, Stok ${stock})`);
+            } else {
+              pushLog(`[FILTERED] Kategori ${cat.slug}: seluruh kandidat tersaring oleh filter anti-clickbait & price floor.`);
+            }
+          } else {
+            pushLog(`[WARN] Kategori ${cat.slug}: tidak ada penawaran live langsung.`);
+          }
+        }
+      } catch (err: any) {
+        pushLog(`[ERROR] Gagal memindai kategori ${cat.slug}: ${err.message}`);
+      }
+    }
+
+    pushLog(`[SUMMARY] Berhasil mengekstrak ${extractedGames.length} penawaran live aktual dari server G2G SLS.`);
+
+    // Live Sync offer katalog yang terdaftar
+    const liveSyncedOffers: any[] = [];
+    const itemsWithOffers = G2G_CRAWLER_DATABASE.filter((g) => extractG2GOfferId(g.g2g_direct_url));
+    pushLog(`[SYNC] Menyelaraskan ${itemsWithOffers.length} offer katalog dengan SLS real-time...`);
+
+    const liveResults = await Promise.allSettled(
+      itemsWithOffers.map((g) => fetchG2GLiveOffer(g.g2g_direct_url))
+    );
+
+    liveResults.forEach((res, idx) => {
+      if (res.status === "fulfilled" && !res.value.error) {
+        liveSyncedOffers.push({
+          game_id: itemsWithOffers[idx].id,
+          title: itemsWithOffers[idx].title,
+          offer_id: res.value.offer_id,
+          live_stock: res.value.available_qty,
+          price_usd: res.value.price_usd,
+          price_idr: res.value.price_idr,
+          seller_name: res.value.seller_name,
+          status: res.value.status,
+          is_sold_out: res.value.is_sold_out,
+        });
+      }
+    });
+
+    pushLog(`[COMPLETE] Sinkronisasi live selesai (${liveSyncedOffers.length} offer live diperbarui).`);
+
     return NextResponse.json({
       status: "success",
-      message: "Crawl g2g.com berhasil diselesaikan.",
+      message: "Crawl g2g.com & SLS Live Sync berhasil diselesaikan.",
       timestamp: new Date().toISOString(),
-      scanned_categories: [
-        "https://www.g2g.com/categories/steam-accounts",
-        "https://www.g2g.com/categories/video-games-pc",
-        "https://www.g2g.com/categories/minecraft-account",
-        "https://www.g2g.com/categories/fc-25-accounts",
-        "https://www.g2g.com/categories/black-myth-wukong-accounts",
-        "https://www.g2g.com/categories/terraria-account",
-      ],
-      total_found: G2G_CRAWLER_DATABASE.length,
-      super_opportunities_count: G2G_CRAWLER_DATABASE.filter((g) => g.arbitrage_verdict === "SUPER_OPPORTUNITY").length,
+      logs,
+      extracted_results: extractedGames,
+      total_extracted: extractedGames.length,
+      scanned_categories: targetCategories.map((c) => `https://www.g2g.com/categories/${c.slug}`),
+      total_found: G2G_CRAWLER_DATABASE.length + extractedGames.length,
+      super_opportunities_count:
+        G2G_CRAWLER_DATABASE.filter((g) => g.arbitrage_verdict === "SUPER_OPPORTUNITY").length +
+        extractedGames.filter((g) => g.arbitrage_verdict === "SUPER_OPPORTUNITY").length,
+      live_synced_offers: liveSyncedOffers,
+      live_synced_count: liveSyncedOffers.length,
     });
   } catch (error: any) {
     return NextResponse.json({ status: "error", message: error.message }, { status: 500 });

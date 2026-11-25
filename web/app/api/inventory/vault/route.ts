@@ -74,7 +74,7 @@ function getVault(): VaultItem[] {
   return inMemoryVaultCache;
 }
 
-function saveVault(items: VaultItem[]) {
+async function saveVault(items: VaultItem[]): Promise<void> {
   inMemoryVaultCache = items;
   const content = JSON.stringify(items, null, 2);
   try {
@@ -94,7 +94,29 @@ function saveVault(items: VaultItem[]) {
   } catch (e) {
     // best-effort
   }
-  setKV("inventory_vault", items).catch(() => {});
+  try {
+    await setKV("inventory_vault", items);
+  } catch (e) {
+    console.warn("KV saveVault warning:", e);
+  }
+}
+
+async function loadVaultAuthoritative(): Promise<VaultItem[]> {
+  try {
+    const dbVault = await getDbVault();
+    if (dbVault !== null && dbVault.length > 0) {
+      inMemoryVaultCache = dbVault;
+      return dbVault;
+    }
+    const kvVault = await getKV("inventory_vault");
+    if (kvVault && Array.isArray(kvVault) && kvVault.length > 0) {
+      inMemoryVaultCache = kvVault;
+      return kvVault;
+    }
+  } catch (e) {
+    console.warn("loadVaultAuthoritative DB/KV notice:", e);
+  }
+  return getVault();
 }
 
 export async function GET(req: Request) {
@@ -103,21 +125,7 @@ export async function GET(req: Request) {
     const game = searchParams.get("game");
     const status = searchParams.get("status");
 
-    const dbVault = await getDbVault();
-    let allItems: VaultItem[];
-    if (dbVault !== null && dbVault.length > 0) {
-      allItems = dbVault;
-      inMemoryVaultCache = dbVault;
-    } else {
-      // 2. Try KV table if relational is empty/unconfigured
-      const kvVault = await getKV("inventory_vault");
-      if (kvVault && Array.isArray(kvVault) && kvVault.length > 0) {
-        allItems = kvVault;
-        inMemoryVaultCache = kvVault;
-      } else {
-        allItems = getVault();
-      }
-    }
+    const allItems = await loadVaultAuthoritative();
     let filtered = allItems;
 
     if (game) {
@@ -180,7 +188,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const vault = getVault();
+    const vault = await loadVaultAuthoritative();
     const nowStr = new Date().toISOString().replace("T", " ").substring(0, 19);
 
     // Mode A: Bulk Import via multiline text (action: "bulk_import" or body.bulk_raw/raw_lines)
@@ -240,10 +248,10 @@ export async function POST(req: Request) {
         addedItems.push(newItem);
       }
 
-      saveVault(vault);
-      Promise.all(addedItems.map((item) => saveDbVaultItem(item))).catch((e) =>
+      await Promise.all(addedItems.map((item) => saveDbVaultItem(item))).catch((e) =>
         console.warn("Supabase vault bulk save notice:", e)
       );
+      await saveVault(vault);
 
       return NextResponse.json({
         status: "success",
@@ -270,8 +278,8 @@ export async function POST(req: Request) {
     };
 
     vault.unshift(newItem);
-    saveVault(vault);
     await saveDbVaultItem(newItem);
+    await saveVault(vault);
 
     return NextResponse.json({
       status: "success",
@@ -286,7 +294,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const vault = getVault();
+    const vault = await loadVaultAuthoritative();
     const { action, id, game_title, order_id } = body;
 
     // Action: claim_for_order (Used by Autonomous Fulfillment to consume 1 buffer item)
@@ -308,8 +316,8 @@ export async function PATCH(req: Request) {
       item.assigned_order_id = order_id || `ORD-${Date.now().toString().slice(-4)}`;
       item.dispatched_at = new Date().toISOString().replace("T", " ").substring(0, 19);
 
-      saveVault(vault);
       await saveDbVaultItem(item);
+      await saveVault(vault);
 
       return NextResponse.json({
         status: "success",
@@ -336,8 +344,8 @@ export async function PATCH(req: Request) {
         delete item.dispatched_at;
       }
 
-      saveVault(vault);
       await saveDbVaultItem(item);
+      await saveVault(vault);
 
       return NextResponse.json({
         status: "success",
@@ -361,10 +369,10 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ status: "error", message: "ID item diperlukan" }, { status: 400 });
     }
 
-    let vault = getVault();
+    let vault = await loadVaultAuthoritative();
     vault = vault.filter(item => item.id !== id);
-    saveVault(vault);
     await deleteDbVaultItem(id);
+    await saveVault(vault);
 
     return NextResponse.json({
       status: "success",

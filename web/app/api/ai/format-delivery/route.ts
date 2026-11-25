@@ -301,7 +301,7 @@ FORMAT OUTPUT HARUS JSON MURNI TANPA MARKDOWN KUTIPAN KODE:
 
     try {
       const userPrompt = `Data Akun Mentah:\n${rawInput}\n\nGame: ${gameTitle}\nPlatform: ${platform}\nNama Pembeli: ${buyerName}\nChannel: ${channel}\nMode Pengiriman: ${isDigital ? "Digital Murni (Non-Fisik)" : "Paket Amplop Kartu Garansi Fisik A6"}\nTone: ${tone}`;
-      const aiResponse = await callGemini(userPrompt, systemPrompt);
+      const aiResponse = await callGemini(userPrompt, systemPrompt, { jsonMode: true });
 
       let cleaned = aiResponse.trim();
       if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
-import { VERIFIED_ENEBA_CATALOG, getEnebaProductUrl } from "@/lib/eneba";
+import { VERIFIED_ENEBA_CATALOG, getEnebaProductUrl, buildEnebaFilteredUrl } from "@/lib/eneba";
 import { resolveG2GProductUrl, KNOWN_DEAD_OFFERS, getG2GGameCategoryUrl } from "@/lib/g2g";
 import { readAuthoritativeCatalog } from "@/lib/catalog";
 import fs from "fs";
@@ -272,6 +272,14 @@ export async function POST(req: NextRequest) {
         await handleStockCommand(chatId);
       } else if (data === "btn_eneba") {
         await handleEnebaCommand(chatId, "minecraft");
+      } else if (data.startsWith("efilt:")) {
+        const parts = data.split(":");
+        if (parts.length >= 4) {
+          const reg = parts[1];
+          const plat = parts[2];
+          const q = parts.slice(3).join(":");
+          await handleEnebaCommand(chatId, `${q} | ${plat} | ${reg}`);
+        }
       } else if (data === "btn_new_claim_help") {
         await handleNewClaimCommand(chatId, "");
       } else if (data === "btn_claims_list") {
@@ -514,25 +522,68 @@ async function handleStockCommand(chatId: string | number) {
 }
 
 async function handleEnebaCommand(chatId: string | number, query: string) {
-  const q = query.trim().toLowerCase();
-  if (!q) {
-    await sendTelegramMessage(chatId, "ℹ️ Ketik `/eneba <nama_game>`\nContoh: `/eneba minecraft` atau `/eneba zomboid`");
+  const raw = (query || "").trim();
+  if (!raw) {
+    await sendTelegramMessage(
+      chatId,
+      "ℹ️ Ketik `/eneba <nama_game>` atau `/eneba <nama_game> | <platform> | <region>`\n"
+      + "Contoh:\n"
+      + "• `/eneba minecraft`\n"
+      + "• `/eneba terraria | steam | global`\n"
+      + "• `/eneba zomboid | steam | asia`"
+    );
     return;
   }
 
-  const matches = Object.values(VERIFIED_ENEBA_CATALOG).filter(
-    (item) =>
+  const parts = raw.split("|").map((p) => p.trim());
+  const gameQuery = parts[0] || "";
+  const platformFilter = (parts[1] || "all").toLowerCase();
+  const regionFilter = (parts[2] || "global").toLowerCase();
+
+  const q = gameQuery.toLowerCase();
+  const matches = Object.values(VERIFIED_ENEBA_CATALOG).filter((item) => {
+    if (platformFilter !== "all" && platformFilter !== "semua") {
+      if (!item.platform.toLowerCase().includes(platformFilter)) return false;
+    }
+    return (
+      !q ||
       item.title.toLowerCase().includes(q) ||
-      item.platform.toLowerCase().includes(q)
-  );
+      item.platform.toLowerCase().includes(q) ||
+      item.keyType.toLowerCase().includes(q)
+    );
+  });
+
+  const filterMarkup = {
+    inline_keyboard: [
+      [
+        { text: `${regionFilter === "global" ? "✅ " : ""}🌍 Global`, callback_data: `efilt:global:${platformFilter}:${gameQuery.slice(0, 20)}` },
+        { text: `${regionFilter === "asia" ? "✅ " : ""}🌏 Asia`, callback_data: `efilt:asia:${platformFilter}:${gameQuery.slice(0, 20)}` },
+        { text: `${regionFilter === "indonesia" || regionFilter === "indo" ? "✅ " : ""}🇮🇩 Indo`, callback_data: `efilt:indonesia:${platformFilter}:${gameQuery.slice(0, 20)}` },
+      ],
+      [
+        { text: `${platformFilter.includes("steam") ? "✅ " : ""}🎮 Steam`, callback_data: `efilt:${regionFilter}:steam:${gameQuery.slice(0, 20)}` },
+        { text: `${platformFilter.includes("xbox") ? "✅ " : ""}🪟 Xbox`, callback_data: `efilt:${regionFilter}:xbox:${gameQuery.slice(0, 20)}` },
+        { text: `${platformFilter === "all" || platformFilter === "semua" ? "✅ " : ""}♾️ Semua`, callback_data: `efilt:${regionFilter}:all:${gameQuery.slice(0, 20)}` },
+      ],
+    ],
+  };
 
   if (matches.length > 0) {
-    const lines = [`⚡ *[RADAR ENEBA CDKEY — ${query.toUpperCase()}]*`, "━━━━━━━━━━━━━━━━━━━━━━"];
+    const lines = [
+      `⚡ *[RADAR ENEBA CDKEY — ${gameQuery.toUpperCase()}]*`,
+      `🏷️ _Filter:_ Region: \`${regionFilter.toUpperCase()}\` | Platform: \`${platformFilter.toUpperCase()}\``,
+      "━━━━━━━━━━━━━━━━━━━━━━",
+    ];
     for (const item of matches.slice(0, 4)) {
       const recommendedShopee = Math.ceil((item.estimatedPriceIdr * 1.25) / 1000) * 1000;
       const shopeeFee = Math.ceil(recommendedShopee * 0.08) + 1000;
-      const netProfit = recommendedShopee - item.estimatedPriceIdr - shopeeFee - 2000;
+      // Full Digital Mode: Zero packaging cost (Rp 0)
+      const netProfit = recommendedShopee - item.estimatedPriceIdr - shopeeFee;
       const netMargin = Math.round((netProfit / recommendedShopee) * 100);
+      const filteredUrl = buildEnebaFilteredUrl(item.title, {
+        region: regionFilter,
+        platform: platformFilter !== "all" ? platformFilter : item.platform,
+      });
 
       lines.push(
         `🎮 *${item.title}*\n`
@@ -541,16 +592,24 @@ async function handleEnebaCommand(chatId: string | number, query: string) {
         + `• Rekomendasi Shopee: *Rp ${recommendedShopee.toLocaleString("id-ID")}*\n`
         + `• Potensi Laba Bersih: *+Rp ${netProfit.toLocaleString("id-ID")}* (+${netMargin}%)\n`
         + `• Keamanan: 🛡️ *0% Hackback (Redeem Langsung)*\n`
-        + `• Link: ${item.defaultUrl}\n`
+        + `• Link: ${filteredUrl}\n`
       );
     }
     lines.push("━━━━━━━━━━━━━━━━━━━━━━");
-    lines.push("💡 _Harga modal dalam Rupiah sudah mencakup kurs & fee checkout Eneba._");
-    await sendTelegramMessage(chatId, lines.join("\n"));
+    lines.push("💡 _Harga modal dalam Rupiah sudah mencakup kurs & fee checkout Eneba (Full Digital Rp 0)._");
+    await sendTelegramMessage(chatId, lines.join("\n"), filterMarkup);
   } else {
+    const customUrl = buildEnebaFilteredUrl(gameQuery, {
+      region: regionFilter,
+      platform: platformFilter !== "all" ? platformFilter : undefined,
+    });
     await sendTelegramMessage(
       chatId,
-      `🔍 Tidak ditemukan judul game '${query}' pada katalog utama Eneba.\nKetik nama game seperti 'minecraft', 'zomboid', 'terraria', atau 'gta'.`
+      `🔍 Tidak ditemukan judul game '${gameQuery}' pada katalog utama Eneba.\n\n`
+      + `🏷️ _Filter Aktif:_ Region: \`${regionFilter.toUpperCase()}\` | Platform: \`${platformFilter.toUpperCase()}\`\n`
+      + `🔗 *Cek Langsung di Eneba:* ${customUrl}\n\n`
+      + `Ketik nama game seperti 'minecraft', 'zomboid', 'terraria', atau 'gta'.`,
+      filterMarkup
     );
   }
 }

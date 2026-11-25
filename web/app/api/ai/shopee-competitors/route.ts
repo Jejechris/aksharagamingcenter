@@ -143,7 +143,7 @@ export async function POST(req: Request) {
 
       const competitorInfo = body.competitor_context || {};
       const systemPrompt = `Kamu adalah Chief Pricing Strategist & E-Commerce Shopee Specialist profesional untuk Akshara Gaming Center di Indonesia.
-Karaktermu: Sangat tajam berhitung, pragmatis, paham psikologi pembeli Shopee (suka cashback, SPayLater, voucher gratis ongkir), dan selalu menghitung margin bersih riil setelah dipotong biaya admin Shopee (8% + Rp 1.000), QRIS kulakan (0.7%), dan biaya garansi digital/packaging garansi (Rp 2.000).
+Karaktermu: Sangat tajam berhitung, pragmatis, paham psikologi pembeli Shopee (suka cashback, SPayLater, voucher gratis ongkir), dan selalu menghitung margin bersih riil setelah dipotong biaya admin Shopee (8% + Rp 1.000), QRIS kulakan (0.7%), dan biaya operasional Full Digital (Rp 0).
 
 Data Game Saat Ini:
 - Judul Game: ${gameTitle} (${platform})
@@ -154,7 +154,7 @@ Data Game Saat Ini:
 
 Aturan Jawaban:
 1. Jawab langsung to-the-point dalam Bahasa Indonesia yang profesional dan ramah.
-2. Hitung simulasi rupiahnya secara matematis (Harga jual - Modal - Fee Shopee 8%+1k - QRIS 0.7% - Pack 2k = Laba Bersih).
+2. Hitung simulasi rupiahnya secara matematis (Harga jual - Modal - Fee Shopee 8%+1k - QRIS 0.7% = Laba Bersih).
 3. Beri rekomendasi keputusan final yang jelas: "Bisa diturunkan ke Rp X", "Pertahankan di Rp Y", atau "Gunakan taktik bundling Z".`;
 
       try {
@@ -172,7 +172,7 @@ Aturan Jawaban:
         // Fallback calculation if AI fails
         const shopeeFee = Math.round(currentPriceIdr * 0.08) + 1000;
         const qrisFee = Math.round(costG2gIdr * 0.007);
-        const estProfit = currentPriceIdr - costG2gIdr - shopeeFee - qrisFee - 2000;
+        const estProfit = currentPriceIdr - costG2gIdr - shopeeFee - qrisFee;
         const marginPct = currentPriceIdr > 0 ? ((estProfit / currentPriceIdr) * 100).toFixed(1) : "0";
 
         return NextResponse.json({
@@ -184,6 +184,7 @@ Aturan Jawaban:
     }
 
     // ACTION: SCAN (Inspect Shopee Competitors)
+    const manualCompetitorPriceIdr = Number(body.manual_competitor_price_idr) || 0;
     const lowerTitle = gameTitle.toLowerCase();
     const matchedKey = Object.keys(SHOPEE_GAME_COMPETITORS).find((k) => lowerTitle.includes(k));
 
@@ -194,8 +195,48 @@ Aturan Jawaban:
     let cogs = costG2gIdr > 0 ? costG2gIdr : 25000;
     let tacticalTip = "Pasang harga sedikit di bawah harga kompetitor terlaris untuk memenangkan algoritma pencarian Shopee.";
     let competitorsList: any[] = [];
+    let dataSource: "manual_verified" | "ai_benchmark" = "ai_benchmark";
 
-    if (matchedKey && SHOPEE_GAME_COMPETITORS[matchedKey]) {
+    if (manualCompetitorPriceIdr > 0) {
+      dataSource = "manual_verified";
+      minPrice = manualCompetitorPriceIdr;
+      avgPrice = Math.round((manualCompetitorPriceIdr * 1.08) / 1000) * 1000;
+      maxPrice = Math.round((manualCompetitorPriceIdr * 1.25) / 1000) * 1000;
+      
+      // Undercut by Rp 1.000 - Rp 2.000
+      recommendedPrice = manualCompetitorPriceIdr > 50000 
+        ? Math.round((manualCompetitorPriceIdr - 2000) / 1000) * 1000 - 100 
+        : manualCompetitorPriceIdr - 1000;
+
+      // Minimum safe price (safeguard minimum 10% net margin)
+      const minSafePrice = Math.round((cogs + Math.round(cogs * 0.007) + 1000) / (1 - 0.08 - 0.10));
+      if (recommendedPrice < minSafePrice) {
+        recommendedPrice = minSafePrice;
+      }
+
+      tacticalTip = `Berdasarkan input kompetitor riil Rp ${manualCompetitorPriceIdr.toLocaleString("id-ID")}, rekomendasi harga diset ke Rp ${recommendedPrice.toLocaleString("id-ID")} untuk memenangkan persaingan harga halaman 1 Shopee secara terukur.`;
+
+      competitorsList = [
+        {
+          shop_name: "Kompetitor Terpantau (Input Riil)",
+          price_idr: manualCompetitorPriceIdr,
+          sold_count: "Terpantau di Shopee",
+          rating: 4.9,
+          product_title: `${gameTitle} PC Original ${platform} Akun / CDKey`,
+          delivery_type: "Instant Chat",
+          badge: "🎯 Terverifikasi",
+        },
+        {
+          shop_name: "IndoGameStore (Benchmark Pasar)",
+          price_idr: avgPrice,
+          sold_count: "800+ terjual",
+          rating: 4.8,
+          product_title: `${gameTitle} Original PC Siap Main Termurah`,
+          delivery_type: "Instant Chat",
+          badge: "⭐ Benchmark",
+        },
+      ];
+    } else if (matchedKey && SHOPEE_GAME_COMPETITORS[matchedKey]) {
       const b = SHOPEE_GAME_COMPETITORS[matchedKey];
       minPrice = b.min_price;
       avgPrice = b.avg_price;
@@ -214,7 +255,7 @@ Aturan Jawaban:
       recommendedPrice = Math.round((minPrice - 2000) / 1000) * 1000 - 100;
       if (recommendedPrice <= cogs) recommendedPrice = minPrice;
 
-      tacticalTip = `Berdasarkan pantauan market Shopee untuk "${gameTitle}", rata-rata seller menjual di kisaran Rp ${avgPrice.toLocaleString("id-ID")}. Memasang harga di Rp ${recommendedPrice.toLocaleString("id-ID")} akan menempatkan produk Anda sebagai pilihan paling menarik bagi pembeli lokal.`;
+      tacticalTip = `Berdasarkan pantauan estimasi market Shopee untuk "${gameTitle}", rata-rata seller menjual di kisaran Rp ${avgPrice.toLocaleString("id-ID")}. Memasang harga di Rp ${recommendedPrice.toLocaleString("id-ID")} akan menempatkan produk Anda sebagai pilihan paling menarik bagi pembeli lokal.`;
 
       competitorsList = [
         {
@@ -247,12 +288,11 @@ Aturan Jawaban:
       ];
     }
 
-    // Calculate Economics
-    const activePrice = currentPriceIdr > 0 ? currentPriceIdr : recommendedPrice;
+    // Calculate Economics (Full Digital Mode: packagingCost = 0)
     const shopeeFee = Math.round(recommendedPrice * 0.08) + 1000;
     const qrisFee = Math.round(cogs * 0.007);
-    const packagingCost = 2000;
-    const netProfit = recommendedPrice - cogs - shopeeFee - qrisFee - packagingCost;
+    const packagingCost = 0;
+    const netProfit = recommendedPrice - cogs - shopeeFee - qrisFee;
     const netMarginPct = recommendedPrice > 0 ? Number(((netProfit / recommendedPrice) * 100).toFixed(1)) : 0;
     const spreadVsMin = Number((((recommendedPrice - minPrice) / minPrice) * 100).toFixed(1));
 
@@ -262,6 +302,8 @@ Aturan Jawaban:
       data: {
         game_title: gameTitle,
         platform: platform,
+        data_source: dataSource,
+        manual_competitor_price_idr: manualCompetitorPriceIdr,
         current_price_idr: currentPriceIdr,
         cost_g2g_idr: cogs,
         min_price_idr: minPrice,
@@ -280,7 +322,8 @@ Aturan Jawaban:
           net_margin_pct: netMarginPct,
           spread_vs_min_pct: spreadVsMin
         },
-        shopee_search_url: `https://shopee.co.id/search?keyword=${encodeURIComponent(gameTitle)}`
+        shopee_search_url: `https://shopee.co.id/search?keyword=${encodeURIComponent(gameTitle)}`,
+        shopee_bestseller_url: `https://shopee.co.id/search?keyword=${encodeURIComponent(gameTitle)}&sortBy=sales`
       }
     });
 

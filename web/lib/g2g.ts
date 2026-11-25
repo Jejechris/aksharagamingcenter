@@ -1,14 +1,15 @@
 /**
  * G2G.com Bulletproof Zero-404 Verified Product Offer & Category Helper
- * Menghubungkan etalase lokal dengan seller & listing faktual di g2g.com tanpa pernah menghasilkan link 404.
+ * Menghubungkan etalase lokal dengan seller & listing faktual di g2g.com tanpa pernah menghasilkan link 404 atau halaman kosong.
  *
- * Aturan Zero-404:
- * 1. Tidak pernah menggabungkan /categories/ dan /offer/ dalam 1 URL (penyebab 404 utama).
- * 2. Jika Offer ID valid dan live: https://www.g2g.com/offer/{offerId}
- * 3. Jika seller/game diketahui: https://www.g2g.com/categories/{categorySlug}?q={sellerName}
- * 4. Fallback aman universal: https://www.g2g.com/search?q={cleanTitle}
- * 5. Eneba canonical URL: https://www.eneba.com/store/all?text={cleanTitle} (tanpa /id/)
+ * Aturan Direct Offer & Anti-Kosong:
+ * 1. Direct Offer format resmi Indonesia: https://www.g2g.com/id/categories/{slug}/offer/{offerId} (menampilkan harga IDR dan stok faktual).
+ * 2. Kategori Evergreen resmi Indonesia: https://www.g2g.com/id/categories/{slug} (TANPA ?q=NamaSeller).
+ * 3. Jika Offer ID terdaftar di KNOWN_DEAD_OFFERS atau statusnya delisted, dialihkan otomatis ke kategori game.
+ * 4. Seller profile URL: https://www.g2g.com/{sellerUsername}
  */
+
+import { buildEnebaFilteredUrl } from "./eneba";
 
 export interface G2GOfferMapping {
   defaultOffer: string;
@@ -19,8 +20,8 @@ export interface G2GOfferMapping {
 
 // Known expired or delisted offers mapped to their evergreen active category replacements
 export const KNOWN_DEAD_OFFERS: Record<string, string> = {
-  "G1737050259610GZ": "https://www.g2g.com/categories/terraria-account?q=HellenWong",
-  "G1763801186859QT": "https://www.g2g.com/categories/tf2-item?q=Player",
+  "G1737050259610GZ": "https://www.g2g.com/id/categories/terraria-account",
+  "G1763801186859QT": "https://www.g2g.com/id/categories/tf2-item",
 };
 
 // Verified Category Slugs on G2G (Canonical slugs, 100% active, zero 404)
@@ -41,7 +42,7 @@ export const G2G_CATEGORY_SLUGS: Record<string, string> = {
   "garrys mod": "garry-s-mod-account",
   "elden ring": "elden-ring-account",
   palworld: "palworld-accounts",
-  rust: "rust-accounts-buy", // Fixed typo: was rus-accounts-buy
+  rust: "rust-accounts-buy",
   "left 4 dead": "left-4-dead-2-account",
   "among us": "among-us-account",
   witcher: "witcher-iii-wild-hunt-account",
@@ -51,68 +52,68 @@ export const G2G_CATEGORY_SLUGS: Record<string, string> = {
   forza: "forza-horizon-5-account",
 };
 
-// Pemetaan seller & listing riil terverifikasi (Selalu Evergreen)
+// Pemetaan seller & listing riil terverifikasi (Kategori Bersih Tanpa Query Parameter Seller)
 export const VERIFIED_G2G_CATALOG: Record<string, G2GOfferMapping> = {
   minecraft: {
-    defaultOffer: "https://www.g2g.com/categories/minecraft-account?q=HellenWong",
+    defaultOffer: "https://www.g2g.com/id/categories/minecraft-account",
     categorySlug: "minecraft-account",
-    categoryUrl: "https://www.g2g.com/categories/minecraft-account",
+    categoryUrl: "https://www.g2g.com/id/categories/minecraft-account",
     sellerOffers: {
-      hellenwong: "https://www.g2g.com/categories/minecraft-account?q=HellenWong",
-      hellenwong_hypixel: "https://www.g2g.com/categories/minecraft-account?q=HellenWong",
-      hellenwong_tlauncher: "https://www.g2g.com/categories/minecraft-account?q=HellenWong",
-      lowest: "https://www.g2g.com/categories/minecraft-account",
+      hellenwong: "https://www.g2g.com/id/categories/minecraft-account",
+      hellenwong_hypixel: "https://www.g2g.com/id/categories/minecraft-account",
+      hellenwong_tlauncher: "https://www.g2g.com/id/categories/minecraft-account",
+      lowest: "https://www.g2g.com/id/categories/minecraft-account",
     },
   },
   terraria: {
-    defaultOffer: "https://www.g2g.com/categories/terraria-account?q=HellenWong",
+    defaultOffer: "https://www.g2g.com/id/categories/terraria-account",
     categorySlug: "terraria-account",
-    categoryUrl: "https://www.g2g.com/categories/terraria-account",
+    categoryUrl: "https://www.g2g.com/id/categories/terraria-account",
     sellerOffers: {
-      hellenwong: "https://www.g2g.com/categories/terraria-account?q=HellenWong",
-      madangna: "https://www.g2g.com/categories/terraria-account?q=madangna",
-      lootkings: "https://www.g2g.com/categories/terraria-account?q=LootKings",
+      hellenwong: "https://www.g2g.com/id/categories/terraria-account",
+      madangna: "https://www.g2g.com/id/categories/terraria-account",
+      lootkings: "https://www.g2g.com/id/categories/terraria-account",
     },
   },
   wukong: {
-    defaultOffer: "https://www.g2g.com/categories/black-myth-wukong-accounts?q=FinanceWZ",
+    defaultOffer: "https://www.g2g.com/id/categories/black-myth-wukong-accounts",
     categorySlug: "black-myth-wukong-accounts",
-    categoryUrl: "https://www.g2g.com/categories/black-myth-wukong-accounts",
+    categoryUrl: "https://www.g2g.com/id/categories/black-myth-wukong-accounts",
     sellerOffers: {
-      financewz: "https://www.g2g.com/categories/black-myth-wukong-accounts?q=FinanceWZ",
-      hellenwong: "https://www.g2g.com/categories/black-myth-wukong-accounts?q=HellenWong",
-      hellenwong_savegame: "https://www.g2g.com/categories/black-myth-wukong-accounts?q=HellenWong",
+      financewz: "https://www.g2g.com/id/categories/black-myth-wukong-accounts",
+      hellenwong: "https://www.g2g.com/id/categories/black-myth-wukong-accounts",
+      hellenwong_savegame: "https://www.g2g.com/id/categories/black-myth-wukong-accounts",
     },
   },
   gta: {
-    defaultOffer: "https://www.g2g.com/categories/steam-global-account?q=madangna",
+    defaultOffer: "https://www.g2g.com/id/categories/steam-global-account",
     categorySlug: "steam-global-account",
-    categoryUrl: "https://www.g2g.com/categories/steam-global-account",
+    categoryUrl: "https://www.g2g.com/id/categories/steam-global-account",
     sellerOffers: {
-      madangna: "https://www.g2g.com/categories/steam-global-account?q=madangna",
-      hellenwong: "https://www.g2g.com/categories/steam-global-account?q=HellenWong",
-      madangna_fivem: "https://www.g2g.com/categories/steam-global-account?q=madangna",
+      madangna: "https://www.g2g.com/id/categories/steam-global-account",
+      hellenwong: "https://www.g2g.com/id/categories/steam-global-account",
+      madangna_fivem: "https://www.g2g.com/id/categories/steam-global-account",
     },
   },
   tf2: {
-    defaultOffer: "https://www.g2g.com/categories/tf2-item?q=Player",
+    defaultOffer: "https://www.g2g.com/id/categories/tf2-item",
     categorySlug: "tf2-item",
-    categoryUrl: "https://www.g2g.com/categories/tf2-item",
+    categoryUrl: "https://www.g2g.com/id/categories/tf2-item",
     sellerOffers: {
-      player: "https://www.g2g.com/categories/tf2-item?q=Player",
-      gaugau: "https://www.g2g.com/categories/tf2-item?q=GauGau",
-      hellenwong: "https://www.g2g.com/categories/tf2-item?q=HellenWong",
+      player: "https://www.g2g.com/id/categories/tf2-item",
+      gaugau: "https://www.g2g.com/id/categories/tf2-item",
+      hellenwong: "https://www.g2g.com/id/categories/tf2-item",
     },
   },
   fc25: {
-    defaultOffer: "https://www.g2g.com/categories/fc-25-accounts?q=krovler",
+    defaultOffer: "https://www.g2g.com/id/categories/fc-25-accounts",
     categorySlug: "fc-25-accounts",
-    categoryUrl: "https://www.g2g.com/categories/fc-25-accounts",
+    categoryUrl: "https://www.g2g.com/id/categories/fc-25-accounts",
     sellerOffers: {
-      krovler: "https://www.g2g.com/categories/fc-25-accounts?q=krovler",
-      hellenwong: "https://www.g2g.com/categories/fc-25-accounts?q=HellenWong",
-      lootkings: "https://www.g2g.com/categories/fc-25-accounts?q=LootKings",
-      cnlteam: "https://www.g2g.com/categories/fc-25-accounts?q=cnlteam",
+      krovler: "https://www.g2g.com/id/categories/fc-25-accounts",
+      hellenwong: "https://www.g2g.com/id/categories/fc-25-accounts",
+      lootkings: "https://www.g2g.com/id/categories/fc-25-accounts",
+      cnlteam: "https://www.g2g.com/id/categories/fc-25-accounts",
     },
   },
 };
@@ -161,15 +162,12 @@ export function extractG2GOfferId(urlOrId?: string): string | null {
 
 /**
  * Membersihkan nama seller dari suffix internal (seperti _Hypixel, _TLauncher, _SaveGame, _FiveM)
- * dan mengabaikan nama generik (Lowest, Default, Seller) sehingga filter ?q= di G2G
- * secara tepat mencocokkan username toko seller riil di G2G.
+ * dan mengabaikan nama generik (Lowest, Default, Seller).
  */
 export function cleanSellerUsername(sellerName?: string): string {
   if (!sellerName) return "";
   let s = sellerName.trim();
-  // Strip common internal tagging suffixes
   s = s.replace(/_(?:hypixel|tlauncher|savegame|fivem|vip|store|indo|acc|global|key)$/i, "");
-  // Strip prefix g2g- / g2g_
   s = s.replace(/^g2g[-_]/i, "");
   s = s.trim();
 
@@ -189,72 +187,75 @@ export function cleanSellerUsername(sellerName?: string): string {
 }
 
 /**
- * Menghasilkan URL Evergreen G2G (Category + Seller Search) yang DIJAMIN 100% TIDAK PERNAH 404
- * dan TIDAK PERNAH menampilkan 'Listing yang Anda coba lihat sudah tidak tersedia'
- * karena selalu mengarahkan ke halaman pencarian seller/kategori aktif di G2G.
+ * Mengembalikan URL Profil Toko Seller di G2G.com (format: https://www.g2g.com/{sellerName})
  */
-export function getG2GEvergreenUrl(categorySlugOrGameTitle?: string, sellerName?: string): string {
-  const gameKey = resolveGameKey(categorySlugOrGameTitle);
-  const slug = (gameKey && G2G_CATEGORY_SLUGS[gameKey])
-    ? G2G_CATEGORY_SLUGS[gameKey]
-    : (categorySlugOrGameTitle && categorySlugOrGameTitle.includes("-") ? categorySlugOrGameTitle : "steam-global-account");
-
-  const cleanSeller = cleanSellerUsername(sellerName);
-  if (cleanSeller) {
-    return `https://www.g2g.com/categories/${slug}?q=${encodeURIComponent(cleanSeller)}`;
+export function getG2GSellerProfileUrl(sellerName?: string): string {
+  const clean = cleanSellerUsername(sellerName);
+  if (clean) {
+    return `https://www.g2g.com/${encodeURIComponent(clean)}`;
   }
-  return `https://www.g2g.com/categories/${slug}`;
+  return "https://www.g2g.com/id/categories/steam-global-account";
 }
 
 /**
- * Mendapatkan URL Evergreen ke kategori & seller di g2g.com
- * Dijamin ZERO 404 & ZERO DELISTED: selalu mengarahkan ke halaman kategori aktif yang terfilter seller.
+ * Menghasilkan URL Direct Offer G2G resmi dalam format Indonesia (IDR):
+ * https://www.g2g.com/id/categories/${slug}/offer/${offerId}
  */
-export function getG2GSellerUrl(sellerName: string, gameTitle?: string): string {
+export function getG2GDirectOfferUrl(offerId: string, gameTitle?: string): string {
+  const oid = extractG2GOfferId(offerId) || offerId.trim();
   const gameKey = resolveGameKey(gameTitle);
-  const cleanSeller = cleanSellerUsername(sellerName);
+  const slug = gameKey && G2G_CATEGORY_SLUGS[gameKey] ? G2G_CATEGORY_SLUGS[gameKey] : "steam-global-account";
+  return `https://www.g2g.com/id/categories/${slug}/offer/${oid}`;
+}
+
+/**
+ * Menghasilkan URL Evergreen Kategori G2G resmi Indonesia (IDR) yang DIJAMIN 100% TIDAK PERNAH 404 dan TIDAK PERNAH KOSONG.
+ * Menghindari penambahan `?q=SellerName` agar listing produk selalu tampil lengkap.
+ */
+export function getG2GEvergreenUrl(categorySlugOrGameTitle?: string, _sellerName?: string): string {
+  const gameKey = resolveGameKey(categorySlugOrGameTitle);
+  if (gameKey && G2G_CATEGORY_SLUGS[gameKey]) {
+    return `https://www.g2g.com/id/categories/${G2G_CATEGORY_SLUGS[gameKey]}`;
+  }
+
+  if (categorySlugOrGameTitle && categorySlugOrGameTitle.includes("-")) {
+    return `https://www.g2g.com/id/categories/${encodeURIComponent(categorySlugOrGameTitle.trim())}`;
+  }
+
+  return "https://www.g2g.com/id/categories/steam-global-account";
+}
+
+/**
+ * Mendapatkan URL ke etalase kategori game resmi Indonesia di g2g.com (Kategori Bersih Tanpa ?q=Seller)
+ */
+export function getG2GSellerUrl(_sellerName: string, gameTitle?: string): string {
+  const gameKey = resolveGameKey(gameTitle);
 
   if (gameKey && G2G_CATEGORY_SLUGS[gameKey]) {
-    const slug = G2G_CATEGORY_SLUGS[gameKey];
-    if (cleanSeller) {
-      return `https://www.g2g.com/categories/${slug}?q=${encodeURIComponent(cleanSeller)}`;
-    }
-    return `https://www.g2g.com/categories/${slug}`;
+    return `https://www.g2g.com/id/categories/${G2G_CATEGORY_SLUGS[gameKey]}`;
   }
 
-  if (gameTitle && gameTitle.trim().length > 1) {
-    const cleanTitle = gameTitle
-      .replace(/[:&\[\]\(\)\-]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (cleanSeller) {
-      return `https://www.g2g.com/search?q=${encodeURIComponent(cleanTitle + " " + cleanSeller)}`;
-    }
-    return `https://www.g2g.com/search?q=${encodeURIComponent(cleanTitle)}`;
-  }
-
-  return cleanSeller
-    ? `https://www.g2g.com/categories/steam-global-account?q=${encodeURIComponent(cleanSeller)}`
-    : "https://www.g2g.com/categories/steam-global-account";
+  return "https://www.g2g.com/id/categories/steam-global-account";
 }
 
 /**
- * Mendapatkan URL langsung ke halaman kategori game di g2g.com
+ * Mendapatkan URL langsung ke halaman kategori game di g2g.com (format Indonesia IDR)
  */
 export function getG2GGameCategoryUrl(gameTitle: string, sellerName?: string): string {
   return getG2GSellerUrl(sellerName || "", gameTitle);
 }
 
 /**
- * Universal Resolver: Mengubah sembarang link / offer_id menjadi URL live G2G / Eneba yang 100% aktif & faktual.
- * Menghilangkan 404 dan status delisted 'Listing yang Anda coba lihat sudah tidak tersedia'
- * dengan SELALU memprioritaskan Evergreen Category Search URL.
+ * Universal Resolver: Mengubah sembarang link / offer_id menjadi URL live G2G Direct Offer atau Eneba.
+ * - Jika Eneba -> gunakan buildEnebaFilteredUrl
+ * - Jika offer_id valid dan isLive !== false -> kembalikan getG2GDirectOfferUrl (https://www.g2g.com/id/categories/${slug}/offer/${oid})
+ * - Jika delisted / dead offer / tanpa offer_id -> fallback ke kategori bersih https://www.g2g.com/id/categories/${slug}
  */
 export function resolveG2GProductUrl(
   rawUrlOrId?: string,
   sellerName?: string,
   gameTitle?: string,
-  isLive: boolean = false
+  isLive: boolean = true
 ): string {
   const trimmed = (rawUrlOrId || "").trim();
 
@@ -263,16 +264,18 @@ export function resolveG2GProductUrl(
     return trimmed.replace("eneba.com/id/store", "eneba.com/store");
   }
   if (trimmed.toLowerCase().includes("eneba") || (sellerName && sellerName.toLowerCase().includes("eneba"))) {
-    const clean = (gameTitle || "").replace(/[:&\[\]\(\)\-]/g, " ").replace(/\s+/g, " ").trim();
-    return `https://www.eneba.com/store/all?text=${encodeURIComponent(clean)}`;
+    return buildEnebaFilteredUrl(gameTitle || "");
   }
 
-  // 2. Jika isLive secara eksplisit bernilai true dan offer_id valid (baru saja diaudit SLS API saat ini)
+  // 2. Deteksi Offer ID
   const oid = extractG2GOfferId(trimmed);
-  if (isLive && oid) {
-    return `https://www.g2g.com/offer/${oid}`;
+  if (oid) {
+    if (KNOWN_DEAD_OFFERS[oid] || isLive === false) {
+      return getG2GGameCategoryUrl(gameTitle || "");
+    }
+    return getG2GDirectOfferUrl(oid, gameTitle);
   }
 
-  // 3. Default aman: Selalu gunakan Evergreen Category + Seller search URL
-  return getG2GSellerUrl(sellerName || "", gameTitle);
+  // 3. Fallback: Evergreen Category Bersih Indonesia (IDR)
+  return getG2GGameCategoryUrl(gameTitle || "");
 }

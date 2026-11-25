@@ -37,6 +37,7 @@ import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
 export default function ResearchCenterPage() {
   // G2G Autonomous Crawler State
   const [scannedGames, setScannedGames] = useState<G2GScannedGame[]>([]);
+  const [latestLiveExtracted, setLatestLiveExtracted] = useState<G2GScannedGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [isScanningBot, setIsScanningBot] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(true);
@@ -152,39 +153,45 @@ export default function ResearchCenterPage() {
     fetchScannedGames();
   }, []);
 
-  // Trigger Autonomous Robot Crawler Animation & Refresh
+  // Trigger Autonomous Robot Crawler (Real G2G SLS Live Extraction)
   const handleRunRobotScanner = async () => {
     setIsScanningBot(true);
     setTerminalOpen(true);
-    setTerminalLogs([]);
-
-    const logSteps = [
-      "[ROBOT-INIT] Mengaktifkan autonomous web scraper robot...",
-      "[GATEWAY] Menghubungkan ke https://www.g2g.com/id & Eneba API melalui direct category gateway...",
-      "[CATEGORY] Scanning /categories/steam-accounts (Steam Global Digital Keys & Accounts)...",
-      "[CATEGORY] Scanning /categories/terraria-account, fc-25, minecraft, stardew-valley...",
-      "[FILTER-SUPPLIERS] Memfilter supplier: mengisolasi trust rating >99% (Sharktech, TAceOfSpades, HellenWong, FinanceWZ)...",
-      "[CROSS-MARKET] Komparasi harga global vs harga pasaran Indonesia (Shopee IDR)...",
-      "[FEE-DEDUCTION] Menghitung potongan Shopee Fee (8% + Rp 1.000) & QRIS Kulakan (0.7%)...",
-      "[COMPLETE] 24 Peluang Arbitrase Margin Besar berhasil diekstrak dan siap diimpor!",
-    ];
-
-    for (let i = 0; i < logSteps.length; i++) {
-      await new Promise((r) => setTimeout(r, 350));
-      const now = new Date().toLocaleTimeString("id-ID");
-      setTerminalLogs((prev) => [...prev, `[${now}] ${logSteps[i]}`]);
-    }
+    setTerminalLogs([
+      `[${new Date().toLocaleTimeString("id-ID")}] [ROBOT-INIT] Mengaktifkan autonomous web scraper robot...`,
+      `[${new Date().toLocaleTimeString("id-ID")}] [GATEWAY] Menghubungkan ke https://sls.g2g.com & Eneba live API...`,
+    ]);
 
     try {
-      await fetch("/api/research/g2g-crawler", {
+      const res = await fetch("/api/research/g2g-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "crawl" }),
       });
-      await fetchScannedGames();
-      showToast("🚀 Autonomous Robot selesai memindai peluang arbitrase terkini!");
-    } catch (err) {
+      const json = await res.json();
+
+      if (res.ok && json.status === "success") {
+        if (Array.isArray(json.logs) && json.logs.length > 0) {
+          setTerminalLogs(json.logs);
+        }
+
+        if (Array.isArray(json.extracted_results) && json.extracted_results.length > 0) {
+          setLatestLiveExtracted(json.extracted_results);
+          setScannedGames((prev) => {
+            const extractedIds = new Set(json.extracted_results.map((r: any) => r.id));
+            const filteredPrev = prev.filter((p) => !extractedIds.has(p.id));
+            return [...json.extracted_results, ...filteredPrev];
+          });
+          showToast(`🚀 Autonomous Robot berhasil mengekstrak ${json.extracted_results.length} penawaran live G2G!`);
+        } else {
+          showToast("🚀 Sinkronisasi live SLS selesai tanpa perubahan penawaran baru.");
+        }
+      } else {
+        showToast(json.message || "Gagal menjalankan crawler robot.", "error");
+      }
+    } catch (err: any) {
       console.error(err);
+      showToast("Kesalahan jaringan saat menjalankan crawler.", "error");
     } finally {
       setIsScanningBot(false);
     }
@@ -239,7 +246,7 @@ export default function ResearchCenterPage() {
         setAddedIds((prev) => new Set([...Array.from(prev), game.id]));
         if (json.allGames && Array.isArray(json.allGames)) {
           try {
-            localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(json.allGames));
+            localStorage.setItem("akshara_custom_catalog_v3", JSON.stringify(json.allGames));
           } catch (e) {}
         }
         showToast(
@@ -281,7 +288,7 @@ export default function ResearchCenterPage() {
           successCount += eJson.importedCount || enebaGames.length;
           if (eJson.allGames && Array.isArray(eJson.allGames)) {
             try {
-              localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(eJson.allGames));
+              localStorage.setItem("akshara_custom_catalog_v3", JSON.stringify(eJson.allGames));
             } catch (e) {}
           }
         }
@@ -301,7 +308,7 @@ export default function ResearchCenterPage() {
           successCount += gJson.count || g2gGames.length;
           if (gJson.allGames && Array.isArray(gJson.allGames)) {
             try {
-              localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(gJson.allGames));
+              localStorage.setItem("akshara_custom_catalog_v3", JSON.stringify(gJson.allGames));
             } catch (e) {}
           }
         }
@@ -616,6 +623,84 @@ export default function ResearchCenterPage() {
         </div>
       </div>
 
+      {/* Ringkasan Hasil Ekstraksi Live (Jika ada hasil crawl terkini) */}
+      {latestLiveExtracted.length > 0 && (
+        <div className="app-card rounded-2xl p-5 border border-emerald-200 bg-emerald-50/40 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>Ringkasan Hasil Ekstraksi Live</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    {latestLiveExtracted.length} ITEM DIEKSTRAK
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-600 font-mono mt-0.5">
+                  Data live ditarik langsung dari server SLS G2G dengan konversi IDR 100% faktual.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("scanned-games-list");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="text-xs font-mono font-semibold flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors"
+            >
+              <span>Lihat Semua Hasil</span>
+              <span>↓</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-emerald-200 bg-white">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                <tr>
+                  <th className="px-4 py-2.5 font-semibold">Game</th>
+                  <th className="px-4 py-2.5 font-semibold">Seller G2G</th>
+                  <th className="px-4 py-2.5 font-semibold">Modal (IDR)</th>
+                  <th className="px-4 py-2.5 font-semibold">Rekomendasi Shopee</th>
+                  <th className="px-4 py-2.5 font-semibold">Net Profit</th>
+                  <th className="px-4 py-2.5 font-semibold">Margin</th>
+                  <th className="px-4 py-2.5 font-semibold text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {latestLiveExtracted.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="px-4 py-2.5 font-medium text-slate-900">{item.title}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{item.seller_name}</td>
+                    <td className="px-4 py-2.5 text-slate-900 font-bold tabular-nums">Rp {item.price_g2g_idr.toLocaleString("id-ID")}</td>
+                    <td className="px-4 py-2.5 text-slate-900 font-bold tabular-nums">Rp {item.recommended_shopee_price_idr.toLocaleString("id-ID")}</td>
+                    <td className="px-4 py-2.5 text-emerald-600 font-bold tabular-nums">+Rp {item.net_profit_idr.toLocaleString("id-ID")}</td>
+                    <td className="px-4 py-2.5 font-bold tabular-nums text-emerald-700">{item.net_margin_pct}%</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleAddSingleGame(item)}
+                        disabled={addingId === item.id || addedIds.has(item.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                          addedIds.has(item.id)
+                            ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                            : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                        }`}
+                      >
+                        {addedIds.has(item.id) ? "Tersimpan" : addingId === item.id ? "Menyimpan..." : "+ Impor"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* KPI Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="app-card rounded-2xl p-5 border border-slate-200 bg-white shadow-sm">
@@ -911,7 +996,7 @@ export default function ResearchCenterPage() {
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div id="scanned-games-list" className="space-y-4">
           {filteredGames.map((game) => {
             const isExpanded = !!expandedCards[game.id];
             const isAlreadyAdded = addedIds.has(game.id);
@@ -926,6 +1011,14 @@ export default function ResearchCenterPage() {
                   {/* Top Bar: Verdict Badge, Platform, Demand */}
                   <div className="flex flex-wrap items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2">
+                      {/* Live Extracted Badge */}
+                      {game.is_live_extracted && (
+                        <span className="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          LIVE EXTRACTED
+                        </span>
+                      )}
+
                       {/* Marketplace Source Badge */}
                       {(game as any).source_marketplace === "ENEBA" ? (
                         <span className="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase bg-violet-50 text-violet-700 border border-violet-200 flex items-center gap-1">

@@ -22,7 +22,7 @@ if BASE_DIR not in sys.path:
 
 from bot.canvas_drawer import generate_game_canvas
 from bot.formatter_data import format_delivery_message, generate_warranty_code
-from bot.eneba_data import VERIFIED_ENEBA_ITEMS, search_eneba_catalog, calculate_custom_eneba
+from bot.eneba_data import VERIFIED_ENEBA_ITEMS, search_eneba_catalog, calculate_custom_eneba, build_eneba_filtered_url
 from bot.market_sentry import (
     audit_all_catalog_sellers,
     build_stock_summary_report,
@@ -641,16 +641,46 @@ class TelegramCommander:
         await self.send_message(chat_id, res_msg)
 
     async def handle_eneba(self, chat_id: str, query: str) -> None:
-        """Handler untuk command /eneba."""
-        q = query.strip()
-        if not q:
-            await self.send_message(chat_id, "ℹ️ Ketik `/eneba <nama_game>`\nContoh: `/eneba minecraft` atau `/eneba zomboid`")
+        """Handler untuk command /eneba [game] | [platform] | [region]."""
+        raw = query.strip()
+        if not raw:
+            await self.send_message(
+                chat_id,
+                "ℹ️ Ketik `/eneba <nama_game>` atau `/eneba <nama_game> | <platform> | <region>`\n"
+                "Contoh:\n"
+                "• `/eneba minecraft`\n"
+                "• `/eneba terraria | steam | global`\n"
+                "• `/eneba zomboid | steam | asia`"
+            )
             return
 
-        results = search_eneba_catalog(q)
+        parts = [p.strip() for p in raw.split("|")]
+        game_query = parts[0] if parts else ""
+        platform_filter = parts[1] if len(parts) > 1 else "all"
+        region_filter = parts[2] if len(parts) > 2 else "global"
+
+        results = search_eneba_catalog(game_query, platform=platform_filter, region=region_filter)
+
+        # Inline keyboard untuk filter cepat
+        filter_markup = {
+            "inline_keyboard": [
+                [
+                    {"text": f"{'✅ ' if region_filter == 'global' else ''}🌍 Global", "callback_data": f"efilt:global:{platform_filter}:{game_query[:20]}"},
+                    {"text": f"{'✅ ' if region_filter == 'asia' else ''}🌏 Asia", "callback_data": f"efilt:asia:{platform_filter}:{game_query[:20]}"},
+                    {"text": f"{'✅ ' if region_filter in ('indonesia', 'indo') else ''}🇮🇩 Indo", "callback_data": f"efilt:indonesia:{platform_filter}:{game_query[:20]}"}
+                ],
+                [
+                    {"text": f"{'✅ ' if 'steam' in platform_filter.lower() else ''}🎮 Steam", "callback_data": f"efilt:{region_filter}:steam:{game_query[:20]}"},
+                    {"text": f"{'✅ ' if 'xbox' in platform_filter.lower() else ''}🪟 Xbox", "callback_data": f"efilt:{region_filter}:xbox:{game_query[:20]}"},
+                    {"text": f"{'✅ ' if platform_filter in ('all', 'semua') else ''}♾️ Semua", "callback_data": f"efilt:{region_filter}:all:{game_query[:20]}"}
+                ]
+            ]
+        }
+
         if results:
             lines = [
-                f"⚡ *[HASIL RADAR ENEBA CDKEY — {q.upper()}]*",
+                f"⚡ *[HASIL RADAR ENEBA CDKEY — {game_query.upper()}]*",
+                f"🏷️ _Filter:_ Region: `{region_filter.upper()}` | Platform: `{platform_filter.upper()}`",
                 "━━━━━━━━━━━━━━━━━━━━━━"
             ]
             for item in results[:4]:
@@ -664,18 +694,23 @@ class TelegramCommander:
                     f"• Link: {item['url']}\n"
                 )
             lines.append("━━━━━━━━━━━━━━━━━━━━━━")
-            lines.append("💡 _Pricelist terkalibrasi kurs Rupiah + fee checkout Eneba 10% + QRIS 0.7%._")
-            await self.send_message(chat_id, "\n".join(lines))
+            lines.append("💡 _Pricelist terkalibrasi kurs Rupiah + fee checkout Eneba 10% + QRIS 0.7% (Full Digital Rp 0)._")
+            await self.send_message(chat_id, "\n".join(lines), reply_markup=filter_markup)
         else:
             calc = calculate_custom_eneba(price_usd=15.0)
+            custom_url = build_eneba_filtered_url(game_query, platform=platform_filter, region=region_filter)
             msg = (
-                f"🔍 Tidak ada game dengan nama *'{q}'* pada 18 katalog utama Eneba.\n\n"
-                f"💡 *Kalkulator Formula Sourcing Eneba:* Jika Anda menemukan CDKey di Eneba seharga misal Rp 245.000, maka landed cost adalah:\n"
+                f"🔍 Tidak ada game dengan nama *'{game_query}'* pada 18 katalog utama Eneba.\n\n"
+                f"🏷️ _Filter Aktif:_ Region: `{region_filter.upper()}` | Platform: `{platform_filter.upper()}`\n"
+                f"🔗 *Cek Langsung di Eneba:* {custom_url}\n\n"
+                f"💡 *Kalkulator Formula Sourcing Eneba (Full Digital):*\n"
+                f"Jika Anda menemukan CDKey di Eneba seharga misal $15 USD (~Rp 245.000), maka landed cost adalah:\n"
                 f"• Modal Checkout (+10% fee): Rp {calc['landed_cost_idr']:,}\n"
+                f"• Fee QRIS (0.7%): Rp {calc['qris_fee_idr']:,}\n"
                 f"• Rekomendasi Jual Shopee: Rp {calc['recommended_shopee_idr']:,}\n"
                 f"• Potensi Laba Bersih: Rp {calc['net_profit_idr']:,} ({calc['net_margin_pct']}%)"
             )
-            await self.send_message(chat_id, msg)
+            await self.send_message(chat_id, msg, reply_markup=filter_markup)
 
     async def handle_g2g(self, chat_id: str, query: str) -> None:
         """Handler untuk command /g2g [link/offer_id]."""
@@ -1198,6 +1233,14 @@ class TelegramCommander:
             await self.handle_stock(chat_id)
         elif data == "btn_eneba":
             await self.handle_eneba(chat_id, "minecraft")
+        elif data.startswith("efilt:"):
+            # Format: efilt:<region>:<platform>:<query>
+            parts = data.split(":", 3)
+            if len(parts) >= 4:
+                reg = parts[1]
+                plat = parts[2]
+                q = parts[3]
+                await self.handle_eneba(chat_id, f"{q} | {plat} | {reg}")
         elif data == "btn_new_claim_help":
             await self.handle_new_claim(chat_id, "")
         elif data.startswith("wizard_game_"):

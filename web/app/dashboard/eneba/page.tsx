@@ -30,7 +30,8 @@ import {
   Send,
 } from "lucide-react";
 import { EnebaScannedGame } from "@/app/api/research/eneba-crawler/route";
-import { getEnebaSearchUrl, getEnebaProductUrl } from "@/lib/eneba";
+import { getEnebaSearchUrl, getEnebaProductUrl, buildEnebaFilteredUrl } from "@/lib/eneba";
+import { evaluateSellerTrust, formatOrdersCompact, getTrustTierBadgeStyle } from "@/lib/sellerTrust";
 import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
 
 export default function EnebaTerminalPage() {
@@ -39,11 +40,13 @@ export default function EnebaTerminalPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Filters
+  const [selectedRegion, setSelectedRegion] = useState("global");
   const [selectedPlatform, setSelectedPlatform] = useState("ALL");
   const [selectedKeyType, setSelectedKeyType] = useState("ALL");
   const [minMarginFilter, setMinMarginFilter] = useState(0);
   const [maxBudgetFilter, setMaxBudgetFilter] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [safeSellerOnly, setSafeSellerOnly] = useState(false);
 
   // Card expanders
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
@@ -115,7 +118,7 @@ export default function EnebaTerminalPage() {
         setAddedIds((prev) => new Set([...Array.from(prev), game.id]));
         if (json.allGames && Array.isArray(json.allGames)) {
           try {
-            localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(json.allGames));
+            localStorage.setItem("akshara_custom_catalog_v3", JSON.stringify(json.allGames));
           } catch (e) {}
         }
         showToast(`✅ "${game.title}" (Eneba CDKey) berhasil disimpan aman ke Radar Katalog!`);
@@ -153,7 +156,7 @@ export default function EnebaTerminalPage() {
         });
         if (json.allGames && Array.isArray(json.allGames)) {
           try {
-            localStorage.setItem("akshara_custom_catalog_v2", JSON.stringify(json.allGames));
+            localStorage.setItem("akshara_custom_catalog_v3", JSON.stringify(json.allGames));
           } catch (e) {}
         }
         showToast(`⚡ ${json.importedCount || unaddedFiltered.length} Digital CDKey berhasil diimpor dan tersimpan permanen di Katalog Radar!`);
@@ -264,6 +267,13 @@ export default function EnebaTerminalPage() {
     }).format(num || 0);
   };
 
+  const getFilteredEnebaUrl = (g: { title: string; platform: string; eneba_direct_url?: string }) => {
+    return buildEnebaFilteredUrl(g.title, {
+      region: selectedRegion,
+      platform: selectedPlatform !== "ALL" ? selectedPlatform : undefined,
+    });
+  };
+
   // Filtered CDKey Games
   const filteredGames = useMemo(() => {
     return games.filter((g) => {
@@ -287,6 +297,13 @@ export default function EnebaTerminalPage() {
         return false;
       }
 
+      // Safe seller filter
+      if (safeSellerOnly) {
+        const ratingVal = g.seller_rating ?? g.seller_rating_pct ?? 0;
+        const ordersVal = g.seller_orders ?? g.seller_reviews_count ?? 0;
+        if (ratingVal < 95 || ordersVal < 20) return false;
+      }
+
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -299,7 +316,7 @@ export default function EnebaTerminalPage() {
 
       return true;
     });
-  }, [games, selectedPlatform, selectedKeyType, minMarginFilter, maxBudgetFilter, searchQuery]);
+  }, [games, selectedPlatform, selectedKeyType, minMarginFilter, maxBudgetFilter, safeSellerOnly, searchQuery]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -488,18 +505,39 @@ export default function EnebaTerminalPage() {
 
         {/* AI Live Custom Game Scanner Box (Collapsible) */}
         {aiScannerOpen && (
-          <div className="app-card p-5 border-violet-200 bg-violet-50/20 shadow-md animate-in fade-in slide-in-from-top-3 space-y-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-violet-600" />
-              <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                Eneba AI Digital Key Arbitrage Scanner
-              </h3>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">
-                Powered by Gemini
+          <div className="app-card p-5 border-violet-200 bg-violet-50/20 shadow-md animate-fade-up space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-violet-600" />
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                  Eneba Multi-API Live CDKey Arbitrage Scanner
+                </h3>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Steam + CheapShark + Gemini AI
+                </span>
+              </div>
+            </div>
+
+            {/* Pipeline Step Indicator */}
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono bg-white border border-violet-200/80 rounded-xl px-3.5 py-2.5 text-slate-600">
+              <span className={`inline-flex items-center gap-1.5 font-semibold ${isAiScanning ? "text-emerald-700 animate-pulse" : "text-slate-700"}`}>
+                <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[10px] font-bold">1</span>
+                Cek Harga Steam ID
+              </span>
+              <ArrowRight className="w-3 h-3 text-slate-300" />
+              <span className={`inline-flex items-center gap-1.5 font-semibold ${isAiScanning ? "text-blue-700 animate-pulse" : "text-slate-700"}`}>
+                <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold">2</span>
+                Cek Harga Key Global (CheapShark)
+              </span>
+              <ArrowRight className="w-3 h-3 text-slate-300" />
+              <span className={`inline-flex items-center gap-1.5 font-semibold ${isAiScanning ? "text-violet-700 animate-pulse" : "text-slate-700"}`}>
+                <span className="w-4 h-4 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-[10px] font-bold">3</span>
+                Analisa Margin Gemini AI
               </span>
             </div>
+
             <p className="text-xs text-slate-600 font-sans leading-relaxed">
-              Ketikkan nama game apa saja yang ingin Anda telusuri di Eneba. AI kami akan menghitung perkiraan modal kulakan Eneba IDR, harga pasaran Shopee, potongan QRIS (0.7%), fee marketplace Shopee, serta panduan aktivasi resminya.
+              Ketikkan nama game apa saja. Mesin kami akan memvalidasi harga retail Steam Indonesia &amp; harga CDKey global aktual via CheapShark API secara paralel, lalu menghitung margin bersih Shopee + QRIS (0.7%) via Gemini AI.
             </p>
 
             <form onSubmit={handleCustomAiScan} className="flex flex-col sm:flex-row items-center gap-3">
@@ -507,7 +545,7 @@ export default function EnebaTerminalPage() {
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Contoh: Monster Hunter Wilds, Dragon Ball Sparking Zero, Resident Evil..."
+                  placeholder="Contoh: Hollow Knight, Monster Hunter Wilds, Resident Evil 4..."
                   value={customTitle}
                   onChange={(e) => setCustomTitle(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 rounded-lg bg-white border border-slate-300 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
@@ -530,12 +568,12 @@ export default function EnebaTerminalPage() {
               <button
                 type="submit"
                 disabled={isAiScanning || !customTitle.trim()}
-                className="w-full sm:w-auto px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 cursor-pointer shadow-sm transition-colors"
+                className="btn-tactile w-full sm:w-auto px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 cursor-pointer shadow-sm"
               >
                 {isAiScanning ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Menganalisis...</span>
+                    <span>Memindai Live API...</span>
                   </>
                 ) : (
                   <>
@@ -599,7 +637,7 @@ export default function EnebaTerminalPage() {
             </div>
           </div>
 
-          {/* Secondary Filter: Platform, Key Type, Live Search */}
+          {/* Secondary Filter: Platform, Region, Key Type, Live Search */}
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 border-t border-slate-100">
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-[11px] text-slate-500 whitespace-nowrap font-medium">Platform:</span>
@@ -614,6 +652,20 @@ export default function EnebaTerminalPage() {
                 <option value="GOG">GOG</option>
                 <option value="Nintendo">Nintendo</option>
                 <option value="EA">EA App / Origin</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-[11px] text-slate-500 whitespace-nowrap font-medium">Region:</span>
+              <select
+                value={selectedRegion}
+                onChange={(e) => setSelectedRegion(e.target.value)}
+                className="bg-white border border-slate-300 text-slate-900 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-violet-500 cursor-pointer"
+              >
+                <option value="global">Global (Aman Indo)</option>
+                <option value="asia">Asia</option>
+                <option value="indonesia">Indonesia</option>
+                <option value="ALL">Semua Region</option>
               </select>
             </div>
 
@@ -643,17 +695,32 @@ export default function EnebaTerminalPage() {
               />
             </div>
 
+            <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-medium text-slate-700 cursor-pointer hover:border-emerald-400 transition-colors shrink-0">
+              <input
+                type="checkbox"
+                checked={safeSellerOnly}
+                onChange={(e) => setSafeSellerOnly(e.target.checked)}
+                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              />
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Hanya Seller Aman (≥95% & ≥20)</span>
+            </label>
+
             {(selectedPlatform !== "ALL" ||
+              selectedRegion !== "global" ||
               selectedKeyType !== "ALL" ||
               minMarginFilter > 0 ||
               maxBudgetFilter > 0 ||
+              safeSellerOnly ||
               searchQuery) && (
               <button
                 onClick={() => {
                   setSelectedPlatform("ALL");
+                  setSelectedRegion("global");
                   setSelectedKeyType("ALL");
                   setMinMarginFilter(0);
                   setMaxBudgetFilter(0);
+                  setSafeSellerOnly(false);
                   setSearchQuery("");
                 }}
                 className="text-xs text-rose-600 hover:underline shrink-0 font-medium"
@@ -746,7 +813,9 @@ export default function EnebaTerminalPage() {
               return (
                 <div
                   key={game.id}
-                  className="app-card overflow-hidden hover:border-violet-300 transition-all group"
+                  className={`app-card card-interactive animate-fade-up overflow-hidden hover:border-violet-300 group ${
+                    game.id.startsWith("eneba-ai-") ? "ring-2 ring-emerald-500/30 border-emerald-300" : ""
+                  }`}
                 >
                   <div className="p-5 sm:p-6 space-y-4">
                     {/* Top Bar: Verdict Badge, Platform, Key Type, Demand */}
@@ -756,6 +825,19 @@ export default function EnebaTerminalPage() {
                           <Zap className="w-3 h-3 text-violet-600" />
                           ENEBA OFFICIAL CDKEY
                         </span>
+
+                        {game.data_source === "live_market_verified" && (
+                          <span className="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase bg-emerald-50 text-emerald-700 border border-emerald-300 flex items-center gap-1 shadow-2xs">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            LIVE MARKET DATA
+                          </span>
+                        )}
+                        {game.data_source === "ai_estimated" && (
+                          <span className="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-amber-600" />
+                            AI ESTIMATED
+                          </span>
+                        )}
 
                         <span
                           className={`px-2.5 py-1 rounded-md text-[10px] font-semibold tracking-wider uppercase ${
@@ -815,16 +897,35 @@ export default function EnebaTerminalPage() {
                         </h3>
                         <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-slate-500">
                           <span className="text-violet-700 font-medium">Supplier Eneba:</span>
-                          <a
-                            href={game.eneba_direct_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-violet-700 hover:text-violet-900 hover:underline flex items-center gap-1 font-semibold"
-                          >
-                            {game.seller_name} ★ {game.seller_rating_pct}% (
-                            {game.seller_reviews_count.toLocaleString("id-ID")})
-                            <ExternalLink className="w-3 h-3 text-slate-400" />
-                          </a>
+                          {(() => {
+                            const ratingVal = Number((game.seller_rating ?? game.seller_rating_pct ?? 0).toFixed(1));
+                            const ordersVal = game.seller_orders ?? game.seller_reviews_count ?? 0;
+                            const trustEval = evaluateSellerTrust({
+                              rating: ratingVal,
+                              orders: ordersVal,
+                              stock: 10,
+                              deliverySpeed: "Instant Key",
+                              priceIdr: game.price_eneba_idr,
+                              sellingPriceShopeeIdr: game.recommended_shopee_price_idr,
+                            });
+                            const trustTier = game.trust_tier || trustEval.trust_tier;
+                            return (
+                              <>
+                                <a
+                                  href={getFilteredEnebaUrl(game)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-violet-700 hover:text-violet-900 hover:underline flex items-center gap-1 font-semibold tabular-nums"
+                                >
+                                  {game.seller_name} <span className="text-amber-500">★</span> {ratingVal}% • {formatOrdersCompact(ordersVal)}
+                                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                                </a>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${getTrustTierBadgeStyle(trustTier)}`}>
+                                  {trustTier}
+                                </span>
+                              </>
+                            );
+                          })()}
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
                             🛡️ 0% HACKBACK (REDEEM CODE RESMI)
                           </span>
@@ -908,7 +1009,7 @@ export default function EnebaTerminalPage() {
                               </div>
                             )}
                             <a
-                              href={game.eneba_direct_url}
+                              href={getFilteredEnebaUrl(game)}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 text-[11px] text-violet-700 hover:text-violet-900 font-semibold underline pt-1"
@@ -973,7 +1074,7 @@ export default function EnebaTerminalPage() {
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         {/* Direct Eneba Listing */}
                         <a
-                          href={game.eneba_direct_url}
+                          href={getFilteredEnebaUrl(game)}
                           target="_blank"
                           rel="noreferrer"
                           className="px-3 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 flex items-center gap-1.5 transition-colors font-medium shadow-2xs"
