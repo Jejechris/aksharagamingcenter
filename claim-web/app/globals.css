@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 /* ============================================================
-   AKSHARA CLAIM VAULT — Next-Gen Obsidian Cyber-Design System v4.0
+   AKSHARA PUBLIC PORTAL (STOREFRONT + CLAIM VAULT)
+   Obsidian Cyber-Design System
    ============================================================ */
 
 :root {
@@ -21,7 +22,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -35,6 +35,40 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.22);
+}
+
+.v0-card {
+  background: linear-gradient(180deg, rgba(16, 20, 31, 0.92) 0%, rgba(10, 13, 22, 0.96) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.65);
+}
+
+.machined-card {
+  border-radius: 24px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(99, 102, 241, 0.25), rgba(255, 255, 255, 0.08));
+}
+
+.machined-card-inner {
+  border-radius: 23px;
+  background: radial-gradient(circle at top right, rgba(30, 41, 59, 0.55), #080b12 65%);
+}
+
+.v0-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.15s ease-out;
+}
+.v0-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.text-gradient-silver {
+  background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Ambient Glow */
@@ -68,7 +102,6 @@ body {
   filter: blur(80px);
 }
 
-/* Shimmer */
 .skeleton-shimmer {
   position: relative;
   overflow: hidden;

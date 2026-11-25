@@ -1,6 +1,6 @@
 # Akshara Gaming Center — Multi-Device Handoff & Sync Guide
 
-> **Canonical Handoff Document (Updated through FASE 19)**  
+> **Canonical Handoff Document (Updated through FASE 20)**  
 > **Repository:** `https://github.com/Jejechris/aksharagamingcenter.git` (`main`)  
 > **Legacy Reference:** [AKSHARA_PROJECT_CONTEXT_HANDOVER.md](./AKSHARA_PROJECT_CONTEXT_HANDOVER.md) *(arsip awal Oktober 2026 — gunakan dokumen ini sebagai status terbaru)*
 
@@ -48,13 +48,16 @@ Karena riwayat chat Antigravity tersimpan lokal di tiap perangkat (`~/.gemini/an
     - `web/lib/gemini.ts`: Memakai `process.env.GEMINI_API_KEY` (tanpa fallback hardcoded key) dengan `FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"]` dan dukungan `jsonMode`.
     - `web/lib/catalog.ts`, `web/lib/g2g.ts`, `web/lib/g2gStock.ts`, `web/lib/eneba.ts`, `web/lib/steamPrice.ts`: Engine katalog (full `await` pada write Supabase/JSON), G2G live IDR pricing (`converted_unit_price` / `display_price`), dan zero-empty links (`?q=<SellerName>` sudah dihapus).
     - `web/app/components/GameSelectorCombobox.tsx`: Searchable combobox memakai `ReactDOM.createPortal(..., document.body)` dengan `position: fixed` dan `z-[9999]` agar selalu di atas kartu `.app-card`.
-    - `web/middleware.ts`: Proteksi `/dashboard/*` via cookie `akshara_admin_session` (`/login`) dan API sensitif via session / `x-admin-secret` / localhost dev bypass.
+    - `web/middleware.ts`: Proteksi `/dashboard/*` via cookie `akshara_admin_session` (`/login`), proteksi **seluruh** endpoint `/api/*` termasuk `GET /api/catalog`, `/api/claim/*`, `/api/verify` via session / `x-admin-secret` / localhost dev bypass, serta redirect `claim.*` dan `/claim/*` ke portal publik (`NEXT_PUBLIC_CLAIM_URL` / `https://claimakshara.vercel.app`).
 - **`bot/`** — Telegram Commander & Market Sentry Python:
   - `bot/market_sentry.py`: Cek stok live G2G SLS (`fetch_g2g_offer_live`, `audit_all_catalog_sellers`) dengan ekstraksi `total_success_order`, `total_rating`, `satisfaction_rate`, serta badge rating & `trust_tier` pada laporan Telegram (`build_stock_summary_report`, `get_critical_stock_alerts`).
   - `bot/eneba_data.py`, `bot/telegram_commander.py`, `bot/canvas_drawer.py`, `bot/formatter_data.py`.
-- **`claim-web/`** — Portal klaim pembeli terpisah (`claimakshara.vercel.app`).
-- **`.github/workflows/ci-web.yml`** — CI otomatis di GitHub Actions untuk mengecek `npx tsc --noEmit`, `npm run build` di `web/`, dan `python -m py_compile` pada `bot/*.py` di setiap push/PR ke `main`.
-- **`scripts/`** — Utility sanitasi & inisialisasi katalog (`scripts/sanitize_catalog.js`, `scripts/init_db.js`).
+- **`claim-web/`** — Portal Publik Terpadu: **Storefront + Warranty Verifier + Customer Claim Vault** (`claimakshara.vercel.app`):
+  - `/` (`claim-web/app/page.tsx`): Storefront publik Akshara Gaming Center, Quick Claim input, VIP Voucher box, Fast-Lane WhatsApp Checkout, serta verifikasi sertifikat garansi real-time (`/api/verify?sn=...`). Zero link atau akses ke `/dashboard` admin.
+  - `/claim` (`claim-web/app/claim/page.tsx`) & `/claim/[code]`: Login klaim & dekripsi brankas AES-256-GCM (`/api/verify`, `/api/reveal`).
+  - **Least-Privilege DB (`akshara_public_portal`)**: Dikonfigurasi via `scripts/setup_least_privilege_roles.js`. Role database ini hanya punya akses `SELECT` kolom publik `catalog_games` (tanpa `sellers`/`margin`) dan `SELECT` + `UPDATE` terbatas (telemetry/lockout/reveal) pada `claims_vault` — ditolak total (`42501 permission denied`) pada `inventory_vault`, `autonomous_orders`, `app_kv`, maupun `INSERT`/`DELETE`.
+- **`.github/workflows/ci-web.yml`** — CI otomatis di GitHub Actions untuk mengecek `npx tsc --noEmit` & `npm run build` di `web/` dan `claim-web/`, serta `python -m py_compile` pada `bot/*.py` di setiap push/PR ke `main`.
+- **`scripts/`** — Utility sanitasi, inisialisasi DB, & isolasi role (`scripts/sanitize_catalog.js`, `scripts/init_db.js`, `scripts/setup_least_privilege_roles.js`).
 
 ---
 
@@ -83,29 +86,30 @@ npm install
 Buat file `.env` (root), `web/.env.local`, dan `claim-web/.env.local` sesuai kebutuhan environment masing-masing perangkat:
 - **Root `.env`**: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`, `IMAP_SERVER`, `IMAP_PORT`, `IMAP_EMAIL`, `IMAP_APP_PASSWORD`, `GEMINI_API_KEY`.
 - **`web/.env.local`**: `GEMINI_API_KEY`, `ADMIN_ACCESS_PIN`, `ADMIN_SECRET` / auth session secret, `VAULT_ENCRYPTION_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`, variabel **Supabase** (URL & key sesuai proyek Supabase aktif), dan `CRON_SECRET` jika dipakai.
-- **`claim-web/.env.local`**: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`, variabel Supabase (jika aktif).
+- **`claim-web/.env.local`**: `DATABASE_URL` (gunakan role terbatas `akshara_public_portal.<ref>` hasil `node scripts/setup_least_privilege_roles.js`), `VAULT_ENCRYPTION_SECRET` (sinkron dengan `web/.env.local`), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`.
 
 ---
 
 ## 4. Perintah Verifikasi Standar
 
 ```powershell
-# TypeScript & Next.js production build
-cd web
-npx tsc --noEmit
-npm run build
+# TypeScript & Next.js production build (Admin Web + Public Portal)
+cd web; npx tsc --noEmit; npm run build
+cd ..\claim-web; npx tsc --noEmit; npm run build
+
+# Audit isolasi DB role least-privilege
+cd ..; node scripts/setup_least_privilege_roles.js
 
 # Syntax check Python bot
-cd ..
 python -m py_compile bot/market_sentry.py bot/telegram_commander.py bot/eneba_data.py
 ```
 
 ---
 
-## 5. Status Terkini (Per FASE 18)
+## 5. Status Terkini (Per FASE 20)
 
-- **Selesai:** FASE 7 s/d FASE 19 (termasuk perbaikan `x-goog-api-key` untuk kunci `AQ.A...`, inisialisasi 5 tabel Supabase + `RLS`, Transaction Pooler IPv4, serta Keepalive Anti-Pause via GitHub Actions).
-- **Catatan Penting Environment (`web/.env.local` & Vercel):**
-  - Pastikan `GEMINI_API_KEY` menggunakan API Key valid dari Google AI Studio (`AIza...`, bukan token `AQ.A...` agar tidak 401 `ACCESS_TOKEN_TYPE_UNSUPPORTED`).
+- **Selesai:** FASE 7 s/d FASE 20 — Pemisahan total antara **Internal Admin Command Center (`web/`)** dan **Public Storefront + Warranty Verifier + Claim Vault (`claim-web/`)**, penguncian middleware `web/`, serta provisioning PostgreSQL least-privilege role `akshara_public_portal`.
+- **Catatan Penting Environment (`web/.env.local`, `claim-web/.env.local`, & Vercel):**
+  - Pastikan project Vercel **`claimakshara`** memakai environment variable `DATABASE_URL` dengan role **`akshara_public_portal.<ref>`** dan `VAULT_ENCRYPTION_SECRET` yang identik dengan project admin `web/`.
   - Pastikan `VAULT_ENCRYPTION_SECRET` terisi string acak 32+ karakter di lokal & Vercel agar enkripsi kredensial di brankas aman.
-- **Tugas Berikutnya:** Siap melanjutkan ke fase fitur berikutnya setelah memastikan `git pull` terbaru dari `origin/main`.
+- **Tugas Berikutnya:** Verifikasi/sinkronkan env project Vercel untuk `claim-web` bila deploy ke production, lalu siap melanjutkan fase berikutnya setelah `git pull` terbaru dari `origin/main`.

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { getDbClaimByCode, upsertDbClaim, getDbClaims, getKV, setKV } from "@/lib/db";
+import { getDbClaimByCode, updateDbClaimState } from "@/lib/db";
 import { decryptCredential } from "@/lib/cryptoVault";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
@@ -42,9 +42,7 @@ async function inspectIpForensics(ip: string) {
         };
       }
     }
-  } catch (e) {
-    console.warn("[IP Forensics] Lookup timed out or failed:", e);
-  }
+  } catch {}
   return {
     status: "unknown",
     country: "Indonesia",
@@ -58,15 +56,12 @@ async function inspectIpForensics(ip: string) {
 }
 
 async function notifyTelegramReveal(claim: any, ip: string, userAgent: string, isFirstTime: boolean, forensicsReport: any) {
-  if (!BOT_TOKEN || !ADMIN_CHAT_ID) {
-    console.warn("[Telegram Notification] TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID is not configured, skipping.");
-    return;
-  }
+  if (!BOT_TOKEN || !ADMIN_CHAT_ID) return;
   try {
     const timeStr = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
     const emoji = isFirstTime ? "🔓" : "⚠️";
     const statusTitle = isFirstTime
-      ? "KREDENSIAL DIBUKA (WEBSITE 2 CLAIM VAULT)"
+      ? "KREDENSIAL DIBUKA (PORTAL PUBLIK CLAIM VAULT)"
       : `KREDENSIAL DIAKSES ULANG (TOTAL ${claim.reveal_count}x)`;
 
     const vpnStatusStr = forensicsReport.is_vpn_or_proxy
@@ -90,7 +85,7 @@ async function notifyTelegramReveal(claim: any, ip: string, userAgent: string, i
       + `• *Perangkat / User-Agent:* \`${userAgent.slice(0, 80)}\`\n`
       + `• *Status Garansi:* AKTIF (${claim.warranty_days} Hari)\n`
       + "━━━━━━━━━━━━━━━━━━━━━━\n"
-      + "_Catatan: Bukti forensik ini sah dan tersimpan permanen. Pembeli telah memasukkan Passcode rahasia dengan benar dan menyetujui SOP video rekaman layar._";
+      + "_Catatan: Bukti ini sah dan tersimpan permanen._";
 
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
@@ -102,16 +97,11 @@ async function notifyTelegramReveal(claim: any, ip: string, userAgent: string, i
         disable_web_page_preview: true,
       }),
     });
-  } catch (err) {
-    console.error("[Telegram Notification Error]", err);
-  }
+  } catch {}
 }
 
 async function notifyTelegramBruteForceAlert(claim: any, ip: string, userAgent: string) {
-  if (!BOT_TOKEN || !ADMIN_CHAT_ID) {
-    console.warn("[Telegram Security Alert] TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID is not configured, skipping.");
-    return;
-  }
+  if (!BOT_TOKEN || !ADMIN_CHAT_ID) return;
   try {
     const timeStr = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
     const msg =
@@ -125,7 +115,7 @@ async function notifyTelegramBruteForceAlert(claim: any, ip: string, userAgent: 
       + `📍 *IP Address:* \`${ip}\`\n`
       + `📱 *User-Agent:* \`${userAgent.slice(0, 80)}\`\n`
       + `⏱️ *Waktu:* ${timeStr} WIB\n`
-      + "🔒 *Tindakan:* Akun otomatis DIKUNCI sementara selama 15 menit demi keamanan sistem.";
+      + "🔒 *Tindakan:* Akun otomatis DIKUNCI sementara selama 15 menit.";
 
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
@@ -137,9 +127,7 @@ async function notifyTelegramBruteForceAlert(claim: any, ip: string, userAgent: 
         disable_web_page_preview: true,
       }),
     });
-  } catch (err) {
-    console.error("[Telegram Security Alert Error]", err);
-  }
+  } catch {}
 }
 
 export async function POST(req: NextRequest) {
@@ -149,70 +137,52 @@ export async function POST(req: NextRequest) {
     const passcode = body.passcode?.trim();
 
     if (!code || !passcode) {
-      return NextResponse.json({
-        status: "error",
-        message: "Kode klaim dan Passcode PIN wajib diisi."
-      }, { status: 400 });
-    }
-
-    // 1. Ambil data dari claims_vault (Row-Level Atomic) atau KV Cloud Database
-    let claims: any[] = [];
-    const dbClaims = await getDbClaims();
-    if (dbClaims && Array.isArray(dbClaims) && dbClaims.length > 0) {
-      claims = dbClaims;
-    } else {
-      const dbData = await getKV("claimed_credentials");
-      if (dbData && Array.isArray(dbData)) {
-        claims = dbData;
-      } else {
-        const localPath = path.join(process.cwd(), "data", "claimed_credentials.json");
-        const parentPath = path.resolve(process.cwd(), "..", "web", "data", "claimed_credentials.json");
-        const targetFile = fs.existsSync(localPath) ? localPath : parentPath;
-        if (fs.existsSync(targetFile)) {
-          claims = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
-        }
-      }
+      return NextResponse.json(
+        { status: "error", message: "Kode klaim dan Passcode PIN wajib diisi." },
+        { status: 400 }
+      );
     }
 
     let claim = await getDbClaimByCode(code);
-    let claimIndex = claims.findIndex((c: any) => c.claim_code.toUpperCase() === code);
-    if (!claim && claimIndex !== -1) {
-      claim = claims[claimIndex];
+    const localPath = path.join(process.cwd(), "data", "claimed_credentials.json");
+    let localClaims: any[] = [];
+    let localIdx = -1;
+
+    if (!claim && fs.existsSync(localPath)) {
+      try {
+        localClaims = JSON.parse(fs.readFileSync(localPath, "utf-8"));
+        localIdx = localClaims.findIndex((c: any) => (c.claim_code || "").toUpperCase() === code);
+        if (localIdx !== -1) claim = localClaims[localIdx];
+      } catch {}
     }
 
     if (!claim) {
       return NextResponse.json({ status: "not_found", message: "Kode klaim tidak valid." }, { status: 404 });
     }
 
-    // Deteksi IP Address Pembeli
     const forwardedFor = req.headers.get("x-forwarded-for");
     const realIp = req.headers.get("x-real-ip");
     const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : realIp || "127.0.0.1";
     const userAgent = req.headers.get("user-agent") || "Unknown Device";
 
-    // Cek apakah akun sedang terkunci karena brute-force PIN
     if (claim.locked_until && new Date(claim.locked_until) > new Date()) {
-      return NextResponse.json({
-        status: "rate_limited",
-        message: "Terlalu banyak percobaan PIN salah. Akun dikunci sementara selama 15 menit demi keamanan."
-      }, { status: 429 });
+      return NextResponse.json(
+        {
+          status: "rate_limited",
+          message: "Terlalu banyak percobaan PIN salah. Akun dikunci sementara selama 15 menit demi keamanan.",
+        },
+        { status: 429 }
+      );
     }
 
-    // Helper simpan ke disk backup
-    const syncLocalDisk = (updatedList: any[]) => {
-      const localPath = path.join(process.cwd(), "data", "claimed_credentials.json");
-      const parentPath = path.resolve(process.cwd(), "..", "web", "data", "claimed_credentials.json");
-      for (const tPath of [localPath, parentPath]) {
-        try {
-          const d = path.dirname(tPath);
-          if (fs.existsSync(d)) {
-            fs.writeFileSync(tPath, JSON.stringify(updatedList, null, 2), "utf-8");
-          }
-        } catch (e) {}
-      }
+    const syncLocalDisk = () => {
+      if (localIdx === -1) return;
+      try {
+        localClaims[localIdx] = claim;
+        fs.writeFileSync(localPath, JSON.stringify(localClaims, null, 2), "utf-8");
+      } catch {}
     };
 
-    // VERIFIKASI PASSCODE SECARA KETAT!
     if (claim.passcode !== passcode) {
       claim.failed_attempts = (claim.failed_attempts || 0) + 1;
       const isLocked = claim.failed_attempts >= 5;
@@ -221,36 +191,33 @@ export async function POST(req: NextRequest) {
         await notifyTelegramBruteForceAlert(claim, ip, userAgent);
       }
 
-      // Simpan pembaruan atomic row-level ke PostgreSQL claims_vault
-      await upsertDbClaim(claim).catch(() => {});
-
-      if (claimIndex !== -1) {
-        claims[claimIndex] = claim;
-        await setKV("claimed_credentials", claims).catch(() => {});
-        syncLocalDisk(claims);
-      }
+      await updateDbClaimState(claim);
+      syncLocalDisk();
 
       if (isLocked) {
-        return NextResponse.json({
-          status: "rate_limited",
-          message: "Terlalu banyak percobaan PIN salah. Akun dikunci sementara selama 15 menit demi keamanan."
-        }, { status: 429 });
+        return NextResponse.json(
+          {
+            status: "rate_limited",
+            message: "Terlalu banyak percobaan PIN salah. Akun dikunci sementara selama 15 menit demi keamanan.",
+          },
+          { status: 429 }
+        );
       }
 
-      return NextResponse.json({
-        status: "invalid_passcode",
-        message: `Passcode PIN salah! Sisa percobaan: ${5 - claim.failed_attempts}. Harap periksa PIN rahasia yang diberikan penjual di chat Shopee.`
-      }, { status: 401 });
+      return NextResponse.json(
+        {
+          status: "invalid_passcode",
+          message: `Passcode PIN salah! Sisa percobaan: ${5 - claim.failed_attempts}. Harap periksa PIN rahasia dari chat pesanan.`,
+        },
+        { status: 401 }
+      );
     }
 
-    // Reset status lockout saat passcode benar
     claim.failed_attempts = 0;
     claim.locked_until = null;
 
     const isFirstTime = claim.status !== "REVEALED";
     const nowIso = new Date().toISOString();
-
-    // Extract client forensics & IP inspection
     const clientForensics = body.forensics || {};
     const ipForensics = await inspectIpForensics(ip);
 
@@ -269,7 +236,6 @@ export async function POST(req: NextRequest) {
       device_hash: clientForensics.device_hash || "N/A",
     };
 
-    // Update Data
     claim.status = "REVEALED";
     if (!claim.revealed_at) {
       claim.revealed_at = nowIso;
@@ -278,10 +244,7 @@ export async function POST(req: NextRequest) {
       claim.forensics = forensicsReport;
     }
     claim.reveal_count = (claim.reveal_count || 0) + 1;
-
-    if (!Array.isArray(claim.reveal_history)) {
-      claim.reveal_history = [];
-    }
+    if (!Array.isArray(claim.reveal_history)) claim.reveal_history = [];
     claim.reveal_history.push({
       timestamp: nowIso,
       ip,
@@ -289,25 +252,10 @@ export async function POST(req: NextRequest) {
       forensics: forensicsReport,
     });
 
-    // 1. Simpan pembaruan atomic row-level ke PostgreSQL claims_vault
-    await upsertDbClaim(claim).catch(() => {});
-
-    if (claimIndex !== -1) {
-      claims[claimIndex] = claim;
-    } else {
-      claims.unshift(claim);
-    }
-
-    // 2. Simpan ke KV Database (Persistent Cloud Storage) sebagai backup
-    await setKV("claimed_credentials", claims).catch(() => {});
-
-    // 3. Tetap simpan ke file lokal & file parent web sebagai backup
-    syncLocalDisk(claims);
-
-    // Kirim notifikasi Telegram ke HP Senna
+    await updateDbClaimState(claim);
+    syncLocalDisk();
     await notifyTelegramReveal(claim, ip, userAgent, isFirstTime, forensicsReport);
 
-    // Dekripsi kredensial untuk dikirimkan ke pembeli
     const decryptedCreds = decryptCredential(claim.credential_data, passcode);
 
     return NextResponse.json({
@@ -326,7 +274,7 @@ export async function POST(req: NextRequest) {
         reveal_count: claim.reveal_count,
         access_ip: ip,
         forensics: forensicsReport,
-      }
+      },
     });
   } catch (error: any) {
     console.error("[Reveal Error]", error);

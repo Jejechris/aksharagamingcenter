@@ -37,6 +37,20 @@ jobs:
           VAULT_ENCRYPTION_SECRET: ${{ secrets.VAULT_ENCRYPTION_SECRET || 'ci-placeholder-vault-secret-32chars!' }}
         run: npm run build
 
+      - name: Install claim-web dependencies
+        working-directory: claim-web
+        run: npm ci
+
+      - name: Run claim-web TypeScript check
+        working-directory: claim-web
+        run: npx tsc --noEmit
+
+      - name: Build claim-web production bundle
+        working-directory: claim-web
+        env:
+          VAULT_ENCRYPTION_SECRET: ${{ secrets.VAULT_ENCRYPTION_SECRET || 'ci-placeholder-vault-secret-32chars!' }}
+        run: npm run build
+
       - name: Setup Python & verify bot syntax
         uses: actions/setup-python@v5
         with:
