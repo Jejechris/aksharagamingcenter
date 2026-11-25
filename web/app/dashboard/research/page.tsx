@@ -39,6 +39,7 @@ import {
   calculateShopeeEconomics,
 } from "@/lib/pricing";
 import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
+import ResearchReviewModal from "@/app/components/ResearchReviewModal";
 
 export default function ResearchCenterPage() {
   // G2G Autonomous Crawler State
@@ -79,6 +80,12 @@ export default function ResearchCenterPage() {
 
   // Shopee Competitor Modal
   const [competitorModalGame, setCompetitorModalGame] = useState<G2GScannedGame | null>(null);
+
+  // Pre-Save Research Staging Modal (Sort & Cek sebelum masuk DB)
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewCandidates, setReviewCandidates] = useState<any[]>([]);
+  const [reviewModalTitle, setReviewModalTitle] = useState("Review Hasil Research Sebelum Masuk Database");
+  const [isSavingReview, setIsSavingReview] = useState(false);
 
   const handleApplyCompetitorPriceInResearch = (newPrice: number) => {
     if (!competitorModalGame) return;
@@ -175,7 +182,7 @@ export default function ResearchCenterPage() {
       const res = await fetch("/api/research/g2g-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "crawl" }),
+        body: JSON.stringify({ action: "crawl", preview_only: true }),
       });
       const json = await res.json();
 
@@ -186,12 +193,10 @@ export default function ResearchCenterPage() {
 
         if (Array.isArray(json.extracted_results) && json.extracted_results.length > 0) {
           setLatestLiveExtracted(json.extracted_results);
-          setScannedGames((prev) => {
-            const extractedIds = new Set(json.extracted_results.map((r: any) => r.id));
-            const filteredPrev = prev.filter((p) => !extractedIds.has(p.id));
-            return [...json.extracted_results, ...filteredPrev];
-          });
-          showToast(`🚀 Autonomous Robot berhasil mengekstrak ${json.extracted_results.length} penawaran live G2G!`);
+          setReviewCandidates(json.extracted_results);
+          setReviewModalTitle(`Review Hasil Robot Crawler G2G (${json.extracted_results.length} Kandidat)`);
+          setReviewModalOpen(true);
+          showToast(`🔍 Robot menemukan ${json.extracted_results.length} penawaran live. Silakan cek & sortir sebelum menyimpan ke DB!`);
         } else {
           showToast("🚀 Sinkronisasi live SLS selesai tanpa perubahan penawaran baru.");
         }
@@ -206,32 +211,28 @@ export default function ResearchCenterPage() {
     }
   };
 
-  // Auto-Discover Trend
+  // Auto-Discover Trend (Pre-Save Review Mode)
   const handleDiscoverTrend = async () => {
     setIsDiscoveringTrend(true);
     try {
       const res = await fetch("/api/research/eneba-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "discover_trend" }),
+        body: JSON.stringify({ action: "discover_trend", preview_only: true }),
       });
       const json = await res.json();
       if (res.ok && json.status === "success" && json.data) {
-        const isEnebaSrc = json.data.source_marketplace === "ENEBA";
         const trendItem = {
           ...json.data,
-          source_marketplace: isEnebaSrc ? "ENEBA" : "ENEBA",
+          source_marketplace: "ENEBA",
           price_g2g_idr: json.data.price_eneba_idr || json.data.price_g2g_idr,
           g2g_direct_url: json.data.eneba_direct_url || json.data.g2g_direct_url,
           g2g_category_slug: "eneba-cdkey",
-          persisted_in_research_db: true,
         };
-        setScannedGames((prev) => {
-          const cleanTitle = String(trendItem.title || "").toLowerCase().trim();
-          const filtered = prev.filter((p) => String(p.title || "").toLowerCase().trim() !== cleanTitle);
-          return [trendItem, ...filtered];
-        });
-        showToast(`🎯 Trend Terverifikasi Live & Disimpan ke DB: ${json.data.title} (Margin +${json.data.net_margin_pct}%)!`);
+        setReviewCandidates([trendItem]);
+        setReviewModalTitle(`Review Auto-Discover Trend: ${json.data.title}`);
+        setReviewModalOpen(true);
+        showToast(`🎯 Trend ditemukan (${json.data.title}). Cek harga asli & margin lalu simpan bila cocok!`);
       } else {
         showToast(json.message || "Gagal mencari trend game saat ini.", "error");
       }
@@ -359,11 +360,13 @@ export default function ResearchCenterPage() {
         body: JSON.stringify({
           query,
           platform: manualPlatform,
+          preview_only: true,
         }),
       });
       const json = await res.json();
       if (res.ok && json.status === "success" && json.data) {
         const isEnebaRes = json.source_marketplace === "ENEBA";
+        const tel = json.market_telemetry || {};
         const customGame: any = {
           id: json.data.id || `manual-${Date.now()}`,
           title: json.data.title,
@@ -374,6 +377,12 @@ export default function ResearchCenterPage() {
           g2g_direct_url: json.data.profile_url || "https://www.g2g.com/categories/steam-global-account",
           eneba_direct_url: isEnebaRes ? json.data.profile_url : undefined,
           price_eneba_idr: isEnebaRes ? json.data.g2g_price_idr : undefined,
+          eneba_base_price_idr: tel.eneba_base_price_idr || 0,
+          eneba_live_verified: Boolean(tel.eneba_live_verified),
+          cheapshark_usd: tel.cheapshark_usd || undefined,
+          arbitrage_viable: tel.arbitrage_viable ?? true,
+          arbitrage_warning: tel.arbitrage_warning,
+          data_source: tel.data_source || "ai_estimated",
           seller_name: json.data.best_supplier.name,
           seller_rating_pct: json.data.best_supplier.rating_pct,
           seller_reviews_count: json.data.best_supplier.reviews_count,
@@ -392,14 +401,12 @@ export default function ResearchCenterPage() {
           arbitrage_verdict: json.data.net_margin_pct >= 40 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
           crawl_timestamp: "Live Market Scan",
           tactical_reason: json.data.arbitrage_reason,
-          persisted_in_research_db: true,
         };
 
-        setScannedGames((prev) => {
-          const cleanTitle = String(customGame.title || "").toLowerCase().trim();
-          return [customGame, ...prev.filter((p) => String(p.title || "").toLowerCase().trim() !== cleanTitle)];
-        });
-        showToast(`✅ "${customGame.title}" terverifikasi pasar live & tersimpan ke DB Radar!`);
+        setReviewCandidates([customGame]);
+        setReviewModalTitle(`Review Hasil Scan Manual: ${customGame.title}`);
+        setReviewModalOpen(true);
+        showToast(`🔍 Hasil scan "${customGame.title}" siap direview sebelum disimpan!`);
         setManualQuery("");
       } else {
         showToast(json.message || "Gagal melakukan scan AI.", "error");
@@ -408,6 +415,57 @@ export default function ResearchCenterPage() {
       showToast("Kesalahan koneksi saat menghubungi server AI.", "error");
     } finally {
       setIsManualScanning(false);
+    }
+  };
+
+  const handleConfirmSaveReview = async (selectedItems: any[], alsoAddToCatalog: boolean) => {
+    if (!selectedItems || selectedItems.length === 0) return;
+    setIsSavingReview(true);
+    try {
+      const enebaItems = selectedItems.filter((g) => g.source_marketplace === "ENEBA");
+      const g2gItems = selectedItems.filter((g) => g.source_marketplace !== "ENEBA");
+
+      if (enebaItems.length > 0) {
+        await fetch("/api/research/eneba-crawler", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "save_research", games: enebaItems }),
+        });
+        if (alsoAddToCatalog) {
+          await fetch("/api/research/eneba-crawler", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "bulk_import", games: enebaItems }),
+          });
+        }
+      }
+
+      if (g2gItems.length > 0) {
+        await fetch("/api/research/g2g-crawler", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "save_research", games: g2gItems }),
+        });
+        if (alsoAddToCatalog) {
+          await fetch("/api/research/g2g-crawler", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "bulk_import", games: g2gItems }),
+          });
+        }
+      }
+
+      await fetchScannedGames();
+      setReviewModalOpen(false);
+      showToast(
+        alsoAddToCatalog
+          ? `✅ ${selectedItems.length} game disimpan ke DB Radar & Katalog Jualan!`
+          : `✅ ${selectedItems.length} game pilihan Anda disimpan ke Database Radar!`
+      );
+    } catch {
+      showToast("Gagal menyimpan hasil review ke database.", "error");
+    } finally {
+      setIsSavingReview(false);
     }
   };
 
@@ -1614,6 +1672,15 @@ export default function ResearchCenterPage() {
           onApplyPrice={handleApplyCompetitorPriceInResearch}
         />
       )}
+
+      <ResearchReviewModal
+        open={reviewModalOpen}
+        title={reviewModalTitle}
+        candidates={reviewCandidates}
+        isSaving={isSavingReview}
+        onClose={() => setReviewModalOpen(false)}
+        onConfirmSave={handleConfirmSaveReview}
+      />
     </div>
   );
 }

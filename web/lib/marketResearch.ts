@@ -86,6 +86,7 @@ export async function fetchLiveEnebaListings(
         html.matchAll(/<a[^>]*title="([^"]{4,160})"[^>]*href="(\/[a-z0-9-]+)"[^>]*><\/a>/gi)
       );
       const listings: LiveEnebaListing[] = [];
+      const seenUrl = new Set<string>();
 
       for (let i = 0; i < anchors.length; i++) {
         const start = anchors[i].index ?? 0;
@@ -95,17 +96,24 @@ export async function fetchLiveEnebaListings(
         const rawTitle = anchors[i][1].trim();
         const slug = anchors[i][2].trim();
         const cleanText = chunk.replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/\s+/g, " ");
-        const pMatch = cleanText.match(/(?:From\s*)?Rp\s*([\d.,]+)/i);
-        const basePriceIdr = pMatch ? Number(pMatch[1].replace(/[^\d]/g, "")) : 0;
+        // Ekstrak SEMUA nominal Rp di dalam blok kartu (e.g. "From Rp 1,200,631 -94% Rp 73,251")
+        // Lalu ambil harga terendah (harga diskon aktual, BUKAN harga coret original!)
+        const rpMatches = Array.from(cleanText.matchAll(/Rp\s*([\d.,]+)/gi))
+          .map((m) => Number(m[1].replace(/[^\d]/g, "")))
+          .filter((n) => Number.isFinite(n) && n > 1000);
+        const basePriceIdr = rpMatches.length > 0 ? Math.min(...rpMatches) : 0;
 
         if (basePriceIdr <= 1000) continue;
+        const fullUrl = `https://www.eneba.com${slug}`;
+        if (seenUrl.has(fullUrl)) continue;
+        seenUrl.add(fullUrl);
 
         const lowTitle = rawTitle.toLowerCase();
         // ~9% Eneba buyer service fee checkout QRIS/Pay
         const landedCostIdr = Math.ceil((basePriceIdr * 1.09) / 1000) * 1000;
         listings.push({
           title: rawTitle,
-          url: `https://www.eneba.com${slug}`,
+          url: fullUrl,
           base_price_idr: basePriceIdr,
           landed_cost_idr: landedCostIdr,
           platform: inferPlatformFromEnebaTitle(rawTitle, options?.platform || "Steam"),
@@ -450,23 +458,20 @@ Hanya kembalikan JSON array string judul game (JANGAN tulis harga):
     }
   }
 
-  // Cek bertahap (max 2 concurrent agar Eneba SSR tidak terkena rate-limit!)
-  const pool = candidateTitles.slice(0, 24);
+  // Cek bertahap (1 per 1 dengan jeda singkat 180ms agar Eneba SSR tidak memblokir/throttle & harga asli Rp 73rb terbaca akurat!)
+  const pool = candidateTitles.slice(0, 18);
   const verifiedEnebaViable: VerifiedMarketOpportunity[] = [];
   const verifiedAnyViable: VerifiedMarketOpportunity[] = [];
   const verifiedLastResort: VerifiedMarketOpportunity[] = [];
 
-  for (let i = 0; i < pool.length; i += 2) {
-    const batch = pool.slice(i, i + 2);
-    const res = await Promise.all(
-      batch.map((title) =>
-        verifyLiveGameOpportunity({ query: title, preferredPlatform: "Steam", targetMarginPct: 18 }).catch(
-          () => null
-        )
-      )
-    );
-    for (const item of res) {
-      if (!item) continue;
+  for (let i = 0; i < pool.length; i++) {
+    const title = pool[i];
+    const item = await verifyLiveGameOpportunity({
+      query: title,
+      preferredPlatform: "Steam",
+      targetMarginPct: 18,
+    }).catch(() => null);
+    if (item) {
       if (item.eneba_live_verified && item.arbitrage_viable && item.net_margin_pct >= 12) {
         verifiedEnebaViable.push(item);
       } else if (item.arbitrage_viable && item.net_margin_pct >= 12) {
@@ -475,8 +480,11 @@ Hanya kembalikan JSON array string judul game (JANGAN tulis harga):
         verifiedLastResort.push(item);
       }
     }
-    if (verifiedEnebaViable.length >= 1) break;
-    if (i >= 10 && verifiedAnyViable.length >= 1) break;
+    if (verifiedEnebaViable.length >= 2) break;
+    if (i >= 10 && verifiedEnebaViable.length >= 1) break;
+    if (i < pool.length - 1) {
+      await new Promise((r) => setTimeout(r, 180));
+    }
   }
 
   verifiedEnebaViable.sort((a, b) => b.net_margin_pct - a.net_margin_pct || b.net_profit_idr - a.net_profit_idr);

@@ -39,6 +39,7 @@ import {
   calculateShopeeEconomics,
 } from "@/lib/pricing";
 import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
+import ResearchReviewModal from "@/app/components/ResearchReviewModal";
 
 export default function EnebaTerminalPage() {
   const [games, setGames] = useState<EnebaScannedGame[]>([]);
@@ -76,6 +77,12 @@ export default function EnebaTerminalPage() {
 
   // Shopee Competitor Intelligence Modal
   const [competitorModalGame, setCompetitorModalGame] = useState<any | null>(null);
+
+  // Pre-Save Research Staging Modal (Sort & Cek sebelum simpan ke DB)
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewCandidates, setReviewCandidates] = useState<EnebaScannedGame[]>([]);
+  const [reviewModalTitle, setReviewModalTitle] = useState("Review Hasil Scan Sebelum Masuk Database");
+  const [isSavingReview, setIsSavingReview] = useState(false);
 
   // Toast Notification
   const [notification, setNotification] = useState<{
@@ -186,7 +193,7 @@ export default function EnebaTerminalPage() {
     }
   };
 
-  // AI Live & Autonomous Radar Scan
+  // AI Live & Autonomous Radar Scan (Pre-Save Review Mode)
   const handleAutonomousScan = async (
     strategy: "all" | "trending" | "big_discount" | "cheap_gems" = "all"
   ) => {
@@ -196,30 +203,18 @@ export default function EnebaTerminalPage() {
       const res = await fetch("/api/research/eneba-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "autonomous_scan", strategy }),
+        body: JSON.stringify({ action: "autonomous_scan", strategy, preview_only: true }),
       });
       const json = await res.json();
-      if (res.ok && json.status === "success" && Array.isArray(json.data)) {
-        setGames((prev) => {
-          const existingMap = new Map(prev.map((p) => [p.title.toLowerCase().trim(), p]));
-          for (const item of json.data as EnebaScannedGame[]) {
-            existingMap.set(item.title.toLowerCase().trim(), item);
-          }
-          // Taruh hasil baru di atas agar user langsung melihat temuan otonom
-          const freshTitles = new Set((json.data as EnebaScannedGame[]).map((d) => d.title.toLowerCase().trim()));
-          const fresh = Array.from(existingMap.values()).filter((x) =>
-            freshTitles.has(x.title.toLowerCase().trim())
-          );
-          const rest = Array.from(existingMap.values()).filter(
-            (x) => !freshTitles.has(x.title.toLowerCase().trim())
-          );
-          return [...fresh, ...rest];
-        });
+      if (res.ok && json.status === "success" && Array.isArray(json.data) && json.data.length > 0) {
+        setReviewCandidates(json.data);
+        setReviewModalTitle(`Review Autonomous CDKey Radar (${json.data.length} Kandidat)`);
+        setReviewModalOpen(true);
         showToast(
-          `🚀 Autonomous Scan selesai: ${json.total_found} peluang CDKey ditemukan (Steam Top Sellers + Specials + CheapShark)!`
+          `🔍 Ditemukan ${json.data.length} kandidat. Silakan sortir & cek harga Eneba dulu sebelum menyimpan ke DB!`
         );
       } else {
-        showToast(json.message || "Gagal menjalankan Autonomous CDKey Scanner.", "error");
+        showToast(json.message || "Tidak ada peluang baru ditemukan saat ini.", "error");
       }
     } catch {
       showToast("Kesalahan koneksi saat memindai peluang CDKey.", "error");
@@ -234,16 +229,14 @@ export default function EnebaTerminalPage() {
       const res = await fetch("/api/research/eneba-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "discover_trend" }),
+        body: JSON.stringify({ action: "discover_trend", preview_only: true }),
       });
       const json = await res.json();
       if (res.ok && json.status === "success" && json.data) {
-        setGames((prev) => {
-          const clean = String(json.data.title || "").toLowerCase().trim();
-          return [json.data, ...prev.filter((p) => String(p.title || "").toLowerCase().trim() !== clean)];
-        });
-        setAiScannerOpen(true);
-        showToast(`🎯 Trend Live Terverifikasi & Disimpan ke DB: ${json.data.title} (+${json.data.net_margin_pct}%)!`);
+        setReviewCandidates([json.data]);
+        setReviewModalTitle(`Review Auto-Discover Trend: ${json.data.title}`);
+        setReviewModalOpen(true);
+        showToast(`🎯 Trend ditemukan (${json.data.title}). Cek detail & harga asli lalu simpan jika sesuai!`);
       } else {
         showToast(json.message || "Gagal menemukan trend.", "error");
       }
@@ -267,17 +260,17 @@ export default function EnebaTerminalPage() {
           action: "search_ai",
           query: customTitle.trim(),
           platform: customPlatform,
+          preview_only: true,
         }),
       });
       const json = await res.json();
       if (res.ok && json.status === "success" && json.data) {
-        setGames((prev) => {
-          const clean = String(json.data.title || "").toLowerCase().trim();
-          return [json.data, ...prev.filter((p) => String(p.title || "").toLowerCase().trim() !== clean)];
-        });
+        setReviewCandidates([json.data]);
+        setReviewModalTitle(`Review Hasil Scan Live: ${json.data.title}`);
+        setReviewModalOpen(true);
         setCustomTitle("");
         const warn = json.data.arbitrage_viable === false ? " ⚠️ Harga Eneba > Steam ID!" : "";
-        showToast(`"${json.data.title}" dipindai dari pasar live & tersimpan di DB Radar!${warn}`);
+        showToast(`🔍 Hasil scan "${json.data.title}" siap direview sebelum disimpan.${warn}`);
       } else {
         showToast(json.message || "Gagal memindai game via AI.", "error");
       }
@@ -285,6 +278,50 @@ export default function EnebaTerminalPage() {
       showToast("Kesalahan jaringan saat menghubungi AI Eneba.", "error");
     } finally {
       setIsAiScanning(false);
+    }
+  };
+
+  const handleConfirmSaveReview = async (selectedItems: any[], alsoAddToCatalog: boolean) => {
+    if (!selectedItems || selectedItems.length === 0) return;
+    setIsSavingReview(true);
+    try {
+      const saveRes = await fetch("/api/research/eneba-crawler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_research", games: selectedItems }),
+      });
+      if (!saveRes.ok) {
+        showToast("Gagal menyimpan item ke Database Radar.", "error");
+        return;
+      }
+
+      if (alsoAddToCatalog) {
+        const impRes = await fetch("/api/research/eneba-crawler", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "bulk_import", games: selectedItems }),
+        });
+        const impJson = await impRes.json();
+        if (impRes.ok && impJson.status === "success") {
+          setAddedIds((prev) => {
+            const next = new Set(Array.from(prev));
+            selectedItems.forEach((g) => next.add(g.id));
+            return next;
+          });
+        }
+      }
+
+      await fetchEnebaGames();
+      setReviewModalOpen(false);
+      showToast(
+        alsoAddToCatalog
+          ? `✅ ${selectedItems.length} game disimpan ke DB Radar & Katalog Jualan!`
+          : `✅ ${selectedItems.length} game pilihan Anda disimpan ke Database Radar!`
+      );
+    } catch {
+      showToast("Gagal menyimpan hasil review ke database.", "error");
+    } finally {
+      setIsSavingReview(false);
     }
   };
 
@@ -1435,6 +1472,15 @@ export default function EnebaTerminalPage() {
             onApplyPrice={handleApplyCompetitorPriceInEneba}
           />
         )}
+
+        <ResearchReviewModal
+          open={reviewModalOpen}
+          title={reviewModalTitle}
+          candidates={reviewCandidates}
+          isSaving={isSavingReview}
+          onClose={() => setReviewModalOpen(false)}
+          onConfirmSave={handleConfirmSaveReview}
+        />
       </div>
     </div>
   );

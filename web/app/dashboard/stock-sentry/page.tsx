@@ -34,6 +34,9 @@ import {
   Info,
   Store,
 } from "lucide-react";
+import SellerReviewModal, {
+  SellerPreviewGameEntry,
+} from "@/app/components/SellerReviewModal";
 
 interface Seller {
   seller_id: string;
@@ -142,6 +145,9 @@ function SentryRiskHubContent() {
   const [lastAuditTime, setLastAuditTime] = useState<string | null>(null);
   const [findingSellerGameId, setFindingSellerGameId] = useState<string | null>(null);
   const [switchingSellerId, setSwitchingSellerId] = useState<string | null>(null);
+  const [sellerReviewOpen, setSellerReviewOpen] = useState(false);
+  const [sellerReviewPreviews, setSellerReviewPreviews] = useState<SellerPreviewGameEntry[]>([]);
+  const [isApplyingSellerReview, setIsApplyingSellerReview] = useState(false);
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   const [pausingGameId, setPausingGameId] = useState<string | null>(null);
 
@@ -440,20 +446,64 @@ function SentryRiskHubContent() {
           title: gameTitle,
           mode: "single",
           safeOnly: safeOnlyFilter,
+          preview_only: true,
         }),
       });
       const json = await res.json();
-      if (res.ok && (json.status === "success" || json.status === "warning")) {
-        await loadCatalog();
-        setDetailGameId(gameId);
-        showToast(json.message || "Kandidat seller diperbarui!", json.status === "success" ? "success" : "warning");
+      if (res.ok && json.status === "success" && Array.isArray(json.sellers) && json.sellers.length > 0) {
+        const target = json.game || catalog.find((g) => g.id === gameId);
+        setSellerReviewPreviews([
+          {
+            game_id: gameId,
+            game_title: target?.title || gameTitle,
+            selling_price_shopee_idr: target?.selling_price_shopee_idr || 100000,
+            current_selected_seller_id: target?.selected_seller_id,
+            recommended_selected_seller_id: json.recommended_selected_seller_id,
+            candidates: json.sellers,
+            filtered_out_clickbait_count: json.filtered_out_clickbait_count,
+            clean_candidates_count: json.clean_candidates_count,
+            total_raw_offers: json.total_raw_offers,
+          },
+        ]);
+        setSellerReviewOpen(true);
+        showToast(json.message || "Kandidat seller siap direview!", "success");
       } else {
-        showToast(json.message || "Gagal mencari seller pengganti.", "error");
+        showToast(json.message || "Gagal mencari seller pengganti.", json.status === "warning" ? "warning" : "error");
       }
     } catch {
       showToast("Gagal menghubungi API auto-find-sellers.", "error");
     } finally {
       setFindingSellerGameId(null);
+    }
+  };
+
+  const handleConfirmApplySellers = async (
+    updates: Array<{ game_id: string; sellers: any[]; selected_seller_id: string }>
+  ) => {
+    if (updates.length === 0) return;
+    setIsApplyingSellerReview(true);
+    try {
+      const res = await fetch("/api/catalog/auto-find-sellers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "apply_preview", updates }),
+      });
+      const json = await res.json();
+      if (res.ok && json.status === "success") {
+        await loadCatalog();
+        if (updates.length === 1) {
+          setDetailGameId(updates[0].game_id);
+        }
+        setSellerReviewOpen(false);
+        setSellerReviewPreviews([]);
+        showToast(json.message || "Pilihan seller diterapkan & disimpan ke database!", "success");
+      } else {
+        showToast(json.message || "Gagal menyimpan pilihan seller.", "error");
+      }
+    } catch {
+      showToast("Kesalahan jaringan saat menyimpan pilihan seller.", "error");
+    } finally {
+      setIsApplyingSellerReview(false);
     }
   };
 
@@ -1458,6 +1508,18 @@ function SentryRiskHubContent() {
           </div>
         </div>
       )}
+
+      <SellerReviewModal
+        open={sellerReviewOpen}
+        previews={sellerReviewPreviews}
+        isSaving={isApplyingSellerReview}
+        onClose={() => {
+          if (!isApplyingSellerReview) {
+            setSellerReviewOpen(false);
+          }
+        }}
+        onConfirmApply={handleConfirmApplySellers}
+      />
     </div>
   );
 }

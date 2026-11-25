@@ -678,6 +678,22 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const action = body.action || "single_import";
+    const previewOnly = Boolean(body.preview_only);
+
+    // ACTION: EXPLICIT SAVE SELECTED REVIEWED ITEMS TO RESEARCH DB (Supabase app_kv)
+    if (action === "save_research") {
+      const items = Array.isArray(body.games) ? body.games : body.game ? [body.game] : [];
+      if (items.length === 0) {
+        return NextResponse.json({ status: "error", message: "Tidak ada item untuk disimpan ke DB Radar." }, { status: 400 });
+      }
+      const saved = await savePersistedResearchGames("eneba", items);
+      return NextResponse.json({
+        status: "success",
+        message: `${items.length} item berhasil diverifikasi & disimpan ke Database Radar!`,
+        persisted_count: saved.length,
+        data: items,
+      });
+    }
 
     // ACTION: BULK IMPORT ENEBA CDKEYS (mendukung games[] terfilter termasuk hasil discover/scan)
     if (action === "bulk_import") {
@@ -926,12 +942,15 @@ Skema JSON:
           persisted_in_research_db: true,
         };
 
-        await savePersistedResearchGames("eneba", [resultItem]);
+        if (!previewOnly) {
+          await savePersistedResearchGames("eneba", [resultItem]);
+        }
 
         return NextResponse.json({
           status: "success",
           data_source: dataSource,
-          persisted: true,
+          persisted: !previewOnly,
+          preview_only: previewOnly,
           market_telemetry: {
             eneba_found: Boolean(verified?.eneba_live_verified),
             eneba_base_price_idr: verified?.eneba_base_price_idr || 0,
@@ -1244,12 +1263,15 @@ Skema JSON:
         const viableFirst = topResults.filter((r) => r.arbitrage_viable !== false);
         const finalResults = (viableFirst.length > 0 ? viableFirst : topResults).slice(0, 12);
 
-        await savePersistedResearchGames("eneba", finalResults);
+        if (!previewOnly) {
+          await savePersistedResearchGames("eneba", finalResults);
+        }
 
         return NextResponse.json({
           status: "success",
           strategy,
-          persisted: true,
+          persisted: !previewOnly,
+          preview_only: previewOnly,
           scanned_sources: {
             steam_top_sellers: topSellers.length,
             steam_specials: specials.length,
@@ -1349,9 +1371,11 @@ Skema JSON:
           ],
         };
 
-        await savePersistedResearchGames("eneba", [resultItem]);
+        if (!previewOnly) {
+          await savePersistedResearchGames("eneba", [resultItem]);
+        }
 
-        return NextResponse.json({ status: "success", persisted: true, data: resultItem });
+        return NextResponse.json({ status: "success", persisted: !previewOnly, preview_only: previewOnly, data: resultItem });
       } catch (err: any) {
         return NextResponse.json(
           { status: "error", message: err?.message || "Gagal menemukan trend yang tervalidasi live saat ini. Coba lagi." },

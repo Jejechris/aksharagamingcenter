@@ -149,7 +149,12 @@ function processBestSellers(
   gameTitle: string,
   sellingPrice: number,
   safeOnly: boolean = false
-): { selectedSellers: any[]; filteredClickbaitCount: number; cleanCandidatesCount: number } | null {
+): {
+  selectedSellers: any[];
+  allCleanSellers: any[];
+  filteredClickbaitCount: number;
+  cleanCandidatesCount: number;
+} | null {
   if (!Array.isArray(offers) || offers.length === 0) return null;
 
   let filteredClickbaitCount = 0;
@@ -383,7 +388,23 @@ function processBestSellers(
     idx++;
   }
 
-  return { selectedSellers, filteredClickbaitCount, cleanCandidatesCount };
+  // Kumpulkan semua kandidat bersih (maks 10 terbaik dari seluruh cleanCandidates) untuk preview/sortir admin sebelum simpan ke DB
+  const allRankedCandidates = [...cleanCandidates].sort((a, b) => {
+    const scoreDiff = (b.qualityScore || 0) - (a.qualityScore || 0);
+    if (scoreDiff !== 0) return scoreDiff;
+    return (a.priceIdr || 0) - (b.priceIdr || 0);
+  });
+  const allCleanSellers = allRankedCandidates.slice(0, 10).map((cand) => {
+    const tier =
+      cand.username === ultraSafeOffer.username
+        ? "ultra_safe"
+        : cand.username === lowestPriceOffer.username
+        ? "lowest_price"
+        : "mid_level";
+    return buildSellerItem(cand, tier, cand.username === selectedSellers[0]?.seller_name);
+  });
+
+  return { selectedSellers, allCleanSellers, filteredClickbaitCount, cleanCandidatesCount };
 }
 
 export async function POST(req: NextRequest) {
@@ -391,6 +412,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { game_id, title, mode, safeOnly } = body;
     const filterSafeOnly = Boolean(safeOnly);
+    const previewOnly = Boolean(body.preview_only);
 
     const catalog = await readAuthoritativeCatalog();
     if (!Array.isArray(catalog) || catalog.length === 0) {
@@ -400,11 +422,72 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // MODE: "all" - Otomatis cari 3 seller live untuk semua game di katalog
+    // MODE: "apply_preview" - Terapkan pilihan seller hasil sortir & review admin ke DB
+    if (mode === "apply_preview") {
+      const updates: Array<{
+        game_id: string;
+        sellers: any[];
+        selected_seller_id: string;
+      }> = Array.isArray(body.updates) ? body.updates : [];
+
+      if (updates.length === 0) {
+        return NextResponse.json({ status: "error", message: "Tidak ada perubahan seller yang dipilih." }, { status: 400 });
+      }
+
+      const changedIds: string[] = [];
+      for (const upd of updates) {
+        const g = catalog.find((x: any) => x.id === upd.game_id);
+        if (!g || !Array.isArray(upd.sellers) || upd.sellers.length === 0) continue;
+
+        g.sellers = upd.sellers;
+        const chosenId =
+          upd.selected_seller_id && upd.sellers.some((s: any) => s.seller_id === upd.selected_seller_id)
+            ? upd.selected_seller_id
+            : upd.sellers[0].seller_id;
+        g.selected_seller_id = chosenId;
+
+        const chosenSeller = upd.sellers.find((s: any) => s.seller_id === chosenId) || upd.sellers[0];
+        const sellingPrice = Number(g.selling_price_shopee_idr || 100000);
+        const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
+        const cogsNet = chosenSeller.cogs_net_idr || Math.round((chosenSeller.price_g2g_idr || 0) * 1.007);
+        const netProfit = sellingPrice - cogsNet - shopeeFee;
+        const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+
+        g.target_margin_pct = netMargin;
+        g.metrics = {
+          selected_seller: { ...chosenSeller },
+          cogs_g2g_idr: chosenSeller.price_g2g_idr,
+          qris_fee_idr: chosenSeller.qris_fee_idr || Math.round((chosenSeller.price_g2g_idr || 0) * 0.007),
+          cogs_net_idr: cogsNet,
+          shopee_fee_idr: shopeeFee,
+          packaging_cost_idr: 0,
+          total_cost_idr: cogsNet + shopeeFee,
+          net_profit_idr: netProfit,
+          net_margin_pct: netMargin,
+          break_even_price_idr: Math.ceil((cogsNet + 1000) / (1 - 0.08)),
+        };
+        changedIds.push(g.id);
+      }
+
+      if (changedIds.length > 0) {
+        await writeAuthoritativeCatalog(catalog, { changedGameIds: changedIds });
+      }
+
+      return NextResponse.json({
+        status: "success",
+        message: `${changedIds.length} game berhasil diperbarui dengan seller pilihan Anda & tersimpan di database!`,
+        updated_count: changedIds.length,
+        allGames: catalog,
+      });
+    }
+
+    // MODE: "all" - Otomatis cari seller live untuk semua game (mendukung preview_only agar admin cek & sortir dulu!)
     if (mode === "all") {
       let updatedCount = 0;
       let totalFilteredClickbait = 0;
       const logs: string[] = [];
+      const changedIds: string[] = [];
+      const batchPreviews: any[] = [];
 
       for (const game of catalog) {
         const gameKey = resolveGameKey(game.title);
@@ -422,8 +505,6 @@ export async function POST(req: NextRequest) {
 
             if (processed && processed.selectedSellers.length > 0) {
               totalFilteredClickbait += processed.filteredClickbaitCount;
-              game.sellers = processed.selectedSellers;
-
               const bestCandidate = processed.selectedSellers[0];
               const sellingPrice = game.selling_price_shopee_idr || 100000;
               const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
@@ -435,41 +516,61 @@ export async function POST(req: NextRequest) {
                 (s: any) => s.seller_id === game.selected_seller_id
               );
 
-              if (netMargin >= 5.0 || !selectedStillExists) {
-                game.selected_seller_id = bestCandidate.seller_id;
-                game.target_margin_pct = netMargin;
-                game.metrics = {
-                  selected_seller: { ...bestCandidate },
-                  cogs_g2g_idr: bestCandidate.price_g2g_idr,
-                  qris_fee_idr: bestCandidate.qris_fee_idr,
-                  cogs_net_idr: bestCandidate.cogs_net_idr,
-                  shopee_fee_idr: shopeeFee,
-                  packaging_cost_idr: 0,
-                  total_cost_idr: totalCost,
-                  net_profit_idr: netProfit,
-                  net_margin_pct: netMargin,
-                  break_even_price_idr: Math.ceil((bestCandidate.cogs_net_idr + 1000) / (1 - 0.08)),
-                };
+              if (previewOnly) {
+                batchPreviews.push({
+                  game_id: game.id,
+                  game_title: game.title,
+                  selling_price_shopee_idr: sellingPrice,
+                  current_selected_seller_id: game.selected_seller_id,
+                  recommended_selected_seller_id: bestCandidate.seller_id,
+                  candidates: processed.allCleanSellers,
+                  filtered_out_clickbait_count: processed.filteredClickbaitCount,
+                  clean_candidates_count: processed.cleanCandidatesCount,
+                  total_raw_offers: offers.length,
+                });
+              } else {
+                game.sellers = processed.selectedSellers;
+                if (netMargin >= 5.0 || !selectedStillExists) {
+                  game.selected_seller_id = bestCandidate.seller_id;
+                  game.target_margin_pct = netMargin;
+                  game.metrics = {
+                    selected_seller: { ...bestCandidate },
+                    cogs_g2g_idr: bestCandidate.price_g2g_idr,
+                    qris_fee_idr: bestCandidate.qris_fee_idr,
+                    cogs_net_idr: bestCandidate.cogs_net_idr,
+                    shopee_fee_idr: shopeeFee,
+                    packaging_cost_idr: 0,
+                    total_cost_idr: totalCost,
+                    net_profit_idr: netProfit,
+                    net_margin_pct: netMargin,
+                    break_even_price_idr: Math.ceil((bestCandidate.cogs_net_idr + 1000) / (1 - 0.08)),
+                  };
+                }
+                changedIds.push(game.id);
               }
 
               updatedCount++;
               logs.push(
-                `✅ ${game.title}: ${processed.selectedSellers.length} seller bersih terverifikasi (${processed.filteredClickbaitCount} clickbait diblokir).`
+                `✅ ${game.title}: ${processed.allCleanSellers.length} kandidat bersih terverifikasi (${processed.filteredClickbaitCount} clickbait diblokir).`
               );
             }
           }
         }
       }
 
-      if (updatedCount > 0) {
-        await writeAuthoritativeCatalog(catalog);
+      if (!previewOnly && updatedCount > 0) {
+        await writeAuthoritativeCatalog(catalog, { changedGameIds: changedIds });
       }
 
       return NextResponse.json({
         status: "success",
-        message: `Autonomous Seller Finder berhasil menyegarkan ${updatedCount} game (${totalFilteredClickbait} listing clickbait/shared diblokir otomatis).`,
+        preview_only: previewOnly,
+        message: previewOnly
+          ? `Preview siap: Ditemukan kandidat seller bersih untuk ${updatedCount} game (${totalFilteredClickbait} clickbait disaring). Silakan cek & sortir sebelum menyimpan.`
+          : `Autonomous Seller Finder berhasil menyegarkan ${updatedCount} game (${totalFilteredClickbait} listing clickbait/shared diblokir otomatis).`,
         updated_count: updatedCount,
         filtered_out_clickbait_count: totalFilteredClickbait,
+        batch_previews: previewOnly ? batchPreviews : undefined,
         allGames: catalog,
         logs,
       });
@@ -519,9 +620,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    targetGame.sellers = processed.selectedSellers;
-
-    // Ensure selected_seller_id never points to a removed/missing seller
     const bestCandidate = processed.selectedSellers[0];
     const sellingPrice = targetGame.selling_price_shopee_idr || 100000;
     const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
@@ -531,6 +629,22 @@ export async function POST(req: NextRequest) {
     const selectedStillExists = processed.selectedSellers.some(
       (s: any) => s.seller_id === targetGame.selected_seller_id
     );
+
+    if (previewOnly) {
+      return NextResponse.json({
+        status: "success",
+        preview_only: true,
+        message: `Ditemukan ${processed.allCleanSellers.length} kandidat seller bersih (${processed.filteredClickbaitCount} clickbait/shared disaring). Cek & sortir sebelum menerapkan ke database.`,
+        game: targetGame,
+        recommended_selected_seller_id: bestCandidate.seller_id,
+        sellers: processed.allCleanSellers,
+        filtered_out_clickbait_count: processed.filteredClickbaitCount,
+        clean_candidates_count: processed.cleanCandidatesCount,
+        total_raw_offers: offers.length,
+      });
+    }
+
+    targetGame.sellers = processed.selectedSellers;
 
     if (netMargin >= 5.0 || !selectedStillExists) {
       targetGame.selected_seller_id = bestCandidate.seller_id;
@@ -553,6 +667,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       status: "success",
+      preview_only: false,
       message: `Ditemukan ${processed.selectedSellers.length} seller Full Access bersih (${processed.filteredClickbaitCount} listing clickbait/shared diblokir otomatis).`,
       game: targetGame,
       allGames: catalog,

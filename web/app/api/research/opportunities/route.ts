@@ -407,6 +407,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const query = (body.query || "").trim();
     const platform = body.platform || "Steam";
+    const previewOnly = Boolean(body.preview_only);
 
     if (!query) {
       return NextResponse.json({ status: "error", message: "Masukkan nama game atau tema yang ingin di-scan." }, { status: 400 });
@@ -519,78 +520,81 @@ JSON:
       shopee_search_query: `${finalTitle} Original`,
     };
 
-    // Persist to Supabase Research DB so reload never loses scanned games!
+    // Persist to Supabase Research DB only when not preview_only
     const channel: "eneba" | "g2g" = verified?.eneba_live_verified ? "eneba" : "g2g";
-    if (channel === "eneba") {
-      await savePersistedResearchGames("eneba", [
-        {
-          id: opportunity.id,
-          title: opportunity.title,
-          platform: opportunity.platform,
-          category: "Digital Key / CDKey",
-          source_marketplace: "ENEBA",
-          eneba_direct_url: opportunity.profile_url,
-          seller_name: opportunity.best_supplier.name,
-          seller_rating_pct: opportunity.best_supplier.rating_pct,
-          seller_reviews_count: opportunity.best_supplier.reviews_count,
-          supplier_tier: "ultra_safe",
-          key_type: verified?.key_type || `${opportunity.platform} Key Global`,
-          price_eneba_idr: opportunity.g2g_price_idr,
-          eneba_base_price_idr: verified?.eneba_base_price_idr,
-          eneba_live_verified: verified?.eneba_live_verified,
-          recommended_shopee_price_idr: opportunity.shopee_retail_price_idr,
-          steam_indo_price_idr: opportunity.steam_indo_price_idr || finalSteamIdr,
-          qris_fee_idr: eco.qrisFeeIdr,
-          shopee_fee_idr: eco.shopeeFeeIdr,
-          operational_fee_idr: 0,
-          net_profit_idr: eco.netProfitIdr,
-          net_margin_pct: eco.netMarginPct,
-          spread_pct: spread,
-          demand_score: opportunity.demand_score,
-          competition_level: opportunity.competition_level,
-          arbitrage_verdict: eco.netMarginPct >= 30 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
-          crawl_timestamp: "Live Market Scan",
-          tactical_reason: opportunity.arbitrage_reason,
-          instant_redeem_guide: "Buka Launcher > Redeem Code > Aktivasi Lisensi.",
-          data_source: verified?.data_source || "ai_estimated",
-          arbitrage_viable: verified?.arbitrage_viable ?? true,
-          arbitrage_warning: verified?.arbitrage_warning,
-        },
-      ]);
-    } else {
-      await savePersistedResearchGames("g2g", [
-        {
-          id: opportunity.id,
-          title: opportunity.title,
-          platform: opportunity.platform,
-          category: opportunity.category,
-          g2g_category_slug: "steam-global-account",
-          g2g_direct_url: opportunity.profile_url,
-          seller_name: opportunity.best_supplier.name,
-          seller_rating_pct: opportunity.best_supplier.rating_pct,
-          seller_reviews_count: opportunity.best_supplier.reviews_count,
-          supplier_tier: "ultra_safe",
-          price_g2g_idr: opportunity.g2g_price_idr,
-          recommended_shopee_price_idr: opportunity.shopee_retail_price_idr,
-          steam_indo_price_idr: opportunity.steam_indo_price_idr || finalSteamIdr,
-          qris_fee_idr: eco.qrisFeeIdr,
-          shopee_fee_idr: eco.shopeeFeeIdr,
-          operational_fee_idr: 0,
-          net_profit_idr: eco.netProfitIdr,
-          net_margin_pct: eco.netMarginPct,
-          spread_pct: spread,
-          demand_score: opportunity.demand_score,
-          competition_level: opportunity.competition_level,
-          arbitrage_verdict: eco.netMarginPct >= 30 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
-          crawl_timestamp: "Live Market Scan",
-          tactical_reason: opportunity.arbitrage_reason,
-        },
-      ]);
+    if (!previewOnly) {
+      if (channel === "eneba") {
+        await savePersistedResearchGames("eneba", [
+          {
+            id: opportunity.id,
+            title: opportunity.title,
+            platform: opportunity.platform,
+            category: "Digital Key / CDKey",
+            source_marketplace: "ENEBA",
+            eneba_direct_url: opportunity.profile_url,
+            seller_name: opportunity.best_supplier.name,
+            seller_rating_pct: opportunity.best_supplier.rating_pct,
+            seller_reviews_count: opportunity.best_supplier.reviews_count,
+            supplier_tier: "ultra_safe",
+            key_type: verified?.key_type || `${opportunity.platform} Key Global`,
+            price_eneba_idr: opportunity.g2g_price_idr,
+            eneba_base_price_idr: verified?.eneba_base_price_idr,
+            eneba_live_verified: verified?.eneba_live_verified,
+            recommended_shopee_price_idr: opportunity.shopee_retail_price_idr,
+            steam_indo_price_idr: opportunity.steam_indo_price_idr || finalSteamIdr,
+            qris_fee_idr: eco.qrisFeeIdr,
+            shopee_fee_idr: eco.shopeeFeeIdr,
+            operational_fee_idr: 0,
+            net_profit_idr: eco.netProfitIdr,
+            net_margin_pct: eco.netMarginPct,
+            spread_pct: spread,
+            demand_score: opportunity.demand_score,
+            competition_level: opportunity.competition_level,
+            arbitrage_verdict: eco.netMarginPct >= 30 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
+            crawl_timestamp: "Live Market Scan",
+            tactical_reason: opportunity.arbitrage_reason,
+            instant_redeem_guide: "Buka Launcher > Redeem Code > Aktivasi Lisensi.",
+            data_source: verified?.data_source || "ai_estimated",
+            arbitrage_viable: verified?.arbitrage_viable ?? true,
+            arbitrage_warning: verified?.arbitrage_warning,
+          },
+        ]);
+      } else {
+        await savePersistedResearchGames("g2g", [
+          {
+            id: opportunity.id,
+            title: opportunity.title,
+            platform: opportunity.platform,
+            category: opportunity.category,
+            g2g_category_slug: "steam-global-account",
+            g2g_direct_url: opportunity.profile_url,
+            seller_name: opportunity.best_supplier.name,
+            seller_rating_pct: opportunity.best_supplier.rating_pct,
+            seller_reviews_count: opportunity.best_supplier.reviews_count,
+            supplier_tier: "ultra_safe",
+            price_g2g_idr: opportunity.g2g_price_idr,
+            recommended_shopee_price_idr: opportunity.shopee_retail_price_idr,
+            steam_indo_price_idr: opportunity.steam_indo_price_idr || finalSteamIdr,
+            qris_fee_idr: eco.qrisFeeIdr,
+            shopee_fee_idr: eco.shopeeFeeIdr,
+            operational_fee_idr: 0,
+            net_profit_idr: eco.netProfitIdr,
+            net_margin_pct: eco.netMarginPct,
+            spread_pct: spread,
+            demand_score: opportunity.demand_score,
+            competition_level: opportunity.competition_level,
+            arbitrage_verdict: eco.netMarginPct >= 30 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
+            crawl_timestamp: "Live Market Scan",
+            tactical_reason: opportunity.arbitrage_reason,
+          },
+        ]);
+      }
     }
 
     return NextResponse.json({
       status: "success",
-      persisted: true,
+      persisted: !previewOnly,
+      preview_only: previewOnly,
       source_marketplace: channel === "eneba" ? "ENEBA" : "G2G",
       market_telemetry: verified || null,
       data: opportunity,

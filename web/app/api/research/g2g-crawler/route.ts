@@ -756,6 +756,16 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const action = body.action || "crawl";
+    const previewOnly = Boolean(body.preview_only);
+
+    if (action === "save_research") {
+      const items = Array.isArray(body.games) ? body.games : body.game ? [body.game] : [];
+      if (items.length === 0) {
+        return NextResponse.json({ status: "error", message: "Tidak ada item untuk disimpan." }, { status: 400 });
+      }
+      const saved = await savePersistedResearchGames("g2g", items);
+      return NextResponse.json({ status: "success", persisted_count: saved.length, data: items });
+    }
 
     if (action === "single_import") {
       const item = body.game;
@@ -1053,7 +1063,7 @@ export async function POST(req: Request) {
 
     pushLog(`[COMPLETE] Sinkronisasi live selesai (${liveSyncedOffers.length} offer live diperbarui).`);
 
-    if (extractedGames.length > 0) {
+    if (!previewOnly && extractedGames.length > 0) {
       await savePersistedResearchGames("g2g", extractedGames);
     }
 

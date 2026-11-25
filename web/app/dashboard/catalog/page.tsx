@@ -16,6 +16,7 @@ import { getEnebaSearchUrl } from '@/lib/eneba';
 import { evaluateSellerTrust, formatOrdersCompact, getTrustTierBadgeStyle } from '@/lib/sellerTrust';
 import { calculateShopeeEconomics } from '@/lib/pricing';
 import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
+import SellerReviewModal, { SellerPreviewGameEntry } from '@/app/components/SellerReviewModal';
 
 interface Seller {
   seller_id: string;
@@ -203,6 +204,9 @@ export default function CatalogDashboardPage() {
   const [isFindingAllSellers, setIsFindingAllSellers] = useState(false);
   const [findingSellerGameId, setFindingSellerGameId] = useState<string | null>(null);
   const [safeSellerOnly, setSafeSellerOnly] = useState(false);
+  const [sellerReviewOpen, setSellerReviewOpen] = useState(false);
+  const [sellerReviewPreviews, setSellerReviewPreviews] = useState<SellerPreviewGameEntry[]>([]);
+  const [isApplyingSellerReview, setIsApplyingSellerReview] = useState(false);
 
   const handleAutoFindAllSellers = async () => {
     setIsFindingAllSellers(true);
@@ -210,14 +214,18 @@ export default function CatalogDashboardPage() {
       const res = await fetch('/api/catalog/auto-find-sellers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'all', safeOnly: safeSellerOnly }),
+        body: JSON.stringify({ mode: 'all', safeOnly: safeSellerOnly, preview_only: true }),
       });
       const json = await res.json();
       if (res.ok && json.status === 'success') {
-        if (Array.isArray(json.allGames)) {
-          updateCatalogState(json.allGames);
+        const previews: SellerPreviewGameEntry[] = Array.isArray(json.batch_previews) ? json.batch_previews : [];
+        if (previews.length === 0) {
+          showToast('Tidak ada kandidat seller baru yang ditemukan.', 'error');
+        } else {
+          setSellerReviewPreviews(previews);
+          setSellerReviewOpen(true);
+          showToast(`🔍 ${json.message}`);
         }
-        showToast(`🚀 ${json.message}`);
       } else {
         showToast(json.message || 'Gagal mencari seller otomatis.', 'error');
       }
@@ -234,24 +242,26 @@ export default function CatalogDashboardPage() {
       const res = await fetch('/api/catalog/auto-find-sellers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_id: gameId, title, mode: 'single', safeOnly: safeSellerOnly }),
+        body: JSON.stringify({ game_id: gameId, title, mode: 'single', safeOnly: safeSellerOnly, preview_only: true }),
       });
       const json = await res.json();
-      if (res.ok && (json.status === 'success' || json.status === 'warning')) {
-        if (Array.isArray(json.allGames)) {
-          updateCatalogState(json.allGames);
-        } else if (json.game) {
-          const next = games.map(g => g.id === gameId ? json.game : g);
-          updateCatalogState(next);
-        }
-        // Buka multi-seller drawer otomatis agar user langsung melihat 3 seller baru
-        setExpandedGames(prev => ({ ...prev, [gameId]: true }));
-
-        if (json.status === 'success') {
-          showToast(`✅ ${json.message}`);
-        } else {
-          showToast(`⚠️ ${json.message}`, 'error');
-        }
+      if (res.ok && json.status === 'success' && Array.isArray(json.sellers) && json.sellers.length > 0) {
+        const target = json.game || games.find(g => g.id === gameId);
+        setSellerReviewPreviews([
+          {
+            game_id: gameId,
+            game_title: target?.title || title,
+            selling_price_shopee_idr: target?.selling_price_shopee_idr || 100000,
+            current_selected_seller_id: target?.selected_seller_id,
+            recommended_selected_seller_id: json.recommended_selected_seller_id,
+            candidates: json.sellers,
+            filtered_out_clickbait_count: json.filtered_out_clickbait_count,
+            clean_candidates_count: json.clean_candidates_count,
+            total_raw_offers: json.total_raw_offers,
+          },
+        ]);
+        setSellerReviewOpen(true);
+        showToast(`🔍 ${json.message}`);
       } else {
         showToast(json.message || 'Gagal mencari seller live.', 'error');
       }
@@ -259,6 +269,38 @@ export default function CatalogDashboardPage() {
       showToast('Terjadi kesalahan jaringan.', 'error');
     } finally {
       setFindingSellerGameId(null);
+    }
+  };
+
+  const handleConfirmApplySellers = async (
+    updates: Array<{ game_id: string; sellers: any[]; selected_seller_id: string }>
+  ) => {
+    if (updates.length === 0) return;
+    setIsApplyingSellerReview(true);
+    try {
+      const res = await fetch('/api/catalog/auto-find-sellers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'apply_preview', updates }),
+      });
+      const json = await res.json();
+      if (res.ok && json.status === 'success') {
+        if (Array.isArray(json.allGames)) {
+          updateCatalogState(json.allGames);
+        }
+        if (updates.length === 1) {
+          setExpandedGames(prev => ({ ...prev, [updates[0].game_id]: true }));
+        }
+        setSellerReviewOpen(false);
+        setSellerReviewPreviews([]);
+        showToast(`✅ ${json.message}`);
+      } else {
+        showToast(json.message || 'Gagal menyimpan pilihan seller.', 'error');
+      }
+    } catch {
+      showToast('Kesalahan jaringan saat menyimpan pilihan seller.', 'error');
+    } finally {
+      setIsApplyingSellerReview(false);
     }
   };
 
@@ -2344,6 +2386,18 @@ export default function CatalogDashboardPage() {
             </div>
           </div>
         )}
+
+        <SellerReviewModal
+          open={sellerReviewOpen}
+          previews={sellerReviewPreviews}
+          isSaving={isApplyingSellerReview}
+          onClose={() => {
+            if (!isApplyingSellerReview) {
+              setSellerReviewOpen(false);
+            }
+          }}
+          onConfirmApply={handleConfirmApplySellers}
+        />
 
       </div>
     </div>
