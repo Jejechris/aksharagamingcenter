@@ -95,6 +95,11 @@ export default function EnebaTerminalPage() {
       const json = await res.json();
       if (json.status === "success" && Array.isArray(json.data)) {
         setGames(json.data);
+        const already = new Set<string>();
+        json.data.forEach((item: any) => {
+          if (item.is_already_in_catalog) already.add(item.id);
+        });
+        setAddedIds(already);
       }
     } catch (err) {
       console.error("Gagal memuat katalog CDKey Eneba:", err);
@@ -156,7 +161,7 @@ export default function EnebaTerminalPage() {
       const res = await fetch("/api/research/eneba-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "bulk_import" }),
+        body: JSON.stringify({ action: "bulk_import", games: unaddedFiltered }),
       });
       const json = await res.json();
       if (res.ok && json.status === "success") {
@@ -233,9 +238,12 @@ export default function EnebaTerminalPage() {
       });
       const json = await res.json();
       if (res.ok && json.status === "success" && json.data) {
-        setGames((prev) => [json.data, ...prev]);
+        setGames((prev) => {
+          const clean = String(json.data.title || "").toLowerCase().trim();
+          return [json.data, ...prev.filter((p) => String(p.title || "").toLowerCase().trim() !== clean)];
+        });
         setAiScannerOpen(true);
-        showToast(`🎯 Trend Ditemukan: ${json.data.title} (${json.data.arbitrage_verdict})!`);
+        showToast(`🎯 Trend Live Terverifikasi & Disimpan ke DB: ${json.data.title} (+${json.data.net_margin_pct}%)!`);
       } else {
         showToast(json.message || "Gagal menemukan trend.", "error");
       }
@@ -263,9 +271,13 @@ export default function EnebaTerminalPage() {
       });
       const json = await res.json();
       if (res.ok && json.status === "success" && json.data) {
-        setGames((prev) => [json.data, ...prev]);
+        setGames((prev) => {
+          const clean = String(json.data.title || "").toLowerCase().trim();
+          return [json.data, ...prev.filter((p) => String(p.title || "").toLowerCase().trim() !== clean)];
+        });
         setCustomTitle("");
-        showToast(`AI berhasil memindai Digital Key untuk "${json.data.title}"!`);
+        const warn = json.data.arbitrage_viable === false ? " ⚠️ Harga Eneba > Steam ID!" : "";
+        showToast(`"${json.data.title}" dipindai dari pasar live & tersimpan di DB Radar!${warn}`);
       } else {
         showToast(json.message || "Gagal memindai game via AI.", "error");
       }
@@ -320,6 +332,13 @@ export default function EnebaTerminalPage() {
   };
 
   const getFilteredEnebaUrl = (g: { title: string; platform: string; eneba_direct_url?: string }) => {
+    if (
+      g.eneba_direct_url &&
+      !g.eneba_direct_url.includes("/store/all") &&
+      selectedRegion === "global"
+    ) {
+      return g.eneba_direct_url;
+    }
     return buildEnebaFilteredUrl(g.title, {
       region: selectedRegion,
       platform: selectedPlatform !== "ALL" ? selectedPlatform : undefined,
@@ -1011,6 +1030,19 @@ export default function EnebaTerminalPage() {
                           ENEBA OFFICIAL CDKEY
                         </span>
 
+                        {game.persisted_in_research_db && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase bg-sky-50 text-sky-700 border border-sky-200">
+                            💾 DB RADAR
+                          </span>
+                        )}
+
+                        {game.arbitrage_viable === false && (
+                          <span className="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase bg-rose-50 text-rose-700 border border-rose-300 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-rose-600" />
+                            ENEBA LEBIH MAHAL DARI STEAM ID
+                          </span>
+                        )}
+
                         {game.data_source === "live_market_verified" && (
                           <span className="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase bg-emerald-50 text-emerald-700 border border-emerald-300 flex items-center gap-1 shadow-2xs">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -1180,13 +1212,29 @@ export default function EnebaTerminalPage() {
                     </div>
 
                     {/* AI Strategic Reason Banner */}
-                    <div className="p-3.5 rounded-xl bg-violet-50/60 border border-violet-200 text-xs text-slate-700 leading-relaxed flex items-start gap-2.5">
-                      <Info className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+                    <div
+                      className={`p-3.5 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 ${
+                        game.arbitrage_viable === false
+                          ? "bg-rose-50/70 border-rose-200 text-rose-900"
+                          : "bg-violet-50/60 border-violet-200 text-slate-700"
+                      }`}
+                    >
+                      {game.arbitrage_viable === false ? (
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <Info className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+                      )}
                       <div>
-                        <strong className="text-violet-900 font-semibold">
-                          Keunggulan Arbitrase Digital CDKey Ini:{" "}
+                        <strong
+                          className={`font-semibold ${
+                            game.arbitrage_viable === false ? "text-rose-800" : "text-violet-900"
+                          }`}
+                        >
+                          {game.arbitrage_viable === false
+                            ? "Peringatan Realitas Pasar (Live Check): "
+                            : "Keunggulan Arbitrase Digital CDKey Ini: "}
                         </strong>
-                        <span>{game.tactical_reason}</span>
+                        <span>{game.arbitrage_warning || game.tactical_reason}</span>
                       </div>
                     </div>
 

@@ -3,6 +3,7 @@ import { getG2GSellerUrl, resolveG2GProductUrl, getG2GDirectOfferUrl } from "@/l
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { readAuthoritativeCatalog, addOrUpdateGame, bulkAddOrUpdateGames } from "@/lib/catalog";
 import { evaluateSellerTrust, TrustTier } from "@/lib/sellerTrust";
+import { getPersistedResearchGames, savePersistedResearchGames, deletePersistedResearchGame } from "@/lib/marketResearch";
 
 export interface G2GScannedGame {
   id: string;
@@ -674,14 +675,32 @@ export async function GET(req: Request) {
     const maxCost = Number(searchParams.get("maxCost")) || 0;
     const platform = searchParams.get("platform") || "ALL";
 
-    // 1. Fetch current database catalog to annotate `is_already_in_catalog`
-    const currentCatalog = await readAuthoritativeCatalog();
+    // 1. Fetch current database catalog + persisted G2G research items
+    const [currentCatalog, persistedG2g] = await Promise.all([
+      readAuthoritativeCatalog(),
+      getPersistedResearchGames("g2g"),
+    ]);
     const existingTitles = new Set(
       (currentCatalog || []).map((g: any) => (g.title || "").toLowerCase().trim())
     );
 
+    const combinedRaw: G2GScannedGame[] = [];
+    const seenTitle = new Set<string>();
+    for (const item of persistedG2g || []) {
+      const k = String(item.title || "").toLowerCase().trim();
+      if (!k || seenTitle.has(k)) continue;
+      seenTitle.add(k);
+      combinedRaw.push(item);
+    }
+    for (const base of G2G_CRAWLER_DATABASE) {
+      const k = String(base.title || "").toLowerCase().trim();
+      if (seenTitle.has(k)) continue;
+      seenTitle.add(k);
+      combinedRaw.push(base);
+    }
+
     // 2. Filter scanned G2G database
-    let results = G2G_CRAWLER_DATABASE.filter((game) => {
+    let results = combinedRaw.filter((game) => {
       if (minMargin > 0 && game.net_margin_pct < minMargin) return false;
       if (maxCost > 0 && game.price_g2g_idr > maxCost) return false;
       if (platform !== "ALL" && !game.platform.toLowerCase().includes(platform.toLowerCase())) return false;
@@ -1034,6 +1053,10 @@ export async function POST(req: Request) {
 
     pushLog(`[COMPLETE] Sinkronisasi live selesai (${liveSyncedOffers.length} offer live diperbarui).`);
 
+    if (extractedGames.length > 0) {
+      await savePersistedResearchGames("g2g", extractedGames);
+    }
+
     return NextResponse.json({
       status: "success",
       message: "Crawl g2g.com & SLS Live Sync berhasil diselesaikan.",
@@ -1051,5 +1074,19 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id") || searchParams.get("title") || "";
+    if (!id.trim()) {
+      return NextResponse.json({ status: "error", message: "Parameter id atau title diperlukan." }, { status: 400 });
+    }
+    const next = await deletePersistedResearchGame("g2g", id);
+    return NextResponse.json({ status: "success", remaining: next.length });
+  } catch (err: any) {
+    return NextResponse.json({ status: "error", message: err.message }, { status: 500 });
   }
 }

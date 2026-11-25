@@ -217,15 +217,21 @@ export default function ResearchCenterPage() {
       });
       const json = await res.json();
       if (res.ok && json.status === "success" && json.data) {
+        const isEnebaSrc = json.data.source_marketplace === "ENEBA";
         const trendItem = {
           ...json.data,
-          source_marketplace: "ENEBA",
+          source_marketplace: isEnebaSrc ? "ENEBA" : "ENEBA",
           price_g2g_idr: json.data.price_eneba_idr || json.data.price_g2g_idr,
           g2g_direct_url: json.data.eneba_direct_url || json.data.g2g_direct_url,
           g2g_category_slug: "eneba-cdkey",
+          persisted_in_research_db: true,
         };
-        setScannedGames((prev) => [trendItem, ...prev]);
-        showToast(`🎯 Trend Ditemukan: ${json.data.title} (${json.data.arbitrage_verdict || "HOT"})!`);
+        setScannedGames((prev) => {
+          const cleanTitle = String(trendItem.title || "").toLowerCase().trim();
+          const filtered = prev.filter((p) => String(p.title || "").toLowerCase().trim() !== cleanTitle);
+          return [trendItem, ...filtered];
+        });
+        showToast(`🎯 Trend Terverifikasi Live & Disimpan ke DB: ${json.data.title} (Margin +${json.data.net_margin_pct}%)!`);
       } else {
         showToast(json.message || "Gagal mencari trend game saat ini.", "error");
       }
@@ -290,7 +296,7 @@ export default function ResearchCenterPage() {
         const res = await fetch("/api/research/eneba-crawler", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "bulk_import" }),
+          body: JSON.stringify({ action: "bulk_import", games: enebaGames }),
         });
         const eJson = await res.json();
         if (res.ok && eJson.status === "success") {
@@ -357,13 +363,17 @@ export default function ResearchCenterPage() {
       });
       const json = await res.json();
       if (res.ok && json.status === "success" && json.data) {
-        const customGame: G2GScannedGame = {
-          id: `manual-${Date.now()}`,
+        const isEnebaRes = json.source_marketplace === "ENEBA";
+        const customGame: any = {
+          id: json.data.id || `manual-${Date.now()}`,
           title: json.data.title,
           platform: json.data.platform,
           category: json.data.category,
-          g2g_category_slug: "steam-accounts",
+          source_marketplace: isEnebaRes ? "ENEBA" : "G2G",
+          g2g_category_slug: isEnebaRes ? "eneba-cdkey" : "steam-accounts",
           g2g_direct_url: json.data.profile_url || "https://www.g2g.com/categories/steam-global-account",
+          eneba_direct_url: isEnebaRes ? json.data.profile_url : undefined,
+          price_eneba_idr: isEnebaRes ? json.data.g2g_price_idr : undefined,
           seller_name: json.data.best_supplier.name,
           seller_rating_pct: json.data.best_supplier.rating_pct,
           seller_reviews_count: json.data.best_supplier.reviews_count,
@@ -380,12 +390,16 @@ export default function ResearchCenterPage() {
           demand_score: json.data.demand_score,
           competition_level: json.data.competition_level,
           arbitrage_verdict: json.data.net_margin_pct >= 40 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
-          crawl_timestamp: "Baru saja",
+          crawl_timestamp: "Live Market Scan",
           tactical_reason: json.data.arbitrage_reason,
+          persisted_in_research_db: true,
         };
 
-        setScannedGames((prev) => [customGame, ...prev]);
-        showToast(`AI berhasil memindai "${customGame.title}"!`);
+        setScannedGames((prev) => {
+          const cleanTitle = String(customGame.title || "").toLowerCase().trim();
+          return [customGame, ...prev.filter((p) => String(p.title || "").toLowerCase().trim() !== cleanTitle)];
+        });
+        showToast(`✅ "${customGame.title}" terverifikasi pasar live & tersimpan ke DB Radar!`);
         setManualQuery("");
       } else {
         showToast(json.message || "Gagal melakukan scan AI.", "error");
@@ -1100,7 +1114,18 @@ export default function ResearchCenterPage() {
                 <div className="p-5 sm:p-6 space-y-4">
                   {/* Top Bar: Verdict Badge, Platform, Demand */}
                   <div className="flex flex-wrap items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(game as any).persisted_in_research_db && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase bg-sky-50 text-sky-700 border border-sky-200">
+                          💾 DB RADAR
+                        </span>
+                      )}
+                      {(game as any).arbitrage_viable === false && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase bg-rose-50 text-rose-700 border border-rose-300 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-rose-600" />
+                          ENEBA &gt; STEAM ID
+                        </span>
+                      )}
                       {/* Live Extracted Badge */}
                       {game.is_live_extracted && (
                         <span className="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">

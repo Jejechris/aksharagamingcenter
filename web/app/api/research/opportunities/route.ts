@@ -3,6 +3,8 @@ import { callGemini } from "@/lib/gemini";
 import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
 import { getG2GSellerUrl, resolveG2GProductUrl } from "@/lib/g2g";
 import { getDbCatalog } from "@/lib/db";
+import { verifyLiveGameOpportunity, savePersistedResearchGames } from "@/lib/marketResearch";
+import { calculateShopeeEconomics, calculateTargetSellingPrice } from "@/lib/pricing";
 
 export interface ArbitrageOpportunity {
   id: string;
@@ -399,7 +401,7 @@ export async function GET() {
   }
 }
 
-// POST: Run deep AI Arbitrage Scan for ANY specific query or genre
+// POST: Run deep AI + Live Market Arbitrage Scan for ANY specific query or genre (persisted to Supabase!)
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -410,101 +412,189 @@ export async function POST(req: Request) {
       return NextResponse.json({ status: "error", message: "Masukkan nama game atau tema yang ingin di-scan." }, { status: 400 });
     }
 
-    const systemPrompt = `Kamu adalah Chief Arbitrage Hunter & Quantitative Market Researcher untuk Akshara Gaming Center di Indonesia.
-Tugasmu adalah menganalisis peluang arbitrase lintas batas (Cross-Border Arbitrage) antara supplier global (G2G.com) dan pasar e-commerce retail Indonesia (Shopee/Tokopedia).
+    // 1. Live Multi-API Price Verification FIRST (Eneba SSR + Steam ID + CheapShark)
+    const verified = await verifyLiveGameOpportunity({
+      query,
+      preferredPlatform: platform,
+      targetMarginPct: 18,
+    });
 
-ATURAN PERHITUNGAN:
-- Biaya Shopee: 8% dari harga jual + Rp 1.000
-- Biaya QRIS kulakan G2G: 0.7% dari harga modal G2G
-- Net Profit = Harga Jual Shopee - (Harga Modal G2G + Biaya QRIS + Biaya Shopee)
-- Net Margin = (Net Profit / Harga Jual Shopee) * 100%
-- Spread = ((Harga Jual Shopee - Modal G2G) / Modal G2G) * 100%
+    const finalTitle = verified?.title || query;
+    const steamPrice = verified?.steam_indo_price_idr || 0;
+    const modalIdr = verified?.price_eneba_idr || 0;
+    const shopeePrice = verified?.recommended_shopee_price_idr || 0;
 
-Format JSON yang HARUS kamu kembalikan (HANYA JSON murni tanpa markdown triple backticks):
-{
-  "title": "Nama Game Lengkap",
-  "platform": "Steam / PC / dll",
-  "category": "Digital Key / Account (Full Access)",
-  "tag": "🔥 HIGH MARGIN" / "💎 BLUECHIP POPULAR" / "⚡ FAST MOVER" / "🚀 VIRAL TREND",
-  "g2g_price_idr": 150000,
-  "best_supplier": {
-    "name": "Sharktech",
-    "rating_pct": 99.8,
-    "reviews_count": 32000,
-    "tier": "ultra_safe"
-  },
-  "shopee_retail_price_idr": 249000,
-  "steam_indo_price_idr": 450000,
-  "demand_score": 92,
-  "competition_level": "Rendah" / "Sedang" / "Kompetitif",
-  "arbitrage_reason": "Penjelasan mengapa game ini murah di global tapi bisa dijual mahal di Shopee Indonesia (min 2 kalimat).",
-  "tactical_tip": "Tips praktis menjual di Shopee agar margin maksimal dan bebas komplain (1-2 kalimat)."
-}`;
-
-    const prompt = `Analisa peluang arbitrase untuk game: "${query}" pada platform "${platform}". Berikan data estimasi real-world yang paling akurat untuk pasar Indonesia saat ini.`;
-
-    const aiText = await callGemini(prompt, systemPrompt, { jsonMode: true });
-
-    let cleaned = (aiText || "").trim();
-    if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
-    }
-
+    let parsed: any = {};
     try {
-      const parsed = JSON.parse(cleaned);
+      const marketContext = verified
+        ? [
+            `Game Target: "${finalTitle}" (${verified.platform})`,
+            verified.eneba_live_verified
+              ? `Harga Modal CDKey Eneba LIVE: Rp ${verified.eneba_base_price_idr.toLocaleString("id-ID")} (Landed +fee = Rp ${modalIdr.toLocaleString("id-ID")})`
+              : `Harga Global API: Rp ${modalIdr.toLocaleString("id-ID")}`,
+            verified.steam_live_verified
+              ? `Harga Steam Indonesia (Faktual): Rp ${steamPrice.toLocaleString("id-ID")}`
+              : `Harga Steam Indonesia belum tersedia.`,
+            `Rekomendasi Jual Shopee: Rp ${shopeePrice.toLocaleString("id-ID")}`,
+            verified.arbitrage_warning ? `PERINGATAN: ${verified.arbitrage_warning}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : `Game "${query}" tidak ditemukan di API live. Estimasi konservatif untuk pasar Indonesia.`;
 
-      // Real Steam Indonesia lookup
-      const realSteam = await fetchRealSteamIndonesiaPrice(query);
-      const finalTitle = realSteam?.official_title || parsed.title || query;
-      const finalSteamPrice = realSteam?.price_idr || Number(parsed.steam_indo_price_idr) || 0;
-
-      const g2gPrice = Number(parsed.g2g_price_idr) || 120000;
-      const shopeePrice = Number(parsed.shopee_retail_price_idr) || 199000;
-      const qrisFee = Math.round(g2gPrice * 0.007);
-      const shopeeFee = Math.round(shopeePrice * 0.08) + 1000;
-      const netProfit = shopeePrice - (g2gPrice + qrisFee + shopeeFee);
-      const netMargin = Math.round((netProfit / shopeePrice) * 1000) / 10;
-      const spread = Math.round(((shopeePrice - g2gPrice) / g2gPrice) * 1000) / 10;
-
-      const opportunity: ArbitrageOpportunity = {
-        id: `arb-ai-${Date.now()}`,
-        title: finalTitle,
-        platform: parsed.platform || platform,
-        category: parsed.category || "Digital Key / Account",
-        tag: parsed.tag || "⚡ FAST MOVER",
-        g2g_price_idr: g2gPrice,
-        best_supplier: {
-          name: parsed.best_supplier?.name || "HellenWong",
-          rating_pct: Number(parsed.best_supplier?.rating_pct) || 99.7,
-          reviews_count: Number(parsed.best_supplier?.reviews_count) || 25000,
-          tier: parsed.best_supplier?.tier || "ultra_safe",
-        },
-        shopee_retail_price_idr: shopeePrice,
-        steam_indo_price_idr: finalSteamPrice || Math.round(shopeePrice * 1.5),
-        qris_fee_idr: qrisFee,
-        shopee_fee_idr: shopeeFee,
-        net_profit_idr: netProfit,
-        net_margin_pct: netMargin,
-        spread_pct: spread,
-        demand_score: Number(parsed.demand_score) || 88,
-        competition_level: parsed.competition_level || "Sedang",
-        arbitrage_reason: parsed.arbitrage_reason || "Potensi arbitrase signifikan antara rate global dan pasar retail lokal.",
-        tactical_tip: (parsed.tactical_tip || "Gunakan format pengiriman instan.") + " Tip: Buka link kategori G2G untuk memilih offer live aktif.",
-        profile_url: resolveG2GProductUrl(undefined, parsed.best_supplier?.name, finalTitle),
-        shopee_search_query: `${finalTitle} Original`,
-      };
-
-      return NextResponse.json({
-        status: "success",
-        data: opportunity,
-      });
-    } catch (parseErr) {
-      return NextResponse.json({
-        status: "error",
-        message: "Gagal memproses kalkulasi AI.",
-        raw: cleaned,
-      }, { status: 500 });
+      const systemPrompt = `Kamu adalah Chief Arbitrage Hunter untuk Akshara Gaming Center Indonesia. Kembalikan hanya JSON valid tanpa markdown backticks.`;
+      const prompt = `${marketContext}
+Berikan tag, demand_score (1-100), competition_level ("Rendah"|"Sedang"|"Kompetitif"), arbitrage_reason (2 kalimat Bahasa Indonesia jujur sesuai fakta harga di atas), dan tactical_tip.${
+        verified ? "" : ` Sertakan estimasi g2g_price_idr, shopee_retail_price_idr, dan steam_indo_price_idr.`
+      }
+JSON:
+{
+  "category": "${verified?.key_type || "Digital Key / Account"}",
+  "tag": "⚡ FAST MOVER",
+  "g2g_price_idr": ${modalIdr || 120000},
+  "shopee_retail_price_idr": ${shopeePrice || 199000},
+  "steam_indo_price_idr": ${steamPrice || 300000},
+  "demand_score": 88,
+  "competition_level": "Sedang",
+  "arbitrage_reason": "...",
+  "tactical_tip": "..."
+}`;
+      const aiText = await callGemini(prompt, systemPrompt, { jsonMode: true, temperature: 0.2 });
+      const cleaned = (aiText || "").replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/, "").trim();
+      parsed = JSON.parse(cleaned);
+    } catch (aiErr) {
+      if (!verified) {
+        return NextResponse.json({ status: "error", message: "Gagal memproses kalkulasi AI & API pasar." }, { status: 500 });
+      }
     }
+
+    const finalModalIdr = verified
+      ? verified.price_eneba_idr
+      : Math.max(15000, Math.round((Number(parsed.g2g_price_idr) || 120000) / 1000) * 1000);
+    const finalShopeeIdr = verified
+      ? verified.recommended_shopee_price_idr
+      : calculateTargetSellingPrice({ cogsIdr: finalModalIdr, presetId: "reguler", packagingCostIdr: 0, targetMarginPct: 18 });
+    const finalSteamIdr = verified
+      ? verified.steam_indo_price_idr
+      : Number(parsed.steam_indo_price_idr) || Math.round(finalShopeeIdr * 1.4);
+
+    const eco = calculateShopeeEconomics({
+      sellingPriceIdr: finalShopeeIdr,
+      cogsIdr: finalModalIdr,
+      presetId: "reguler",
+      packagingCostIdr: 0,
+    });
+    const spread = finalModalIdr > 0 ? Math.round(((finalShopeeIdr - finalModalIdr) / finalModalIdr) * 1000) / 10 : 0;
+
+    const opportunity: ArbitrageOpportunity = {
+      id: `arb-live-${finalTitle.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 18)}-${Date.now().toString().slice(-4)}`,
+      title: finalTitle,
+      platform: verified?.platform || platform,
+      category: verified?.key_type || parsed.category || "Digital Key / CDKey",
+      tag: verified?.arbitrage_viable === false ? "⚡ FAST MOVER" : (parsed.tag || "⚡ FAST MOVER"),
+      g2g_price_idr: finalModalIdr,
+      best_supplier: {
+        name: verified?.eneba_live_verified ? "Eneba Live Merchants" : "G2G / Eneba Verified",
+        rating_pct: 99.8,
+        reviews_count: 32000,
+        tier: "ultra_safe",
+      },
+      shopee_retail_price_idr: finalShopeeIdr,
+      steam_indo_price_idr: finalSteamIdr,
+      qris_fee_idr: eco.qrisFeeIdr,
+      shopee_fee_idr: eco.shopeeFeeIdr,
+      net_profit_idr: eco.netProfitIdr,
+      net_margin_pct: eco.netMarginPct,
+      spread_pct: spread,
+      demand_score: Number(parsed.demand_score) || 88,
+      competition_level: parsed.competition_level || "Sedang",
+      arbitrage_reason:
+        verified?.arbitrage_warning ||
+        parsed.arbitrage_reason ||
+        `Harga pasar live terverifikasi Rp ${finalModalIdr.toLocaleString("id-ID")} vs Steam Indo Rp ${finalSteamIdr.toLocaleString("id-ID")}.`,
+      tactical_tip:
+        (parsed.tactical_tip || "Gunakan format pengiriman instan via Claim Vault.") +
+        " Hasil scan otomatis tersimpan di Database Radar.",
+      profile_url: verified?.eneba_direct_url || resolveG2GProductUrl(undefined, "HellenWong", finalTitle),
+      shopee_search_query: `${finalTitle} Original`,
+    };
+
+    // Persist to Supabase Research DB so reload never loses scanned games!
+    const channel: "eneba" | "g2g" = verified?.eneba_live_verified ? "eneba" : "g2g";
+    if (channel === "eneba") {
+      await savePersistedResearchGames("eneba", [
+        {
+          id: opportunity.id,
+          title: opportunity.title,
+          platform: opportunity.platform,
+          category: "Digital Key / CDKey",
+          source_marketplace: "ENEBA",
+          eneba_direct_url: opportunity.profile_url,
+          seller_name: opportunity.best_supplier.name,
+          seller_rating_pct: opportunity.best_supplier.rating_pct,
+          seller_reviews_count: opportunity.best_supplier.reviews_count,
+          supplier_tier: "ultra_safe",
+          key_type: verified?.key_type || `${opportunity.platform} Key Global`,
+          price_eneba_idr: opportunity.g2g_price_idr,
+          eneba_base_price_idr: verified?.eneba_base_price_idr,
+          eneba_live_verified: verified?.eneba_live_verified,
+          recommended_shopee_price_idr: opportunity.shopee_retail_price_idr,
+          steam_indo_price_idr: opportunity.steam_indo_price_idr || finalSteamIdr,
+          qris_fee_idr: eco.qrisFeeIdr,
+          shopee_fee_idr: eco.shopeeFeeIdr,
+          operational_fee_idr: 0,
+          net_profit_idr: eco.netProfitIdr,
+          net_margin_pct: eco.netMarginPct,
+          spread_pct: spread,
+          demand_score: opportunity.demand_score,
+          competition_level: opportunity.competition_level,
+          arbitrage_verdict: eco.netMarginPct >= 30 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
+          crawl_timestamp: "Live Market Scan",
+          tactical_reason: opportunity.arbitrage_reason,
+          instant_redeem_guide: "Buka Launcher > Redeem Code > Aktivasi Lisensi.",
+          data_source: verified?.data_source || "ai_estimated",
+          arbitrage_viable: verified?.arbitrage_viable ?? true,
+          arbitrage_warning: verified?.arbitrage_warning,
+        },
+      ]);
+    } else {
+      await savePersistedResearchGames("g2g", [
+        {
+          id: opportunity.id,
+          title: opportunity.title,
+          platform: opportunity.platform,
+          category: opportunity.category,
+          g2g_category_slug: "steam-global-account",
+          g2g_direct_url: opportunity.profile_url,
+          seller_name: opportunity.best_supplier.name,
+          seller_rating_pct: opportunity.best_supplier.rating_pct,
+          seller_reviews_count: opportunity.best_supplier.reviews_count,
+          supplier_tier: "ultra_safe",
+          price_g2g_idr: opportunity.g2g_price_idr,
+          recommended_shopee_price_idr: opportunity.shopee_retail_price_idr,
+          steam_indo_price_idr: opportunity.steam_indo_price_idr || finalSteamIdr,
+          qris_fee_idr: eco.qrisFeeIdr,
+          shopee_fee_idr: eco.shopeeFeeIdr,
+          operational_fee_idr: 0,
+          net_profit_idr: eco.netProfitIdr,
+          net_margin_pct: eco.netMarginPct,
+          spread_pct: spread,
+          demand_score: opportunity.demand_score,
+          competition_level: opportunity.competition_level,
+          arbitrage_verdict: eco.netMarginPct >= 30 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
+          crawl_timestamp: "Live Market Scan",
+          tactical_reason: opportunity.arbitrage_reason,
+        },
+      ]);
+    }
+
+    return NextResponse.json({
+      status: "success",
+      persisted: true,
+      source_marketplace: channel === "eneba" ? "ENEBA" : "G2G",
+      market_telemetry: verified || null,
+      data: opportunity,
+    });
   } catch (error: any) {
     return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
   }

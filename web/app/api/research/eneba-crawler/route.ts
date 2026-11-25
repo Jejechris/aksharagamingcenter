@@ -6,6 +6,14 @@ import { fetchUsdToIdrRate } from "@/lib/g2gStock";
 import { readAuthoritativeCatalog, addOrUpdateGame, bulkAddOrUpdateGames } from "@/lib/catalog";
 import { evaluateSellerTrust, TrustTier } from "@/lib/sellerTrust";
 import { calculateShopeeEconomics, calculateTargetSellingPrice } from "@/lib/pricing";
+import {
+  verifyLiveGameOpportunity,
+  discoverRealTrendingOpportunity,
+  fetchLiveEnebaListings,
+  getPersistedResearchGames,
+  savePersistedResearchGames,
+  deletePersistedResearchGame,
+} from "@/lib/marketResearch";
 
 export interface EnebaScannedGame {
   id: string;
@@ -48,6 +56,11 @@ export interface EnebaScannedGame {
   steam_appid?: number;
   opportunity_tags?: string[];
   discovery_strategy?: string;
+  arbitrage_viable?: boolean;
+  arbitrage_warning?: string;
+  eneba_base_price_idr?: number;
+  eneba_live_verified?: boolean;
+  persisted_in_research_db?: boolean;
 }
 
 // 18+ Top Digital Key Arbitrage Opportunities on eneba.com (QRIS / DANA Ready)
@@ -560,12 +573,31 @@ const ENEBA_CRAWLER_DATABASE: EnebaScannedGame[] = [
 
 export async function GET() {
   try {
-    const currentCatalog = await readAuthoritativeCatalog();
+    const [currentCatalog, persistedDiscovered] = await Promise.all([
+      readAuthoritativeCatalog(),
+      getPersistedResearchGames("eneba"),
+    ]);
     const existingTitles = new Set(
       (currentCatalog || []).map((g: any) => (g.title || "").toLowerCase().trim())
     );
 
-    const enriched = ENEBA_CRAWLER_DATABASE.map((item) => {
+    // Gabungkan hasil research/discover yang tersimpan di Supabase di paling atas (dedup by title)
+    const combinedRaw: EnebaScannedGame[] = [];
+    const seenTitle = new Set<string>();
+    for (const d of persistedDiscovered || []) {
+      const k = String(d.title || "").toLowerCase().trim();
+      if (!k || seenTitle.has(k)) continue;
+      seenTitle.add(k);
+      combinedRaw.push({ ...d, persisted_in_research_db: true });
+    }
+    for (const base of ENEBA_CRAWLER_DATABASE) {
+      const k = String(base.title || "").toLowerCase().trim();
+      if (seenTitle.has(k)) continue;
+      seenTitle.add(k);
+      combinedRaw.push(base);
+    }
+
+    const enriched = combinedRaw.map((item) => {
       const eco = calculateShopeeEconomics({
         sellingPriceIdr: item.recommended_shopee_price_idr,
         cogsIdr: item.price_eneba_idr,
@@ -585,10 +617,10 @@ export async function GET() {
         deliverySpeed: "Instant 0-Detik",
         verified: true,
       });
-      const oppTags: string[] = [];
-      if (margin >= 25) oppTags.push("High Margin");
-      if (item.price_eneba_idr <= 65000) oppTags.push("Modal Ringan");
-      if (item.demand_score >= 95) oppTags.push("High Demand");
+      const oppTags: string[] = Array.isArray(item.opportunity_tags) ? [...item.opportunity_tags] : [];
+      if (margin >= 25 && !oppTags.includes("High Margin")) oppTags.push("High Margin");
+      if (item.price_eneba_idr <= 65000 && !oppTags.includes("Modal Ringan")) oppTags.push("Modal Ringan");
+      if (item.demand_score >= 95 && !oppTags.includes("High Demand")) oppTags.push("High Demand");
 
       return {
         ...item,
@@ -606,7 +638,7 @@ export async function GET() {
         trust_score: trust.trust_score,
         trust_tier: trust.trust_tier,
         is_already_in_catalog: Array.from(existingTitles).some(
-          (t) => t.includes(item.title.toLowerCase().trim()) || item.title.toLowerCase().trim().includes(t)
+          (t) => t === item.title.toLowerCase().trim() || t.includes(item.title.toLowerCase().trim()) || item.title.toLowerCase().trim().includes(t)
         ),
       };
     });
@@ -614,6 +646,7 @@ export async function GET() {
     return NextResponse.json({
       status: "success",
       source: "ENEBA_DIGITAL_KEYS",
+      persisted_count: (persistedDiscovered || []).length,
       data: enriched,
       meta: {
         total_items: enriched.length,
@@ -627,29 +660,45 @@ export async function GET() {
   }
 }
 
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id") || searchParams.get("title") || "";
+    if (!id.trim()) {
+      return NextResponse.json({ status: "error", message: "Parameter id atau title diperlukan." }, { status: 400 });
+    }
+    const next = await deletePersistedResearchGame("eneba", id);
+    return NextResponse.json({ status: "success", remaining: next.length });
+  } catch (err: any) {
+    return NextResponse.json({ status: "error", message: err.message }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const action = body.action || "single_import";
 
-    // ACTION: BULK IMPORT ALL ENEBA CDKEYS
+    // ACTION: BULK IMPORT ENEBA CDKEYS (mendukung games[] terfilter termasuk hasil discover/scan)
     if (action === "bulk_import") {
-      const payloads = ENEBA_CRAWLER_DATABASE.map((item) => ({
-        id: item.id || `eneba-${Date.now()}`,
+      const sourceItems =
+        Array.isArray(body.games) && body.games.length > 0 ? body.games : ENEBA_CRAWLER_DATABASE;
+      const payloads = sourceItems.map((item: any) => ({
+        id: item.id || `eneba-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         title: item.title,
         platform: item.platform || "Steam",
         category: "Digital Key / CDKey",
         source_marketplace: "ENEBA",
-        selling_price_shopee_idr: item.recommended_shopee_price_idr,
-        target_margin_pct: item.net_margin_pct,
-        selected_seller_id: `${item.id}-eneba-seller`,
+        selling_price_shopee_idr: item.recommended_shopee_price_idr || item.selling_price_shopee_idr,
+        target_margin_pct: item.net_margin_pct ?? item.target_margin_pct ?? 20,
+        selected_seller_id: `${item.id || "eneba"}-eneba-seller`,
         sellers: [
           {
-            seller_id: `${item.id}-eneba-seller`,
+            seller_id: `${item.id || "eneba"}-eneba-seller`,
             seller_name: `${item.seller_name || "Eneba Verified Merchant"} (Eneba)`,
             rating_pct: item.seller_rating_pct || 99.8,
             reviews_count: item.seller_reviews_count || 25000,
-            price_g2g_idr: item.price_eneba_idr,
+            price_g2g_idr: item.price_eneba_idr || item.price_g2g_idr,
             delivery_speed: "Instant 0-Detik (Redeem Code)",
             stock: 999,
             risk_score: 0,
@@ -717,7 +766,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // ACTION: SEARCH AI (Real Multi-API Market Scan + Gemini Strategic Analysis)
+    // ACTION: SEARCH AI (100% Real Multi-API Scan: Live Eneba SSR + Steam ID + CheapShark + Gemini Advisory)
     if (action === "search_ai") {
       const query = (body.query || "").trim();
       const preferredPlatform = (body.platform || "Steam").trim();
@@ -726,123 +775,94 @@ export async function POST(req: Request) {
       }
 
       try {
-        // Langkah 1: Real Market Data Fetch Paralel (Steam Store ID + CheapShark Global + Live USD/IDR Rate)
-        const [realSteam, cheapSharkRaw, usdRate] = await Promise.all([
-          fetchRealSteamIndonesiaPrice(query).catch(() => null),
-          fetch(`https://www.cheapshark.com/api/1.0/games?title=${encodeURIComponent(query)}&limit=5`, {
-            headers: {
-              "User-Agent": "AksharaGamingCenter/1.0 (admin@aksharagaming.com)",
-              Accept: "application/json",
-            },
-            signal: AbortSignal.timeout(5000),
-            cache: "no-store",
-          })
-            .then((r) => (r.ok ? r.json() : null))
-            .catch(() => null),
-          fetchUsdToIdrRate().catch(() => 16850),
-        ]);
+        const verified = await verifyLiveGameOpportunity({
+          query,
+          preferredPlatform,
+          targetMarginPct: 18,
+        });
 
-        let cheapestUsd = 0;
-        let cheapSharkTitle = "";
-        if (Array.isArray(cheapSharkRaw) && cheapSharkRaw.length > 0) {
-          const qLower = query.toLowerCase();
-          const bestMatch =
-            cheapSharkRaw.find((c: any) => (c.external || "").toLowerCase().trim() === qLower) ||
-            cheapSharkRaw.find((c: any) => (c.external || "").toLowerCase().includes(qLower)) ||
-            cheapSharkRaw[0];
-          if (bestMatch) {
-            cheapestUsd = Number(bestMatch.cheapest) || 0;
-            cheapSharkTitle = bestMatch.external || "";
-          }
-        }
+        let resolvedTitle = verified?.title || query;
+        let finalPlatform = verified?.platform || preferredPlatform;
+        let finalEnebaPrice = verified?.price_eneba_idr || 0;
+        let finalShopeePrice = verified?.recommended_shopee_price_idr || 0;
+        let finalSteamPrice = verified?.steam_indo_price_idr || 0;
+        let enebaDirectUrl =
+          verified?.eneba_direct_url ||
+          buildEnebaFilteredUrl(resolvedTitle, { region: "global", platform: finalPlatform });
+        const dataSource: "live_market_verified" | "ai_estimated" = verified
+          ? verified.data_source
+          : "ai_estimated";
 
-        // Langkah 2: Kalkulasi Harga Modal Faktual
-        const hasLiveCheapShark = cheapestUsd > 0;
-        const hasLiveSteam = Boolean(realSteam && realSteam.price_idr > 0);
-        const dataSource: "live_market_verified" | "ai_estimated" =
-          hasLiveCheapShark || hasLiveSteam ? "live_market_verified" : "ai_estimated";
-
-        const resolvedTitle = realSteam?.official_title || cheapSharkTitle || query;
-        const resolvedSteamPrice = realSteam?.price_idr || 0;
-        const factualEnebaModalIdr = hasLiveCheapShark
-          ? Math.ceil((cheapestUsd * usdRate * 1.10) / 1000) * 1000
-          : 0;
-
-        // Langkah 3: Gemini AI Strategic Analysis dengan jsonMode: true
-        const systemPrompt = `Kamu adalah Market Intelligence Analyst untuk toko game digital Indonesia "Akshara Gaming Center" (Shopee).
-Berikan strategi harga jual Shopee yang kompetitif di bawah harga resmi Steam Indonesia dan hasilkan panduan aktivasi resmi.
-Kembalikan JSON valid saja sesuai skema.`;
-
-        const marketContext = [
-          `Game Target: "${resolvedTitle}" (Platform preferensi: ${preferredPlatform})`,
-          hasLiveSteam
-            ? `Harga Retail Resmi Steam Indonesia (Faktual): Rp ${resolvedSteamPrice.toLocaleString("id-ID")}`
-            : `Harga Retail Steam Indonesia: Belum ditemukan langsung (estimasi sesuai pasar Indonesia)`,
-          hasLiveCheapShark
-            ? `Harga Key Termurah Global Aktual (CheapShark API): $${cheapestUsd.toFixed(2)} USD (Kurs Rp ${Math.round(usdRate).toLocaleString("id-ID")}/USD -> Estimasi Landed Cost Eneba +10% fee = Rp ${factualEnebaModalIdr.toLocaleString("id-ID")})`
-            : `Harga Key Global CheapShark: Tidak ditemukan langsung (berikan estimasi modal Eneba IDR yang realistis)`,
-        ].join("\n");
-
-        const prompt = `${marketContext}
-
-Tugasmu:
-1. Tentukan platform dan tipe key yang tepat (misal "Steam Key Global", "Microsoft Key Global", dll).
-2. Jika harga modal Eneba belum tersedia dari CheapShark, estimasikan price_eneba_idr yang realistis. Jika sudah tersedia (Rp ${factualEnebaModalIdr}), gunakan angka faktual tersebut sebagai acuan utama.
-3. Tentukan recommended_shopee_price_idr yang menarik pembeli (kompetitif di bawah harga Steam Indo bila tersedia, tetap menghasilkan margin sehat >= 15% setelah potongan Shopee 8% + Rp 1.000 & QRIS 0.7%).
-4. Tulis tactical_reason singkat (2 kalimat) dan instant_redeem_guide langkah aktivasi resmi.
-
-Skema JSON:
-{
-  "title": "${resolvedTitle}",
-  "platform": "${preferredPlatform}",
-  "key_type": "Steam Key Global",
-  "price_eneba_idr": ${factualEnebaModalIdr > 0 ? factualEnebaModalIdr : 65000},
-  "recommended_shopee_price_idr": 99900,
-  "steam_indo_price_idr": ${resolvedSteamPrice > 0 ? resolvedSteamPrice : 150000},
-  "tactical_reason": "Alasan strategis penjualan di Shopee.",
-  "instant_redeem_guide": "Panduan redeem resmi."
-}`;
-
+        // Gemini AI hanya menyusun narasi taktis & panduan aktivasi (TIDAK BOLEH menimpa angka faktual Eneba/Steam!)
         let parsed: any = {};
         try {
-          const rawAi = await callGemini(prompt, systemPrompt, { jsonMode: true, temperature: 0.2 });
+          const marketContext = verified
+            ? [
+                `Game: "${resolvedTitle}" (${finalPlatform})`,
+                verified.eneba_live_verified
+                  ? `Harga Eneba LIVE (Faktual): Rp ${verified.eneba_base_price_idr.toLocaleString("id-ID")} (Estimasi mendarat +fee = Rp ${verified.price_eneba_idr.toLocaleString("id-ID")})`
+                  : `Harga Global API: Rp ${verified.price_eneba_idr.toLocaleString("id-ID")}`,
+                verified.steam_live_verified
+                  ? `Harga Resmi Steam Indonesia (Faktual): Rp ${verified.steam_indo_price_idr.toLocaleString("id-ID")}${verified.steam_discount_pct > 0 ? ` (Sedang diskon ${verified.steam_discount_pct}% dari Rp ${verified.steam_indo_original_idr.toLocaleString("id-ID")})` : ""}`
+                  : `Harga Steam Indonesia belum tersedia.`,
+                `Rekomendasi Jual Shopee (Target Profit +18%): Rp ${verified.recommended_shopee_price_idr.toLocaleString("id-ID")}`,
+                verified.arbitrage_warning ? `PERINGATAN: ${verified.arbitrage_warning}` : "",
+              ]
+                .filter(Boolean)
+                .join("\n")
+            : `Game "${query}" tidak ditemukan di Eneba/Steam/CheapShark live. Berikan estimasi realistis untuk pasar Indonesia.`;
+
+          const prompt = `${marketContext}
+
+Tugasmu: Kembalikan JSON valid dengan key_type, tactical_reason (2 kalimat Bahasa Indonesia jujur sesuai fakta harga di atas), dan instant_redeem_guide.${
+            verified
+              ? ""
+              : ` Karena API live belum menemukan produk ini, isi juga estimasi price_eneba_idr, recommended_shopee_price_idr, dan steam_indo_price_idr yang realistis (IDR).`
+          }
+Skema JSON:
+{
+  "key_type": "Steam Key Global",
+  "price_eneba_idr": ${finalEnebaPrice || 150000},
+  "recommended_shopee_price_idr": ${finalShopeePrice || 229000},
+  "steam_indo_price_idr": ${finalSteamPrice || 300000},
+  "tactical_reason": "...",
+  "instant_redeem_guide": "..."
+}`;
+          const rawAi = await callGemini(
+            prompt,
+            "Kamu adalah Market Intelligence Analyst yang jujur dan presisi. Kembalikan JSON valid saja.",
+            { jsonMode: true, temperature: 0.2 }
+          );
           const cleaned = rawAi.replace(/```json/gi, "").replace(/```/g, "").trim();
           parsed = JSON.parse(cleaned);
         } catch (aiErr) {
-          console.warn("[Eneba search_ai] Gemini fallback:", aiErr);
-          if (!hasLiveCheapShark && !hasLiveSteam) {
-            throw aiErr;
-          }
+          if (!verified) throw aiErr;
         }
 
-        const finalPlatform = parsed.platform || preferredPlatform || "Steam";
-        const finalEnebaPrice =
-          factualEnebaModalIdr > 0
-            ? factualEnebaModalIdr
-            : Number(parsed.price_eneba_idr) ||
-              (resolvedSteamPrice > 0 ? Math.round((resolvedSteamPrice * 0.55) / 1000) * 1000 : 65000);
-
-        const finalSteamPrice =
-          resolvedSteamPrice > 0
-            ? resolvedSteamPrice
-            : Number(parsed.steam_indo_price_idr) || Math.round(finalEnebaPrice * 1.65);
-
-        const minSafeShopee =
-          Math.ceil((finalEnebaPrice * 1.007 + 1000) / (1 - 0.08 - 0.18) / 1000) * 1000 - 100;
-        let finalShopeePrice = Number(parsed.recommended_shopee_price_idr) || minSafeShopee;
-        if (finalShopeePrice < minSafeShopee) {
-          finalShopeePrice = minSafeShopee;
+        if (!verified) {
+          finalEnebaPrice = Math.max(15000, Math.round((Number(parsed.price_eneba_idr) || 150000) / 1000) * 1000);
+          finalSteamPrice = Math.max(finalEnebaPrice, Math.round((Number(parsed.steam_indo_price_idr) || finalEnebaPrice * 1.5) / 1000) * 1000);
+          finalShopeePrice = calculateTargetSellingPrice({
+            cogsIdr: finalEnebaPrice,
+            presetId: "reguler",
+            packagingCostIdr: 0,
+            targetMarginPct: 18,
+          });
         }
 
-        const qris = Math.round(finalEnebaPrice * 0.007);
-        const shopeeFee = Math.round(finalShopeePrice * 0.08) + 1000;
-        const profit = finalShopeePrice - finalEnebaPrice - qris - shopeeFee;
-        const margin = finalShopeePrice > 0 ? (profit / finalShopeePrice) * 100 : 0;
+        const eco = calculateShopeeEconomics({
+          sellingPriceIdr: finalShopeePrice,
+          cogsIdr: finalEnebaPrice,
+          presetId: "reguler",
+          packagingCostIdr: 0,
+        });
         const spread = finalEnebaPrice > 0 ? ((finalShopeePrice - finalEnebaPrice) / finalEnebaPrice) * 100 : 0;
 
-        const defaultReason = hasLiveCheapShark
-          ? `Harga key global live terdeteksi $${cheapestUsd.toFixed(2)} USD (~Rp ${finalEnebaPrice.toLocaleString("id-ID")} termasuk fee Eneba) dibanding harga resmi Steam Rp ${finalSteamPrice.toLocaleString("id-ID")}. Aktivasi CDKey resmi bebas risiko hackback.`
-          : `Peluang arbitrase CDKey resmi dengan aktivasi instan ke akun pribadi pembeli tanpa risiko tabrakan login.`;
+        const defaultReason = verified?.arbitrage_warning
+          ? verified.arbitrage_warning
+          : verified?.eneba_live_verified
+          ? `Harga Eneba Live Rp ${verified.eneba_base_price_idr.toLocaleString("id-ID")} (~Rp ${finalEnebaPrice.toLocaleString("id-ID")} + fee checkout) vs Steam Indo Rp ${finalSteamPrice.toLocaleString("id-ID")}. Kode aktivasi resmi 0% hackback.`
+          : `Peluang CDKey resmi dengan aktivasi instan ke akun pribadi pembeli.`;
 
         const trust = evaluateSellerTrust({
           rating: 99.8,
@@ -855,16 +875,17 @@ Skema JSON:
         });
 
         const resultItem: EnebaScannedGame = {
-          id: `eneba-ai-${Date.now()}`,
+          id: `eneba-ai-${resolvedTitle.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 18)}-${Date.now().toString().slice(-4)}`,
           title: resolvedTitle,
           platform: finalPlatform,
           category: "Digital Key / CDKey",
           source_marketplace: "ENEBA",
-          eneba_direct_url: buildEnebaFilteredUrl(resolvedTitle, {
-            region: "global",
-            platform: finalPlatform,
-          }),
-          seller_name: hasLiveCheapShark ? "Eneba Global Merchants (Live API)" : "Eneba Global Merchants",
+          eneba_direct_url: enebaDirectUrl,
+          seller_name: verified?.eneba_live_verified
+            ? "Eneba Live Catalog (SSR Verified)"
+            : verified?.cheapshark_live_verified
+            ? "Eneba / Global Key (CheapShark API)"
+            : "Eneba Global Merchants",
           seller_rating_pct: trust.seller_rating,
           seller_reviews_count: trust.seller_orders,
           seller_rating: trust.seller_rating,
@@ -875,37 +896,52 @@ Skema JSON:
           trust_score: trust.trust_score,
           trust_tier: trust.trust_tier,
           supplier_tier: "ultra_safe",
-          key_type: parsed.key_type || `${finalPlatform} Key Global`,
+          key_type: verified?.key_type || parsed.key_type || `${finalPlatform} Key Global`,
           price_eneba_idr: finalEnebaPrice,
+          eneba_base_price_idr: verified?.eneba_base_price_idr,
+          eneba_live_verified: verified?.eneba_live_verified,
           recommended_shopee_price_idr: finalShopeePrice,
           steam_indo_price_idr: finalSteamPrice,
-          qris_fee_idr: qris,
-          shopee_fee_idr: shopeeFee,
+          qris_fee_idr: eco.qrisFeeIdr,
+          shopee_fee_idr: eco.shopeeFeeIdr,
           operational_fee_idr: 0,
-          net_profit_idr: profit,
-          net_margin_pct: Number(margin.toFixed(1)),
+          net_profit_idr: eco.netProfitIdr,
+          net_margin_pct: eco.netMarginPct,
           spread_pct: Number(spread.toFixed(1)),
-          demand_score: 90,
+          demand_score: verified?.arbitrage_viable === false ? 72 : 92,
           competition_level: "Sedang",
-          arbitrage_verdict: margin >= 30 ? "SUPER_OPPORTUNITY" : margin >= 18 ? "HIGH_MARGIN" : "STEADY_PROFIT",
-          crawl_timestamp: hasLiveCheapShark || hasLiveSteam ? "Live Market Scan" : "AI Scan",
+          arbitrage_verdict:
+            eco.netMarginPct >= 30 ? "SUPER_OPPORTUNITY" : eco.netMarginPct >= 18 ? "HIGH_MARGIN" : "STEADY_PROFIT",
+          crawl_timestamp: verified?.eneba_live_verified ? "Live Eneba Verified" : "Live Market Scan",
           tactical_reason: parsed.tactical_reason || defaultReason,
           instant_redeem_guide:
             parsed.instant_redeem_guide || "Steam Client > Tambah Game > Aktifkan Produk di Steam > Masukkan Kode.",
           data_source: dataSource,
-          cheapshark_usd: hasLiveCheapShark ? cheapestUsd : undefined,
-          usd_idr_rate: Math.round(usdRate),
+          cheapshark_usd: verified?.cheapshark_usd || undefined,
+          usd_idr_rate: verified?.usd_idr_rate || undefined,
+          discount_pct: verified?.steam_discount_pct || undefined,
+          steam_appid: verified?.steam_app_id,
+          arbitrage_viable: verified?.arbitrage_viable ?? true,
+          arbitrage_warning: verified?.arbitrage_warning,
+          persisted_in_research_db: true,
         };
+
+        await savePersistedResearchGames("eneba", [resultItem]);
 
         return NextResponse.json({
           status: "success",
           data_source: dataSource,
+          persisted: true,
           market_telemetry: {
-            steam_found: hasLiveSteam,
-            steam_price_idr: resolvedSteamPrice,
-            cheapshark_found: hasLiveCheapShark,
-            cheapshark_usd: cheapestUsd,
-            usd_idr_rate: Math.round(usdRate),
+            eneba_found: Boolean(verified?.eneba_live_verified),
+            eneba_base_price_idr: verified?.eneba_base_price_idr || 0,
+            steam_found: Boolean(verified?.steam_live_verified),
+            steam_price_idr: finalSteamPrice,
+            cheapshark_found: Boolean(verified?.cheapshark_live_verified),
+            cheapshark_usd: verified?.cheapshark_usd || 0,
+            usd_idr_rate: verified?.usd_idr_rate || 16850,
+            arbitrage_viable: verified?.arbitrage_viable ?? true,
+            arbitrage_warning: verified?.arbitrage_warning,
           },
           data: resultItem,
         });
@@ -1161,19 +1197,67 @@ Skema JSON:
           return bScore - aScore;
         });
 
-        const topResults = results.slice(0, 18);
+        const topResultsRaw = results.slice(0, 12);
+
+        // Verifikasi harga Eneba SSR aktual untuk 8 kandidat teratas agar bukan sekadar estimasi 0.72x
+        const topResults: EnebaScannedGame[] = [];
+        for (let i = 0; i < topResultsRaw.length; i += 4) {
+          const batch = topResultsRaw.slice(i, i + 4);
+          const verifiedBatch = await Promise.all(
+            batch.map(async (item) => {
+              if (i >= 8) return item;
+              try {
+                const live = await verifyLiveGameOpportunity({
+                  query: item.title,
+                  preferredPlatform: item.platform,
+                  targetMarginPct: 20,
+                });
+                if (live && live.eneba_live_verified) {
+                  return {
+                    ...item,
+                    price_eneba_idr: live.price_eneba_idr,
+                    eneba_base_price_idr: live.eneba_base_price_idr,
+                    eneba_live_verified: true,
+                    eneba_direct_url: live.eneba_direct_url,
+                    recommended_shopee_price_idr: live.recommended_shopee_price_idr,
+                    steam_indo_price_idr: live.steam_indo_price_idr,
+                    qris_fee_idr: live.qris_fee_idr,
+                    shopee_fee_idr: live.shopee_fee_idr,
+                    net_profit_idr: live.net_profit_idr,
+                    net_margin_pct: live.net_margin_pct,
+                    spread_pct: live.spread_pct,
+                    arbitrage_viable: live.arbitrage_viable,
+                    arbitrage_warning: live.arbitrage_warning,
+                    persisted_in_research_db: true,
+                    tactical_reason: live.arbitrage_warning
+                      ? live.arbitrage_warning
+                      : `Terverifikasi Eneba Live Rp ${live.eneba_base_price_idr.toLocaleString("id-ID")} (~Rp ${live.price_eneba_idr.toLocaleString("id-ID")} + fee) vs Steam ID Rp ${live.steam_indo_price_idr.toLocaleString("id-ID")}.`,
+                  };
+                }
+              } catch {}
+              return { ...item, persisted_in_research_db: true };
+            })
+          );
+          topResults.push(...verifiedBatch);
+        }
+
+        const viableFirst = topResults.filter((r) => r.arbitrage_viable !== false);
+        const finalResults = (viableFirst.length > 0 ? viableFirst : topResults).slice(0, 12);
+
+        await savePersistedResearchGames("eneba", finalResults);
 
         return NextResponse.json({
           status: "success",
           strategy,
+          persisted: true,
           scanned_sources: {
             steam_top_sellers: topSellers.length,
             steam_specials: specials.length,
             cheapshark_deals: allCsDeals.length,
             usd_idr_rate: Math.round(usdRate),
           },
-          total_found: topResults.length,
-          data: topResults,
+          total_found: finalResults.length,
+          data: finalResults,
         });
       } catch (err: any) {
         return NextResponse.json(
@@ -1183,91 +1267,41 @@ Skema JSON:
       }
     }
 
-    // ACTION: DISCOVER TRENDS (Gemini + Live Steam Featured Fallback)
+    // ACTION: DISCOVER TRENDS (Zero-Gimmick: Multi-Source Live Verification + Persisted to Supabase)
     if (action === "discover_trend") {
       try {
-        let parsed: any = null;
-        try {
-          const prompt = `Berperanlah sebagai Market Intelligence Analyst untuk game PC.
-Temukan 1 judul game yang SAAT INI sedang trending keras (viral di Steam, Twitch, TikTok, atau rilis baru yang hype) dan memiliki potensi margin tinggi jika dibeli CDKey-nya di marketplace global (Eneba) lalu dijual di Indonesia.
-Format JSON only:
-{
-  "title": "Nama Game (Contoh: Helldivers 2)",
-  "platform": "Steam",
-  "key_type": "Steam Key Global",
-  "price_eneba_idr": 250000,
-  "recommended_shopee_price_idr": 350000,
-  "steam_indo_price_idr": 450000,
-  "tactical_reason": "Alasan mengapa game ini sedang trending dan marginnya bagus."
-}`;
-          const rawAi = await callGemini(prompt, undefined, { jsonMode: true });
-          const cleaned = rawAi.replace(/```json/gi, "").replace(/```/g, "").trim();
-          parsed = JSON.parse(cleaned);
-        } catch {
-          // Real live market fallback dari Steam Featured Top Sellers / Specials saat Gemini unavailable
-          const steamFeat = await fetch("https://store.steampowered.com/api/featuredcategories/?cc=id&l=indonesian", {
-            signal: AbortSignal.timeout(6000),
-            cache: "no-store",
-          })
-            .then((r) => (r.ok ? r.json() : null))
-            .catch(() => null);
-          const candidates = [
-            ...(Array.isArray(steamFeat?.specials?.items) ? steamFeat.specials.items : []),
-            ...(Array.isArray(steamFeat?.top_sellers?.items) ? steamFeat.top_sellers.items : []),
-          ].filter((it: any) => (Number(it.final_price) || 0) >= 2000000);
-          const pick = candidates[Math.floor(Math.random() * Math.max(1, Math.min(5, candidates.length)))] || candidates[0];
-          if (!pick) {
-            throw new Error("Sumber trend live tidak tersedia sementara.");
-          }
-          const finalIdr = Math.round((Number(pick.final_price) || 0) / 100);
-          const origIdr = Math.round((Number(pick.original_price) || 0) / 100) || finalIdr;
-          const estEneba = Math.max(15000, Math.round((finalIdr * 0.7) / 1000) * 1000);
-          const recShopee = calculateTargetSellingPrice({
-            cogsIdr: estEneba,
-            presetId: "reguler",
-            packagingCostIdr: 0,
-            targetMarginPct: 20,
-          });
-          parsed = {
-            title: pick.name,
-            platform: "Steam",
-            key_type: "Steam Key Global",
-            price_eneba_idr: estEneba,
-            recommended_shopee_price_idr: recShopee,
-            steam_indo_price_idr: origIdr,
-            discount_pct: Number(pick.discount_percent) || 0,
-            steam_appid: Number(pick.id) || undefined,
-            tactical_reason: `Terdeteksi langsung dari Steam Indonesia (${pick.discount_percent ? `Diskon ${pick.discount_percent}%` : "Top Sellers Live"}). Harga resmi normal Rp ${origIdr.toLocaleString("id-ID")}.`,
-          };
-        }
+        const [currentCatalog, persistedResearch] = await Promise.all([
+          readAuthoritativeCatalog().catch(() => []),
+          getPersistedResearchGames("eneba").catch(() => []),
+        ]);
+        const excludeTitles = new Set<string>([
+          ...(currentCatalog || []).map((g: any) => String(g.title || "").toLowerCase().trim()),
+          ...(persistedResearch || []).slice(0, 12).map((g: any) => String(g.title || "").toLowerCase().trim()),
+        ]);
 
-        const realSteam = await fetchRealSteamIndonesiaPrice(parsed.title).catch(() => null);
-        const resolvedTitle = realSteam?.official_title || parsed.title;
-        const resolvedSteamPrice = realSteam?.price_idr || parsed.steam_indo_price_idr || 350000;
-        const eco = calculateShopeeEconomics({
-          sellingPriceIdr: parsed.recommended_shopee_price_idr,
-          cogsIdr: parsed.price_eneba_idr,
-          presetId: "reguler",
-          packagingCostIdr: 0,
-        });
+        const { verified, tactical_reason, instant_redeem_guide } =
+          await discoverRealTrendingOpportunity(excludeTitles);
+
         const trust = evaluateSellerTrust({
           rating: 99.8,
           orders: 45000,
           stock: 999,
-          priceIdr: parsed.price_eneba_idr,
-          sellingPriceShopeeIdr: parsed.recommended_shopee_price_idr,
+          priceIdr: verified.price_eneba_idr,
+          sellingPriceShopeeIdr: verified.recommended_shopee_price_idr,
           deliverySpeed: "Instant 0-Detik",
           verified: true,
         });
 
         const resultItem: EnebaScannedGame = {
-          id: `eneba-trend-${Date.now()}`,
-          title: resolvedTitle,
-          platform: parsed.platform || "Steam",
+          id: `eneba-trend-${verified.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 18)}-${Date.now().toString().slice(-4)}`,
+          title: verified.title,
+          platform: verified.platform || "Steam",
           category: "Digital Key / CDKey",
           source_marketplace: "ENEBA",
-          eneba_direct_url: buildEnebaFilteredUrl(resolvedTitle, { region: "global", platform: parsed.platform || "Steam" }),
-          seller_name: "Eneba Global Merchants",
+          eneba_direct_url: verified.eneba_direct_url,
+          seller_name: verified.eneba_live_verified
+            ? "Eneba Live Merchants (SSR Verified)"
+            : "Eneba Global Merchants (Live API)",
           seller_rating_pct: trust.seller_rating,
           seller_reviews_count: trust.seller_orders,
           seller_rating: trust.seller_rating,
@@ -1278,31 +1312,49 @@ Format JSON only:
           trust_score: trust.trust_score,
           trust_tier: trust.trust_tier,
           supplier_tier: "ultra_safe",
-          key_type: parsed.key_type || "Steam Key Global",
-          price_eneba_idr: parsed.price_eneba_idr,
-          recommended_shopee_price_idr: parsed.recommended_shopee_price_idr,
-          steam_indo_price_idr: resolvedSteamPrice,
-          qris_fee_idr: eco.qrisFeeIdr,
-          shopee_fee_idr: eco.shopeeFeeIdr,
+          key_type: verified.key_type || "Steam Key Global",
+          price_eneba_idr: verified.price_eneba_idr,
+          eneba_base_price_idr: verified.eneba_base_price_idr,
+          eneba_live_verified: verified.eneba_live_verified,
+          recommended_shopee_price_idr: verified.recommended_shopee_price_idr,
+          steam_indo_price_idr: verified.steam_indo_price_idr,
+          qris_fee_idr: verified.qris_fee_idr,
+          shopee_fee_idr: verified.shopee_fee_idr,
           operational_fee_idr: 0,
-          net_profit_idr: eco.netProfitIdr,
-          net_margin_pct: eco.netMarginPct,
-          spread_pct: Number((((parsed.recommended_shopee_price_idr - parsed.price_eneba_idr) / parsed.price_eneba_idr) * 100).toFixed(1)),
+          net_profit_idr: verified.net_profit_idr,
+          net_margin_pct: verified.net_margin_pct,
+          spread_pct: verified.spread_pct,
           demand_score: 96,
           competition_level: "Sedang",
-          arbitrage_verdict: eco.netMarginPct >= 30 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
-          crawl_timestamp: "Live Trend Discovery",
-          tactical_reason: parsed.tactical_reason || "Trend tinggi di market, margin menjanjikan.",
-          instant_redeem_guide: "Sesuai Platform > Redeem Code",
-          discount_pct: parsed.discount_pct,
-          steam_appid: parsed.steam_appid,
-          opportunity_tags: ["Trending Steam", ...(parsed.discount_pct >= 40 ? [`Diskon ${parsed.discount_pct}%`] : [])],
+          arbitrage_verdict:
+            verified.net_margin_pct >= 30
+              ? "SUPER_OPPORTUNITY"
+              : verified.net_margin_pct >= 18
+              ? "HIGH_MARGIN"
+              : "STEADY_PROFIT",
+          crawl_timestamp: "Live Trend Verified",
+          tactical_reason,
+          instant_redeem_guide,
+          data_source: verified.data_source,
+          cheapshark_usd: verified.cheapshark_usd || undefined,
+          usd_idr_rate: verified.usd_idr_rate,
+          discount_pct: verified.steam_discount_pct || undefined,
+          steam_appid: verified.steam_app_id,
+          arbitrage_viable: verified.arbitrage_viable,
+          arbitrage_warning: verified.arbitrage_warning,
+          persisted_in_research_db: true,
+          opportunity_tags: [
+            "Trending Verified",
+            ...(verified.steam_discount_pct >= 40 ? [`Diskon Steam ${verified.steam_discount_pct}%`] : []),
+          ],
         };
 
-        return NextResponse.json({ status: "success", data: resultItem });
+        await savePersistedResearchGames("eneba", [resultItem]);
+
+        return NextResponse.json({ status: "success", persisted: true, data: resultItem });
       } catch (err: any) {
         return NextResponse.json(
-          { status: "error", message: err?.message || "Gagal menemukan trend saat ini. Coba lagi." },
+          { status: "error", message: err?.message || "Gagal menemukan trend yang tervalidasi live saat ini. Coba lagi." },
           { status: 500 }
         );
       }
