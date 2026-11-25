@@ -1,6 +1,6 @@
 # Akshara Gaming Center — Multi-Device Handoff & Sync Guide
 
-> **Canonical Handoff Document (Updated through FASE 18)**  
+> **Canonical Handoff Document (Updated through FASE 19)**  
 > **Repository:** `https://github.com/Jejechris/aksharagamingcenter.git` (`main`)  
 > **Legacy Reference:** [AKSHARA_PROJECT_CONTEXT_HANDOVER.md](./AKSHARA_PROJECT_CONTEXT_HANDOVER.md) *(arsip awal Oktober 2026 — gunakan dokumen ini sebagai status terbaru)*
 
@@ -38,7 +38,9 @@ Karena riwayat chat Antigravity tersimpan lokal di tiap perangkat (`~/.gemini/an
   - **Komponen & Library Penting**:
     - `web/lib/sellerTrust.ts`: Composite Trust & Value Score (0–100: 40% harga/margin, 35% rating, 15% volume order, 10% stok & kecepatan kirim), klasifikasi `Safe (A+)` / `Moderate (B)` / `Caution (C)`, serta hard-reject rule untuk rating `< 92%` atau transaksi rendah mencurigakan.
     - `web/lib/envLoader.ts` & `web/next.config.mjs`: Fallback loader untuk memuat environment variables dari root `.env` (`../.env`) saat Next.js berjalan di `web/`.
-    - `web/app/api/health/route.ts`: Audit koneksi PostgreSQL aktual + deteksi status `HEALTHY`/`DEGRADED` secara jujur (tidak memalsukan status sehat saat DB offline/tak terkonfigurasi).
+    - `web/lib/gemini.ts` & `ai_engine.py`: Mengirim `GEMINI_API_KEY` melalui header `x-goog-api-key` (bukan `?key=` di URL) sehingga mendukung penuh format kunci Google AI Studio baru (`AQ.A...`) maupun `AIza...`.
+    - `web/lib/db.ts`, `scripts/init_db.js`, & `.github/workflows/supabase-keepalive.yml`: Semua 5 tabel Supabase (`app_kv`, `claims_vault`, `catalog_games`, `inventory_vault`, `autonomous_orders`) diaktifkan dengan **Row Level Security (`RLS`)** dan dilengkapi heartbeat anti-pause (`touchSupabaseKeepalive`) pada row tunggal `app_kv('supabase_keepalive')` yang dipicu oleh cron (`/api/cron/sentry`, `/api/cron/check-orders`, `/api/health?keepalive=1`) setiap 15 menit & 12 jam.
+    - **Penting untuk Supabase:** Gunakan Transaction Pooler URL (`aws-0-ap-northeast-1.pooler.supabase.com:6543`, username `postgres.<ref>`) pada `DATABASE_URL` lokal (`web/.env.local` / `.env`) dan Vercel karena hostname langsung `db.<ref>.supabase.co` hanya melayani IPv6.
     - `web/app/api/research/eneba-crawler/route.ts`: Ditambah `action: "autonomous_scan"` (menggabungkan Steam Store `featuredcategories` `top_sellers`/`specials` + CheapShark Deals API dengan `User-Agent` valid) + fallback Steam live untuk `discover_trend`.
     - `web/lib/pricing.ts`: Single Source of Truth kalkulasi Shopee (`calculateShopeeEconomics`, `calculateBreakEvenPrice`, `calculateTargetSellingPrice`), preset program biaya Shopee (`reguler` 8%+1k, `xtra_ongkir` 12%+1k, `flash_promo` 14.5%+1k), QRIS 0.7%, dan FX Volatility Buffer (`+1.5%`). Disinkronkan ke Quant, Launchpad, Catalog, Eneba Terminal (`/dashboard/eneba`), dan Research Center (`/dashboard/research`).
     - `web/app/api/orders/finalize/route.ts`: 1-Klik Finalisasi Order (`POST /api/orders/finalize`) untuk membuat token Claim Vault terenkripsi, mencatat laba bersih ke `financial_ledger` (`/dashboard/operator`), mengupdate order di `/dashboard/autonomous`, serta menghasilkan template pesan Shopee chat siap salin.
@@ -102,7 +104,7 @@ python -m py_compile bot/market_sentry.py bot/telegram_commander.py bot/eneba_da
 
 ## 5. Status Terkini (Per FASE 18)
 
-- **Selesai:** FASE 7 s/d FASE 18 (termasuk Unified Pricing & Shopee Promo Presets, Trust Guard pada Cron Auto-Failover, 1-Klik Finalisasi Order -> Claim + Kas Ledger, GitHub Actions CI `ci-web.yml`, Root `.env` fallback loader, Honest DB `/api/health`, serta **Autonomous CDKey Scanner** + sinkronisasi filter **`Saring Margin Bersih`** di `/dashboard/eneba` & `/dashboard/research`).
+- **Selesai:** FASE 7 s/d FASE 19 (termasuk perbaikan `x-goog-api-key` untuk kunci `AQ.A...`, inisialisasi 5 tabel Supabase + `RLS`, Transaction Pooler IPv4, serta Keepalive Anti-Pause via GitHub Actions).
 - **Catatan Penting Environment (`web/.env.local` & Vercel):**
   - Pastikan `GEMINI_API_KEY` menggunakan API Key valid dari Google AI Studio (`AIza...`, bukan token `AQ.A...` agar tidak 401 `ACCESS_TOKEN_TYPE_UNSUPPORTED`).
   - Pastikan `VAULT_ENCRYPTION_SECRET` terisi string acak 32+ karakter di lokal & Vercel agar enkripsi kredensial di brankas aman.

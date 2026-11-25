@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { queryDb, isDbConfigured } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { queryDb, isDbConfigured, touchSupabaseKeepalive, getKV } from "@/lib/db";
 import { ensureRootEnvLoaded } from "@/lib/envLoader";
 
 export const dynamic = "force-dynamic";
@@ -15,12 +15,14 @@ function getMaskedDbHost(): string {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   ensureRootEnvLoaded();
   const startTime = performance.now();
   const dbConfigured = isDbConfigured();
   const maskedHost = getMaskedDbHost();
   const vaultSecretSet = Boolean((process.env.VAULT_ENCRYPTION_SECRET || "").trim().length >= 16);
+  const { searchParams } = new URL(req.url);
+  const doKeepalive = searchParams.get("keepalive") === "1" || searchParams.get("keepalive") === "true";
 
   if (!dbConfigured) {
     return NextResponse.json(
@@ -49,35 +51,40 @@ export async function GET() {
       throw new Error("PostgreSQL ping tidak mengembalikan baris (cek koneksi / DATABASE_URL).");
     }
 
+    if (doKeepalive) {
+      await touchSupabaseKeepalive("health_keepalive");
+    }
+
     const latencyMs = Math.round(performance.now() - startTime);
 
-    // 2. Query table counts & security flags cleanly
-    let catalogCount = 0;
-    let vaultAvailableCount = 0;
-    let ordersCount = 0;
-    let claimsCount = 0;
+    // 2. Query table counts & RLS status
+    const countQuery = async (sql: string) => {
+      try {
+        const res = await queryDb<{ count: string }>(sql);
+        return Number(res[0]?.count || 0);
+      } catch {
+        return 0;
+      }
+    };
 
-    try {
-      const catRes = await queryDb<{ count: string }>("SELECT count(*) as count FROM catalog_games");
-      catalogCount = Number(catRes[0]?.count || 0);
-    } catch {}
+    const [catalogCount, vaultAvailableCount, ordersCount, claimsCount, rlsRows, keepaliveMeta] =
+      await Promise.all([
+        countQuery("SELECT count(*) as count FROM catalog_games"),
+        countQuery("SELECT count(*) as count FROM inventory_vault WHERE status = 'AVAILABLE'"),
+        countQuery("SELECT count(*) as count FROM autonomous_orders"),
+        countQuery("SELECT count(*) as count FROM claims_vault"),
+        queryDb<{ tablename: string; rowsecurity: boolean }>(
+          "SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename"
+        ).catch(() => []),
+        getKV("supabase_keepalive").catch(() => null),
+      ]);
 
-    try {
-      const vltRes = await queryDb<{ count: string }>(
-        "SELECT count(*) as count FROM inventory_vault WHERE status = 'AVAILABLE'"
-      );
-      vaultAvailableCount = Number(vltRes[0]?.count || 0);
-    } catch {}
-
-    try {
-      const ordRes = await queryDb<{ count: string }>("SELECT count(*) as count FROM autonomous_orders");
-      ordersCount = Number(ordRes[0]?.count || 0);
-    } catch {}
-
-    try {
-      const clmRes = await queryDb<{ count: string }>("SELECT count(*) as count FROM claims_vault");
-      claimsCount = Number(clmRes[0]?.count || 0);
-    } catch {}
+    const rlsMap: Record<string, boolean> = {};
+    for (const r of rlsRows) {
+      rlsMap[r.tablename] = Boolean(r.rowsecurity);
+    }
+    const allRlsEnabled =
+      rlsRows.length > 0 && rlsRows.every((r) => Boolean(r.rowsecurity));
 
     return NextResponse.json({
       status: "HEALTHY",
@@ -86,6 +93,9 @@ export async function GET() {
       host: maskedHost,
       ssl: true,
       vault_secret_configured: vaultSecretSet,
+      rls_all_enabled: allRlsEnabled,
+      tables_rls: rlsMap,
+      keepalive: keepaliveMeta,
       latency_ms: latencyMs,
       server_time: pingResult[0]?.server_time || new Date().toISOString(),
       pg_version: pingResult[0]?.version
@@ -102,9 +112,9 @@ export async function GET() {
         idleTimeoutMillis: 15000,
         connectionTimeoutMillis: 2500,
       },
-      security: vaultSecretSet
-        ? "Parameterized SQL + SSL TLS + AES-GCM Vault Secret Active"
-        : "Parameterized SQL + SSL TLS (VAULT_ENCRYPTION_SECRET belum disetel!)",
+      security: `${allRlsEnabled ? "RLS Active" : "RLS Partial"} + Parameterized SQL + SSL TLS${
+        vaultSecretSet ? " + Vault Secret Active" : " (VAULT_ENCRYPTION_SECRET belum disetel)"
+      }`,
       tier: "Tier 1 Cloud Database Active",
       timestamp: new Date().toISOString(),
     });

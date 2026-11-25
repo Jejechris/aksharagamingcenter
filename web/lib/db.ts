@@ -259,6 +259,35 @@ export async function setKV(key: string, value: any): Promise<boolean> {
   return false;
 }
 
+/**
+ * Menjaga database Supabase tetap aktif (anti auto-pause 7 hari inaktif) dengan memperbarui
+ * 1 baris heartbeat tunggal `supabase_keepalive` di `app_kv` tanpa membuat data sampah baru.
+ */
+export async function touchSupabaseKeepalive(source: string = "app_cron"): Promise<{
+  ok: boolean;
+  pinged_at: string;
+  source: string;
+}> {
+  const pingedAt = new Date().toISOString();
+  if (!isDbConfigured()) {
+    return { ok: false, pinged_at: pingedAt, source };
+  }
+  try {
+    await queryDb("SELECT 1 AS ping");
+    const existing = await getKV("supabase_keepalive");
+    const totalPings = Number(existing?.total_pings || 0) + 1;
+    await setKV("supabase_keepalive", {
+      pinged_at: pingedAt,
+      source,
+      status: "alive",
+      total_pings: totalPings,
+    });
+    return { ok: true, pinged_at: pingedAt, source };
+  } catch {
+    return { ok: false, pinged_at: pingedAt, source };
+  }
+}
+
 // -------------------------------------------------------------
 // Atomic Claims Vault Helpers (Row-Level Concurrency Guard)
 // -------------------------------------------------------------

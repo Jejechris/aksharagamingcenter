@@ -32,7 +32,7 @@ export async function callGemini(
   }
 
   for (const model of FALLBACK_MODELS) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
     const body: any = {
       contents: [
@@ -53,7 +53,10 @@ export async function callGemini(
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
         body: JSON.stringify(body),
       });
 

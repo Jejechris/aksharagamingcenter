@@ -16,7 +16,7 @@ if not key:
                 if line.startswith("GEMINI_API_KEY="):
                     key = line.split("=", 1)[1].strip().strip('"').strip("'")
 
-url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={key}"
+url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
 systemPrompt = """Kamu adalah AI Delivery & Customer Experience Officer untuk Akshara Gaming Center.
 Tugasmu adalah mengubah data raw akun game (email/username dan password mentah dari supplier G2G) menjadi pesan pengiriman pesanan yang SANGAT RAPI, PROFESIONAL, RAMAH, dan SIAP KIRIM ke chat pembeli (Shopee / WhatsApp).
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     }
 
     try:
-        r = httpx.post(url, json=payload, timeout=10.0)
+        r = httpx.post(url, headers={"x-goog-api-key": key}, json=payload, timeout=10.0)
         print("Status:", r.status_code)
         if r.status_code == 200:
             text = r.json()['candidates'][0]['content']['parts'][0]['text'].strip()

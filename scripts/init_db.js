@@ -1,9 +1,34 @@
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-require('dotenv').config({ path: path.join(__dirname, '..', 'web', '.env.local') });
-require('dotenv').config();
-const { Client } = require('pg');
 const fs = require('fs');
+
+function loadEnvFile(envPath) {
+  try {
+    if (!fs.existsSync(envPath)) return;
+    const raw = fs.readFileSync(envPath, 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith('#') || !t.includes('=')) continue;
+      const idx = t.indexOf('=');
+      const k = t.slice(0, idx).trim();
+      let v = t.slice(idx + 1).trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+        v = v.slice(1, -1);
+      }
+      if (k && v && !process.env[k]) process.env[k] = v;
+    }
+  } catch {}
+}
+
+loadEnvFile(path.join(__dirname, '..', 'web', '.env.local'));
+loadEnvFile(path.join(__dirname, '..', '.env'));
+
+let pgModule;
+try {
+  pgModule = require('pg');
+} catch {
+  pgModule = require(path.join(__dirname, '..', 'web', 'node_modules', 'pg'));
+}
+const { Client } = pgModule;
 
 const DB_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
 if (!DB_URL) {
@@ -263,13 +288,20 @@ async function main() {
   }
 
   await client.query(
-    'INSERT INTO app_kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
-    ['system_ping', JSON.stringify({ last_ping: new Date().toISOString() })]
+    'INSERT INTO app_kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP',
+    ['supabase_keepalive', JSON.stringify({ pinged_at: new Date().toISOString(), source: 'init_db', status: 'alive' })]
   );
-  console.log("✓ app_kv: system_ping updated.");
+  console.log("✓ app_kv: supabase_keepalive initialized.");
+
+  // Enable Row Level Security (RLS) on all public tables so anon REST access is locked down
+  // while backend server pg connections retain full access.
+  for (const tbl of ['app_kv', 'claims_vault', 'catalog_games', 'inventory_vault', 'autonomous_orders']) {
+    await client.query(`ALTER TABLE IF EXISTS "${tbl}" ENABLE ROW LEVEL SECURITY;`);
+  }
+  console.log("✓ Row Level Security (RLS) enabled on all 5 tables.");
 
   await client.end();
-  console.log("✓ All 5 tables initialized and verified successfully!");
+  console.log("✓ All 5 tables initialized, secured (RLS), and verified successfully!");
 }
 
 main().catch(console.error);

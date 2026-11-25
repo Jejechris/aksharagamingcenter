@@ -16,7 +16,7 @@ if not key:
                 if line.startswith("GEMINI_API_KEY="):
                     key = line.split("=", 1)[1].strip().strip('"').strip("'")
 
-url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={key}"
+url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
 systemPrompt = """Kamu adalah Chief Quant & Gaming Market Analyst profesional untuk Akshara Gaming Center (toko game digital di Indonesia).
 Tugasmu adalah memberikan estimasi harga modal g2g.com/id dan harga jual Shopee yang SANGAT AKURAT dan REALISTIS sesuai tier/kategori game:
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         'systemInstruction': {'parts': [{'text': systemPrompt}]}
     }
     try:
-        r = httpx.post(url, json=payload, timeout=10.0)
+        r = httpx.post(url, headers={"x-goog-api-key": key}, json=payload, timeout=10.0)
         print('Status:', r.status_code)
         if r.status_code == 200:
             print('Output:', r.json()['candidates'][0]['content']['parts'][0]['text'])

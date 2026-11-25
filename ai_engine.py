@@ -13,16 +13,22 @@ import json
 import httpx
 from typing import Dict, Any, List, Optional
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6JJaaf2otbjX9Ppo22_tDfUsB9_6S6q7uEEnoDJLFPpTw")
-DEFAULT_MODEL = os.getenv("GEMINI_DEFAULT_MODEL", "gemini-3.5-flash-lite")
-FALLBACK_MODELS = [DEFAULT_MODEL, "gemini-flash-lite-latest", "gemini-2.5-flash"]
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+DEFAULT_MODEL = os.getenv("GEMINI_DEFAULT_MODEL", "gemini-2.5-flash")
+FALLBACK_MODELS = [DEFAULT_MODEL, "gemini-2.0-flash", "gemini-2.5-flash-lite"]
 
 def call_gemini(prompt: str, system_instruction: Optional[str] = None, timeout: float = 12.0) -> str:
     """Mengirim prompt ke Google Gemini Generative Language API."""
-    headers = {"Content-Type": "application/json"}
+    api_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY).strip()
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY belum dikonfigurasi di environment variables.")
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key,
+    }
     
     for model in FALLBACK_MODELS:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         payload: Dict[str, Any] = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {

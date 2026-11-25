@@ -1,0 +1,45 @@
+name: Supabase Anti-Pause Keepalive
+
+on:
+  schedule:
+    # Jalankan setiap 12 jam agar Supabase Free Tier tidak pernah terpause karena 7 hari inaktif
+    - cron: '0 6,18 * * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    name: Supabase Keepalive Heartbeat
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL || 'https://asksharagaming.vercel.app' }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL || '' }}
+    steps:
+      - name: Ping Production Health Keepalive Endpoint
+        run: |
+          echo "Triggering keepalive heartbeat via ${VERCEL_APP_URL}/api/health?keepalive=1"
+          curl -s -S --max-time 30 "${VERCEL_APP_URL}/api/health?keepalive=1" || echo "Health endpoint check completed."
+
+      - name: Direct PostgreSQL Heartbeat (if DATABASE_URL secret configured)
+        if: env.DATABASE_URL != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Upsert Single Keepalive Row in app_kv
+        if: env.DATABASE_URL != ''
+        run: |
+          npm install --no-save pg
+          node -e '
+            const { Client } = require("pg");
+            (async () => {
+              const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+              await client.connect();
+              await client.query("CREATE TABLE IF NOT EXISTS app_kv (key VARCHAR(255) PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+              await client.query(
+                "INSERT INTO app_kv (key, value, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+                ["supabase_keepalive", JSON.stringify({ pinged_at: new Date().toISOString(), source: "github_actions_direct", status: "alive" })]
+              );
+              console.log("Direct Supabase keepalive row updated.");
+              await client.end();
+            })();
+          '
