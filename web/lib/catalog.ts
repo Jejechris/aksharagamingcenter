@@ -69,14 +69,15 @@ export interface CatalogGame {
 }
 
 export function calculateItemMetrics(item: any): CatalogGame {
+  const sellers = Array.isArray(item.sellers) ? item.sellers : [];
   const selectedSeller =
-    item.sellers?.find((s: any) => s.seller_id === item.selected_seller_id) ||
-    item.sellers?.[0] || { price_g2g_idr: 100000, seller_name: "Default Seller" };
+    sellers.find((s: any) => s.seller_id === item.selected_seller_id) ||
+    sellers[0] || { price_g2g_idr: 100000, seller_name: "Default Seller" };
 
-  const cogsG2g = selectedSeller.price_g2g_idr || 0;
+  const cogsG2g = Math.max(0, Math.round(Number(selectedSeller.price_g2g_idr ?? 0) || 0));
   const qrisFee = Math.round(cogsG2g * QRIS_FEE_PCT);
   const cogsNet = cogsG2g + qrisFee;
-  const sellingPrice = item.selling_price_shopee_idr || 0;
+  const sellingPrice = Math.max(0, Math.round(Number(item.selling_price_shopee_idr ?? 0) || 0));
   const shopeeFee = Math.round(sellingPrice * SHOPEE_ADMIN_FEE_PCT) + SHOPEE_FIXED_FEE_IDR;
   const packaging = PACKAGING_COST_IDR; // Digital mode: Rp 0; Envelope: Rp 2.000
   const totalCost = cogsNet + shopeeFee + packaging;
@@ -84,15 +85,16 @@ export function calculateItemMetrics(item: any): CatalogGame {
   const netMargin = sellingPrice > 0 ? (netProfit / sellingPrice) * 100 : 0;
   const breakEven = Math.round((cogsNet + SHOPEE_FIXED_FEE_IDR + packaging) / (1 - SHOPEE_ADMIN_FEE_PCT));
 
-  const enrichedSellers: Seller[] = (item.sellers || []).map((s: any) => {
-    const sCogsG2g = s.price_g2g_idr || 0;
-    const sQris = Math.round(sCogsG2g * 0.007);
+  const enrichedSellers: Seller[] = sellers.map((s: any) => {
+    const sCogsG2g = Math.max(0, Math.round(Number(s.price_g2g_idr ?? 0) || 0));
+    const sQris = Math.round(sCogsG2g * QRIS_FEE_PCT);
     const sCogsNet = sCogsG2g + sQris;
     const sTotalCost = sCogsNet + shopeeFee + packaging;
     const sProfit = sellingPrice - sTotalCost;
     const sMargin = sellingPrice > 0 ? (sProfit / sellingPrice) * 100 : 0;
     return {
       ...s,
+      price_g2g_idr: sCogsG2g,
       qris_fee_idr: sQris,
       cogs_net_idr: sCogsNet,
       net_profit_idr: sProfit,
@@ -102,6 +104,8 @@ export function calculateItemMetrics(item: any): CatalogGame {
 
   return {
     ...item,
+    selling_price_shopee_idr: sellingPrice,
+    selected_seller_id: selectedSeller?.seller_id || item.selected_seller_id || "",
     sellers: enrichedSellers,
     metrics: {
       selected_seller: selectedSeller,
@@ -179,11 +183,118 @@ export async function readAuthoritativeCatalog(): Promise<any[]> {
   return [];
 }
 
-export async function writeAuthoritativeCatalog(catalogList: any[]): Promise<void> {
-  inMemoryCatalogCache = catalogList;
+export interface WriteCatalogOptions {
+  changedGameIds?: string[];
+  syncAllGamesToDb?: boolean;
+}
+
+function sanitizeNumber(val: any, fallback: number): number {
+  const n = Number(val);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function sanitizeSellersList(rawSellers: any[], gameTitle: string, isEneba: boolean): Seller[] {
+  const defaultEnebaUrl = getEnebaProductUrl(gameTitle);
+  return (Array.isArray(rawSellers) ? rawSellers : []).map((s: any, idx: number) => ({
+    ...s,
+    seller_id: String(s.seller_id || `seller-${Date.now()}-${idx}`).trim(),
+    seller_name: String(s.seller_name || (isEneba ? "Eneba Verified Merchant (Eneba)" : "G2G Verified")).trim(),
+    rating_pct: sanitizeNumber(s.rating_pct ?? s.seller_rating, 99.5),
+    reviews_count: Math.max(0, Math.round(sanitizeNumber(s.reviews_count ?? s.reviews, 10000))),
+    price_g2g_idr: Math.max(0, Math.round(sanitizeNumber(s.price_g2g_idr ?? s.price_eneba_idr ?? s.price_idr, 50000))),
+    delivery_speed: s.delivery_speed || s.delivery || (isEneba ? "Instant 0-Detik (Redeem Code)" : "Instant Delivery"),
+    stock: Math.max(0, Math.round(sanitizeNumber(s.stock, isEneba ? 999 : 30))),
+    risk_score: Math.max(0, Math.round(sanitizeNumber(s.risk_score, 0))),
+    is_recommended: Boolean(s.is_recommended ?? idx === 0),
+    profile_url: s.profile_url || (isEneba ? defaultEnebaUrl : resolveG2GProductUrl("", s.seller_name, gameTitle)),
+    tier: s.tier || "ultra_safe",
+    tier_label: s.tier_label || (isEneba ? "🛡️ ENEBA CDKEY (0% HACKBACK)" : "🛡️ TOP VERIFIED"),
+    tier_desc: s.tier_desc || (isEneba ? "Kunci aktivasi digital resmi Eneba. Instant redeem ke akun Steam pribadi." : "Diimpor langsung dari Sourcing Radar."),
+  }));
+}
+
+function mergeNormalizedGame(existing: any, incomingGame: any): any {
+  const isEneba = Boolean(
+    incomingGame.category?.toLowerCase().includes("key") ||
+    incomingGame.category?.toLowerCase().includes("cdkey") ||
+    incomingGame.id?.startsWith("eneba-") ||
+    incomingGame.source_marketplace === "ENEBA" ||
+    existing?.category?.toLowerCase().includes("cdkey")
+  );
+  const title = String(incomingGame.title || existing?.title || "Game Title").trim();
+  const existingSellers: Seller[] = Array.isArray(existing?.sellers) ? existing.sellers : [];
+  const rawIncomingSellers = Array.isArray(incomingGame.sellers) ? incomingGame.sellers : [];
+  const incomingSellers = sanitizeSellersList(rawIncomingSellers, title, isEneba);
+
+  const mergedSellers = [...existingSellers];
+  for (const is of incomingSellers) {
+    const sIdx = mergedSellers.findIndex(
+      (s) => s.seller_id === is.seller_id || (s.seller_name || "").toLowerCase() === is.seller_name.toLowerCase()
+    );
+    if (sIdx >= 0) {
+      mergedSellers[sIdx] = { ...mergedSellers[sIdx], ...is };
+    } else {
+      mergedSellers.push(is);
+    }
+  }
+
+  const finalSellers = mergedSellers.length > 0 ? mergedSellers : existingSellers;
+  const rawPrice =
+    incomingGame.selling_price_shopee_idr ??
+    incomingGame.recommended_shopee_price_idr ??
+    existing?.selling_price_shopee_idr;
+  const sellingPrice = Math.max(0, Math.round(sanitizeNumber(rawPrice, 100000)));
+  const rawMargin =
+    incomingGame.target_margin_pct ??
+    incomingGame.net_margin_pct ??
+    existing?.target_margin_pct;
+  const targetMargin = Math.round(sanitizeNumber(rawMargin, 25) * 100) / 100;
+
+  const candidateSelected = String(incomingGame.selected_seller_id || existing?.selected_seller_id || "").trim();
+  const selectedSellerId =
+    candidateSelected && finalSellers.some((s) => s.seller_id === candidateSelected)
+      ? candidateSelected
+      : String(finalSellers[0]?.seller_id || candidateSelected || "");
+
+  return {
+    ...existing,
+    ...incomingGame,
+    id: existing?.id || incomingGame.id || `game-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    title,
+    platform: String(incomingGame.platform || existing?.platform || "Steam").trim(),
+    category: String(incomingGame.category || existing?.category || (isEneba ? "Digital Key / CDKey" : "Account (Full Access)")).trim(),
+    selling_price_shopee_idr: sellingPrice,
+    target_margin_pct: targetMargin,
+    status: String(incomingGame.status || existing?.status || "active").trim(),
+    selected_seller_id: selectedSellerId,
+    sellers: finalSellers,
+  };
+}
+
+export async function writeAuthoritativeCatalog(
+  catalogList: any[],
+  options: WriteCatalogOptions = {}
+): Promise<void> {
+  const sanitizedList = catalogList.map((g) => {
+    const sellers = Array.isArray(g.sellers) ? g.sellers : [];
+    const rawSel = String(g.selected_seller_id || "").trim();
+    const resolvedSel =
+      rawSel && sellers.some((s: any) => s.seller_id === rawSel)
+        ? rawSel
+        : String(sellers[0]?.seller_id || rawSel || "");
+    return {
+      ...g,
+      selling_price_shopee_idr: Math.max(0, Math.round(sanitizeNumber(g.selling_price_shopee_idr, 100000))),
+      target_margin_pct: Math.round(sanitizeNumber(g.target_margin_pct, 25) * 100) / 100,
+      selected_seller_id: resolvedSel,
+      sellers,
+    };
+  });
+
+  inMemoryCatalogCache = sanitizedList;
   lastCacheTimestamp = Date.now();
 
-  const jsonStr = JSON.stringify(catalogList, null, 2);
+  const jsonStr = JSON.stringify(sanitizedList, null, 2);
 
   const targets = [
     bundledCatalogPath,
@@ -202,11 +313,25 @@ export async function writeAuthoritativeCatalog(catalogList: any[]): Promise<voi
   }
 
   if (isDbConfigured()) {
-    try {
-      await Promise.all(catalogList.map((g) => saveDbGame(g)));
-      await setKV("active_catalog", catalogList);
-    } catch (err) {
-      console.warn("writeAuthoritativeCatalog DB sync warning:", err);
+    const gamesToSync =
+      Array.isArray(options.changedGameIds) && options.changedGameIds.length > 0 && !options.syncAllGamesToDb
+        ? sanitizedList.filter((g) => options.changedGameIds!.includes(g.id))
+        : sanitizedList;
+
+    const failedIds: string[] = [];
+    // Batch sequentially in chunks of 4 to avoid exhausting pool max=5
+    for (let i = 0; i < gamesToSync.length; i += 4) {
+      const chunk = gamesToSync.slice(i, i + 4);
+      const res = await Promise.all(chunk.map((g) => saveDbGame(g)));
+      res.forEach((ok, idx) => {
+        if (!ok) failedIds.push(chunk[idx]?.id || "unknown");
+      });
+    }
+
+    const kvOk = await setKV("active_catalog", sanitizedList);
+    if (failedIds.length > 0 || !kvOk) {
+      console.error("[Catalog DB Sync Error]", { failedIds, kvOk });
+      throw new Error(`Sinkronisasi database gagal untuk: ${failedIds.join(", ") || "active_catalog KV"}`);
     }
   }
 }
@@ -253,100 +378,48 @@ export async function addOrUpdateGame(incomingGame: any): Promise<{ item: Catalo
   const defaultEnebaUrl = getEnebaProductUrl(incomingGame.title);
 
   if (existingIdx >= 0) {
-    // Merge existing
-    const existing = catalog[existingIdx];
-    const existingSellers: Seller[] = existing.sellers || [];
-    const incomingSellers: Seller[] = (incomingGame.sellers || []).map((s: any, idx: number) => ({
-      seller_id: s.seller_id || `seller-${Date.now()}-${idx}`,
-      seller_name: s.seller_name || (isEneba ? "Eneba Verified Merchant (Eneba)" : "G2G Verified"),
-      rating_pct: Number(s.rating_pct) || 99.8,
-      reviews_count: Number(s.reviews_count) || 25000,
-      price_g2g_idr: Number(s.price_g2g_idr || s.price_eneba_idr) || 50000,
-      delivery_speed: s.delivery_speed || (isEneba ? "Instant 0-Detik (Redeem Code)" : "Instant Delivery"),
-      stock: Number(s.stock) || (isEneba ? 999 : 30),
-      risk_score: Number(s.risk_score) || 0,
-      is_recommended: Boolean(s.is_recommended ?? (idx === 0)),
-      profile_url: s.profile_url || (isEneba ? defaultEnebaUrl : resolveG2GProductUrl("", s.seller_name, incomingGame.title)),
-      tier: s.tier || "ultra_safe",
-      tier_label: s.tier_label || (isEneba ? "🛡️ ENEBA CDKEY (0% HACKBACK)" : "🛡️ TOP VERIFIED"),
-      tier_desc: s.tier_desc || (isEneba ? "Kunci aktivasi digital resmi Eneba. Instant redeem ke akun Steam pribadi." : "Diimpor langsung dari Sourcing Radar."),
-    }));
-
-    // Merge sellers without duplicates
-    const mergedSellers = [...existingSellers];
-    for (const is of incomingSellers) {
-      const sIdx = mergedSellers.findIndex(s => s.seller_id === is.seller_id || s.seller_name.toLowerCase() === is.seller_name.toLowerCase());
-      if (sIdx >= 0) {
-        mergedSellers[sIdx] = { ...mergedSellers[sIdx], ...is };
-      } else {
-        mergedSellers.push(is);
-      }
-    }
-
-    targetItem = {
-      ...existing,
-      ...incomingGame,
-      id: existing.id || incomingGame.id,
-      title: incomingGame.title || existing.title,
-      platform: incomingGame.platform || existing.platform,
-      category: incomingGame.category || existing.category,
-      selling_price_shopee_idr: Number(incomingGame.selling_price_shopee_idr ?? existing.selling_price_shopee_idr),
-      target_margin_pct: Number(incomingGame.target_margin_pct ?? existing.target_margin_pct),
-      status: incomingGame.status || existing.status || "active",
-      selected_seller_id: incomingGame.selected_seller_id || existing.selected_seller_id || mergedSellers[0]?.seller_id,
-      sellers: mergedSellers.length > 0 ? mergedSellers : existingSellers,
-    };
+    targetItem = mergeNormalizedGame(catalog[existingIdx], incomingGame);
     catalog[existingIdx] = targetItem;
   } else {
     // Insert new
     const rawSellers = incomingGame.sellers || [];
-    const newSellers: Seller[] = rawSellers.length > 0 ? rawSellers.map((s: any, idx: number) => ({
-      seller_id: s.seller_id || `seller-${Date.now()}-${idx}`,
-      seller_name: s.seller_name || (isEneba ? "Eneba Verified Merchant (Eneba)" : "G2G / Eneba Verified"),
-      rating_pct: Number(s.rating_pct) || 99.8,
-      reviews_count: Number(s.reviews_count) || 25000,
-      price_g2g_idr: Number(s.price_g2g_idr || s.price_eneba_idr) || 50000,
-      delivery_speed: s.delivery_speed || (isEneba ? "Instant 0-Detik (Redeem Code)" : "Instant Delivery"),
-      stock: Number(s.stock) || (isEneba ? 999 : 30),
-      risk_score: Number(s.risk_score) || 0,
-      is_recommended: Boolean(s.is_recommended ?? (idx === 0)),
-      profile_url: s.profile_url || (isEneba ? defaultEnebaUrl : resolveG2GProductUrl("", s.seller_name, incomingGame.title)),
-      tier: s.tier || "ultra_safe",
-      tier_label: s.tier_label || (isEneba ? "🛡️ ENEBA CDKEY (0% HACKBACK)" : "🛡️ TOP VERIFIED"),
-      tier_desc: s.tier_desc || (isEneba ? "Kunci aktivasi digital resmi Eneba. Instant redeem ke akun Steam pribadi." : "Diimpor langsung dari Sourcing Radar."),
-    })) : [
-      {
-        seller_id: `${incomingGame.id || "seller"}-top-merchant`,
-        seller_name: incomingGame.seller_name || (isEneba ? "Eneba Verified Merchant (Eneba)" : "G2G Verified"),
-        rating_pct: Number(incomingGame.seller_rating_pct) || 99.8,
-        reviews_count: Number(incomingGame.seller_reviews_count) || 25000,
-        price_g2g_idr: Number(incomingGame.price_g2g_idr || incomingGame.price_eneba_idr) || 50000,
-        delivery_speed: isEneba ? "Instant 0-Detik (Redeem Code)" : "Instant Delivery",
-        stock: isEneba ? 999 : 30,
-        risk_score: 0,
-        is_recommended: true,
-        profile_url: incomingGame.eneba_direct_url || (isEneba ? defaultEnebaUrl : (incomingGame.g2g_direct_url || resolveG2GProductUrl("", incomingGame.seller_name, incomingGame.title))),
-        tier: incomingGame.supplier_tier || "ultra_safe",
-        tier_label: isEneba ? "🛡️ ENEBA CDKEY (0% HACKBACK)" : "🛡️ TOP VERIFIED",
-        tier_desc: isEneba ? "Kunci aktivasi digital resmi Eneba. Instant redeem ke akun Steam pribadi." : "Diimpor langsung dari Sourcing Radar.",
-      }
-    ];
+    const newSellers: Seller[] =
+      rawSellers.length > 0
+        ? sanitizeSellersList(rawSellers, incomingGame.title || "Game Title", isEneba)
+        : [
+            {
+              seller_id: `${incomingGame.id || "seller"}-top-merchant`,
+              seller_name: incomingGame.seller_name || (isEneba ? "Eneba Verified Merchant (Eneba)" : "G2G Verified"),
+              rating_pct: sanitizeNumber(incomingGame.seller_rating_pct, 99.8),
+              reviews_count: Math.max(0, Math.round(sanitizeNumber(incomingGame.seller_reviews_count, 25000))),
+              price_g2g_idr: Math.max(0, Math.round(sanitizeNumber(incomingGame.price_g2g_idr ?? incomingGame.price_eneba_idr, 50000))),
+              delivery_speed: isEneba ? "Instant 0-Detik (Redeem Code)" : "Instant Delivery",
+              stock: isEneba ? 999 : 30,
+              risk_score: 0,
+              is_recommended: true,
+              profile_url: incomingGame.eneba_direct_url || (isEneba ? defaultEnebaUrl : (incomingGame.g2g_direct_url || resolveG2GProductUrl("", incomingGame.seller_name, incomingGame.title))),
+              tier: incomingGame.supplier_tier || "ultra_safe",
+              tier_label: isEneba ? "🛡️ ENEBA CDKEY (0% HACKBACK)" : "🛡️ TOP VERIFIED",
+              tier_desc: isEneba ? "Kunci aktivasi digital resmi Eneba. Instant redeem ke akun Steam pribadi." : "Diimpor langsung dari Sourcing Radar.",
+            },
+          ];
 
+    const newItemId = incomingGame.id || `game-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     targetItem = {
-      id: incomingGame.id || `game-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      title: incomingGame.title,
-      platform: incomingGame.platform || "Steam",
-      category: incomingGame.category || (isEneba ? "Digital Key / CDKey" : "Account (Full Access)"),
-      selling_price_shopee_idr: Number(incomingGame.selling_price_shopee_idr || incomingGame.recommended_shopee_price_idr) || 100000,
-      target_margin_pct: Math.round(Number(incomingGame.target_margin_pct || incomingGame.net_margin_pct)) || 25,
-      status: "active",
-      selected_seller_id: incomingGame.selected_seller_id || newSellers[0]?.seller_id,
+      id: newItemId,
+      title: String(incomingGame.title).trim(),
+      platform: String(incomingGame.platform || "Steam").trim(),
+      category: String(incomingGame.category || (isEneba ? "Digital Key / CDKey" : "Account (Full Access)")).trim(),
+      selling_price_shopee_idr: Math.max(0, Math.round(sanitizeNumber(incomingGame.selling_price_shopee_idr ?? incomingGame.recommended_shopee_price_idr, 100000))),
+      target_margin_pct: Math.round(sanitizeNumber(incomingGame.target_margin_pct ?? incomingGame.net_margin_pct, 25) * 100) / 100,
+      status: String(incomingGame.status || "active").trim(),
+      selected_seller_id: incomingGame.selected_seller_id || newSellers[0]?.seller_id || "",
       sellers: newSellers,
     };
     catalog.unshift(targetItem);
   }
 
-  await writeAuthoritativeCatalog(catalog);
+  await writeAuthoritativeCatalog(catalog, { changedGameIds: [targetItem.id] });
 
   // Send Telegram Bot notification with verified product link
   notifyTelegramCatalogEvent(targetItem).catch(() => {});
@@ -365,58 +438,64 @@ export async function bulkAddOrUpdateGames(incomingGames: any[]): Promise<{ impo
 
   const catalog = await readAuthoritativeCatalog();
   let count = 0;
+  const changedIds: string[] = [];
 
   for (const incoming of incomingGames) {
     if (!incoming || !incoming.title) continue;
-    const existingIdx = findGameIndexInList(catalog, incoming.id, incoming.title);
+    const existingIdx = findGameIndexInList(catalog, incoming.id, incoming.title, incoming.category);
 
     if (existingIdx >= 0) {
-      // Update
-      catalog[existingIdx] = {
-        ...catalog[existingIdx],
-        ...incoming,
-        id: catalog[existingIdx].id,
-        title: incoming.title || catalog[existingIdx].title,
-      };
+      const merged = mergeNormalizedGame(catalog[existingIdx], incoming);
+      catalog[existingIdx] = merged;
+      changedIds.push(merged.id);
       count++;
     } else {
-      // Add
+      const isEneba = Boolean(
+        incoming.category?.toLowerCase().includes("key") ||
+        incoming.category?.toLowerCase().includes("cdkey") ||
+        incoming.id?.startsWith("eneba-") ||
+        incoming.source_marketplace === "ENEBA"
+      );
       const rawSellers = incoming.sellers || [];
-      const newSellers: Seller[] = rawSellers.length > 0 ? rawSellers : [
-        {
-          seller_id: `seller-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          seller_name: incoming.seller_name || "G2G / Eneba Verified",
-          rating_pct: Number(incoming.seller_rating_pct) || 99.5,
-          reviews_count: Number(incoming.seller_reviews_count) || 10000,
-          price_g2g_idr: Number(incoming.price_g2g_idr || incoming.price_eneba_idr) || 100000,
-          delivery_speed: "Instant Delivery",
-          stock: 30,
-          risk_score: 0,
-          is_recommended: true,
-          profile_url: incoming.g2g_direct_url || incoming.eneba_direct_url || resolveG2GProductUrl("", incoming.seller_name, incoming.title),
-          tier: incoming.supplier_tier || "ultra_safe",
-          tier_label: incoming.source_marketplace === "ENEBA" ? "🛡️ ENEBA CDKEY (0% HACKBACK)" : "🛡️ TOP VERIFIED",
-          tier_desc: "Diimpor langsung dari Sourcing Radar.",
-        }
-      ];
+      const newSellers: Seller[] =
+        rawSellers.length > 0
+          ? sanitizeSellersList(rawSellers, incoming.title, isEneba)
+          : [
+              {
+                seller_id: `seller-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                seller_name: incoming.seller_name || "G2G / Eneba Verified",
+                rating_pct: sanitizeNumber(incoming.seller_rating_pct, 99.5),
+                reviews_count: Math.max(0, Math.round(sanitizeNumber(incoming.seller_reviews_count, 10000))),
+                price_g2g_idr: Math.max(0, Math.round(sanitizeNumber(incoming.price_g2g_idr ?? incoming.price_eneba_idr, 100000))),
+                delivery_speed: isEneba ? "Instant 0-Detik (Redeem Code)" : "Instant Delivery",
+                stock: isEneba ? 999 : 30,
+                risk_score: 0,
+                is_recommended: true,
+                profile_url: incoming.g2g_direct_url || incoming.eneba_direct_url || resolveG2GProductUrl("", incoming.seller_name, incoming.title),
+                tier: incoming.supplier_tier || "ultra_safe",
+                tier_label: incoming.source_marketplace === "ENEBA" ? "🛡️ ENEBA CDKEY (0% HACKBACK)" : "🛡️ TOP VERIFIED",
+                tier_desc: "Diimpor langsung dari Sourcing Radar.",
+              },
+            ];
 
       const newItem = {
         id: incoming.id || `game-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        title: incoming.title,
-        platform: incoming.platform || "Steam",
-        category: incoming.category || "Digital Key / Account",
-        selling_price_shopee_idr: Number(incoming.selling_price_shopee_idr || incoming.recommended_shopee_price_idr) || 100000,
-        target_margin_pct: Math.round(Number(incoming.target_margin_pct || incoming.net_margin_pct)) || 25,
-        status: "active",
-        selected_seller_id: newSellers[0]?.seller_id,
+        title: String(incoming.title).trim(),
+        platform: String(incoming.platform || "Steam").trim(),
+        category: String(incoming.category || "Digital Key / Account").trim(),
+        selling_price_shopee_idr: Math.max(0, Math.round(sanitizeNumber(incoming.selling_price_shopee_idr ?? incoming.recommended_shopee_price_idr, 100000))),
+        target_margin_pct: Math.round(sanitizeNumber(incoming.target_margin_pct ?? incoming.net_margin_pct, 25) * 100) / 100,
+        status: String(incoming.status || "active").trim(),
+        selected_seller_id: newSellers[0]?.seller_id || "",
         sellers: newSellers,
       };
       catalog.unshift(newItem);
+      changedIds.push(newItem.id);
       count++;
     }
   }
 
-  await writeAuthoritativeCatalog(catalog);
+  await writeAuthoritativeCatalog(catalog, { changedGameIds: changedIds });
   const enrichedAll = catalog.map(calculateItemMetrics);
   return { importedCount: count, allGames: enrichedAll };
 }
@@ -424,10 +503,10 @@ export async function bulkAddOrUpdateGames(incomingGames: any[]): Promise<{ impo
 export async function deleteGameFromCatalog(gameId: string): Promise<CatalogGame[]> {
   const catalog = await readAuthoritativeCatalog();
   const next = catalog.filter((g) => g.id !== gameId);
-  await writeAuthoritativeCatalog(next);
   if (isDbConfigured()) {
-    await deleteDbGame(gameId).catch(() => {});
+    await deleteDbGame(gameId);
   }
+  await writeAuthoritativeCatalog(next, { changedGameIds: [] });
   return next.map(calculateItemMetrics);
 }
 

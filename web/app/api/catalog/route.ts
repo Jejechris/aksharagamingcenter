@@ -8,7 +8,7 @@ import {
   bulkAddOrUpdateGames,
   deleteGameFromCatalog,
 } from "@/lib/catalog";
-import { saveDbGame, deleteDbGame } from "@/lib/db";
+import { deleteDbGame } from "@/lib/db";
 import { resolveG2GProductUrl, extractG2GOfferId } from "@/lib/g2g";
 import { getEnebaProductUrl } from "@/lib/eneba";
 
@@ -74,8 +74,11 @@ async function loadCatalog(): Promise<any[]> {
   return readAuthoritativeCatalog();
 }
 
-async function saveCatalogData(data: any[]): Promise<void> {
-  await writeAuthoritativeCatalog(data);
+async function saveCatalogData(data: any[], changedGameIds?: string[]): Promise<void> {
+  await writeAuthoritativeCatalog(
+    data,
+    changedGameIds && changedGameIds.length > 0 ? { changedGameIds } : { syncAllGamesToDb: true }
+  );
 }
 
 
@@ -267,8 +270,7 @@ export async function POST(req: Request) {
         targetGame.selected_seller_id = sellerId;
       }
 
-      await saveCatalogData(catalog);
-      await saveDbGame(targetGame);
+      await saveCatalogData(catalog, [targetGame.id]);
       return NextResponse.json({
         status: "success",
         message: `Seller added to ${targetGame.title}`,
@@ -294,6 +296,7 @@ export async function POST(req: Request) {
       const prev = targetGame.sellers[sIdx];
       const newTier = editData.tier || prev.tier;
       const tierLabel = newTier === 'ultra_safe' ? '🛡️ Top Verified' : newTier === 'lowest_price' ? '⚡ Lowest Price' : newTier === 'mid_level' ? '⚖️ Mid-Level' : prev.tier_label;
+      const rawPrice = Number(editData.price_g2g_idr ?? editData.price_idr ?? prev.price_g2g_idr);
 
       targetGame.sellers[sIdx] = {
         ...prev,
@@ -303,9 +306,9 @@ export async function POST(req: Request) {
         tier: newTier,
         tier_label: editData.tier_label || tierLabel,
         tier_desc: editData.tier_desc !== undefined ? editData.tier_desc : prev.tier_desc,
-        price_g2g_idr: Number(editData.price_g2g_idr ?? editData.price_idr ?? prev.price_g2g_idr),
-        rating_pct: Number(editData.rating_pct ?? prev.rating_pct),
-        reviews_count: Number(editData.reviews_count ?? editData.reviews ?? prev.reviews_count),
+        price_g2g_idr: Number.isFinite(rawPrice) ? Math.max(0, Math.round(rawPrice)) : prev.price_g2g_idr,
+        rating_pct: Number.isFinite(Number(editData.rating_pct ?? prev.rating_pct)) ? Number(editData.rating_pct ?? prev.rating_pct) : prev.rating_pct,
+        reviews_count: Number.isFinite(Number(editData.reviews_count ?? editData.reviews ?? prev.reviews_count)) ? Math.round(Number(editData.reviews_count ?? editData.reviews ?? prev.reviews_count)) : prev.reviews_count,
         delivery_speed: editData.delivery_speed || editData.delivery || prev.delivery_speed,
         profile_url: editData.profile_url || prev.profile_url,
       };
@@ -314,8 +317,7 @@ export async function POST(req: Request) {
         targetGame.selected_seller_id = targetSellerId;
       }
 
-      await saveCatalogData(catalog);
-      await saveDbGame(targetGame);
+      await saveCatalogData(catalog, [targetGame.id]);
       return NextResponse.json({
         status: "success",
         message: `Seller "${targetGame.sellers[sIdx].seller_name}" berhasil diperbarui`,
@@ -323,18 +325,24 @@ export async function POST(req: Request) {
       });
     }
 
-    // Action: add or upsert game
+    // Action: add or upsert game — match ONLY by exact ID or exact normalized (title, cdkey) to avoid overwriting distinct games
     if (body.action === "add" || body.title) {
-      const existingIndex = findGameIndex(catalog, body.id, body.title);
+      const existingIndex = findGameIndexInList(catalog, body.id, body.title, body.category);
 
       if (existingIndex >= 0) {
         // UPSERT: Update existing game
         const existing = catalog[existingIndex];
         if (body.selling_price_shopee_idr !== undefined) {
-          existing.selling_price_shopee_idr = Number(body.selling_price_shopee_idr);
+          const parsedPrice = Number(body.selling_price_shopee_idr);
+          if (Number.isFinite(parsedPrice) && parsedPrice >= 0) {
+            existing.selling_price_shopee_idr = Math.round(parsedPrice);
+          }
         }
         if (body.target_margin_pct !== undefined) {
-          existing.target_margin_pct = Number(body.target_margin_pct);
+          const parsedMargin = Number(body.target_margin_pct);
+          if (Number.isFinite(parsedMargin)) {
+            existing.target_margin_pct = Math.round(parsedMargin * 100) / 100;
+          }
         }
         if (body.selected_seller_id) {
           existing.selected_seller_id = body.selected_seller_id;
@@ -345,7 +353,7 @@ export async function POST(req: Request) {
 
         // Merge incoming sellers
         if (Array.isArray(body.sellers) && body.sellers.length > 0) {
-          const mergedSellers = [...existing.sellers];
+          const mergedSellers = [...(existing.sellers || [])];
           for (const incoming of body.sellers) {
             const incomingName = (incoming.seller_name || incoming.name || "").toLowerCase().trim();
             const existingSellerIdx = mergedSellers.findIndex(
@@ -360,12 +368,12 @@ export async function POST(req: Request) {
               tier_desc: incoming.tier_desc || "",
               rating_pct: Number(incoming.rating_pct) || 99.0,
               reviews_count: Number(incoming.reviews_count || incoming.reviews) || 1000,
-              price_g2g_idr: Number(incoming.price_g2g_idr || incoming.price_idr) || 100000,
+              price_g2g_idr: Math.round(Number(incoming.price_g2g_idr || incoming.price_idr) || 100000),
               delivery_speed: incoming.delivery_speed || incoming.delivery || "Instant Delivery",
               stock: typeof incoming.stock === 'number' ? incoming.stock : (!isNaN(Number(incoming.stock)) ? Number(incoming.stock) : 20),
               risk_score: Number(incoming.risk_score) || 0,
               is_recommended: Boolean(incoming.is_recommended || incoming.is_selected),
-              profile_url: resolveG2GProductUrl(incoming.profile_url, incoming.seller_name || incoming.name, existing.title),
+              profile_url: incoming.profile_url || resolveG2GProductUrl(incoming.profile_url, incoming.seller_name || incoming.name, existing.title),
             };
 
             if (existingSellerIdx >= 0) {
@@ -377,8 +385,7 @@ export async function POST(req: Request) {
           existing.sellers = mergedSellers;
         }
 
-        await saveCatalogData(catalog);
-        await saveDbGame(existing);
+        await saveCatalogData(catalog, [existing.id]);
         return NextResponse.json({
           status: "success",
           message: `Game "${existing.title}" updated successfully`,
@@ -395,29 +402,30 @@ export async function POST(req: Request) {
           tier_desc: s.tier_desc || "",
           rating_pct: Number(s.rating_pct) || 99.5,
           reviews_count: Number(s.reviews_count || s.reviews) || 10000,
-          price_g2g_idr: Number(s.price_g2g_idr || s.price_idr) || 100000,
+          price_g2g_idr: Math.round(Number(s.price_g2g_idr || s.price_idr) || 100000),
           delivery_speed: s.delivery_speed || s.delivery || "Instant Delivery",
           stock: typeof s.stock === 'number' ? s.stock : (!isNaN(Number(s.stock)) ? Number(s.stock) : 20),
           risk_score: Number(s.risk_score) || 0,
           is_recommended: Boolean(s.is_recommended || s.is_selected),
-          profile_url: resolveG2GProductUrl(s.profile_url, s.seller_name || s.name, body.title),
+          profile_url: s.profile_url || resolveG2GProductUrl(s.profile_url, s.seller_name || s.name, body.title),
         }));
 
+        const parsedSell = Number(body.selling_price_shopee_idr);
+        const parsedMargin = Number(body.target_margin_pct);
         const newItem = {
           id: body.id || `game-${Date.now()}`,
-          title: body.title || "New Game Title",
+          title: String(body.title || "New Game Title").trim(),
           platform: body.platform || "PC",
           category: body.category || "Digital Key",
-          selling_price_shopee_idr: Number(body.selling_price_shopee_idr) || 100000,
-          target_margin_pct: Number(body.target_margin_pct) || 25,
+          selling_price_shopee_idr: Number.isFinite(parsedSell) ? Math.max(0, Math.round(parsedSell)) : 100000,
+          target_margin_pct: Number.isFinite(parsedMargin) ? Math.round(parsedMargin * 100) / 100 : 25,
           status: body.status || "active",
           selected_seller_id: body.selected_seller_id || newSellers[0]?.seller_id || "g2g-default",
           sellers: newSellers,
         };
 
         catalog.unshift(newItem);
-        await saveCatalogData(catalog);
-        await saveDbGame(newItem);
+        await saveCatalogData(catalog, [newItem.id]);
         notifyTelegramNewGame(newItem).catch(() => {});
         return NextResponse.json({
           status: "success",
@@ -478,10 +486,16 @@ export async function PATCH(req: Request) {
       game.selected_seller_id = selected_seller_id;
     }
     if (selling_price_shopee_idr !== undefined) {
-      game.selling_price_shopee_idr = Number(selling_price_shopee_idr);
+      const parsedPrice = Number(selling_price_shopee_idr);
+      if (Number.isFinite(parsedPrice) && parsedPrice >= 0) {
+        game.selling_price_shopee_idr = Math.round(parsedPrice);
+      }
     }
     if (target_margin_pct !== undefined) {
-      game.target_margin_pct = Number(target_margin_pct);
+      const parsedMargin = Number(target_margin_pct);
+      if (Number.isFinite(parsedMargin)) {
+        game.target_margin_pct = Math.round(parsedMargin * 100) / 100;
+      }
     }
     if (body.status !== undefined) {
       game.status = body.status;
@@ -586,12 +600,11 @@ export async function PATCH(req: Request) {
       }
     }
 
-    await saveCatalogData(catalog);
-    await saveDbGame(game);
+    await saveCatalogData(catalog, [game.id]);
 
     return NextResponse.json({
       status: "success",
-      message: `Game "${game.title}" updated and persisted to disk`,
+      message: `Game "${game.title}" updated and persisted to database`,
       data: calculateItemMetrics(game),
     });
   } catch (error: any) {
@@ -608,12 +621,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ status: "error", message: "Game id required" }, { status: 400 });
     }
 
-    // Always delete from Supabase database
-    await deleteDbGame(gameId);
-
-    const catalog = await loadCatalog();
-    const nextCatalog = catalog.filter((g) => g.id !== gameId);
-    await saveCatalogData(nextCatalog);
+    await deleteGameFromCatalog(gameId);
 
     return NextResponse.json({ status: "success", message: `Game "${gameId}" deleted successfully` });
   } catch (error: any) {

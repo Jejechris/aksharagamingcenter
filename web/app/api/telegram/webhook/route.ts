@@ -6,7 +6,8 @@ import { readAuthoritativeCatalog } from "@/lib/catalog";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { getKV, setKV, getDbVault, saveDbVaultItem } from "@/lib/db";
+import { getKV, setKV, getDbVault, saveDbVaultItem, getDbOrders, saveDbOrder, getDbClaims, upsertDbClaim } from "@/lib/db";
+import { encryptCredential } from "@/lib/cryptoVault";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
@@ -77,6 +78,8 @@ async function popVaultItem(gameTitle: string, orderId: string): Promise<any | n
 
 async function readAutonomousOrders(): Promise<any[]> {
   try {
+    const dbOrders = await getDbOrders();
+    if (dbOrders && dbOrders.length > 0) return dbOrders;
     const kv = await getKV("autonomous_orders");
     if (kv && Array.isArray(kv) && kv.length > 0) return kv;
   } catch (e) {}
@@ -97,6 +100,7 @@ async function markOrderStatusCompleted(orderId: string): Promise<void> {
     if (o.id === orderId || o.order_id === orderId) {
       o.status = "COMPLETED";
       o.completed_at = new Date().toISOString();
+      await saveDbOrder(o).catch(() => {});
       break;
     }
   }
@@ -893,6 +897,12 @@ function getClaimsFilePath(): string {
 }
 
 async function readClaimsData(): Promise<any[]> {
+  try {
+    const dbClaims = await getDbClaims();
+    if (dbClaims && Array.isArray(dbClaims) && dbClaims.length > 0) {
+      return dbClaims;
+    }
+  } catch (e) {}
   const dbData = await getKV("claimed_credentials");
   if (dbData && Array.isArray(dbData)) {
     return dbData;
@@ -1142,7 +1152,8 @@ async function finalizeClaim(
     buyer_username: buyer,
     product_title: game,
     platform,
-    credential_data: credential,
+    credential_data: encryptCredential(credential, passcode),
+    is_encrypted: true,
     warranty_days: warrantyDays,
     warranty_code: warrantySerial,
     status: "UNCLAIMED",
@@ -1154,6 +1165,9 @@ async function finalizeClaim(
     reveal_history: [],
   };
 
+  await upsertDbClaim(newClaim).catch((err) => {
+    console.warn("[Telegram finalizeClaim] upsertDbClaim failed:", err);
+  });
   claims.unshift(newClaim);
   await saveClaimsData(claims);
 

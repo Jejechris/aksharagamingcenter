@@ -39,6 +39,19 @@ export async function queryDb<T = any>(text: string, params?: any[]): Promise<T[
   return res.rows as T[];
 }
 
+function toSafeBigInt(val: any, fallback: number = 0): number {
+  const num = Number(val);
+  if (!Number.isFinite(num)) return Math.max(0, Math.round(fallback));
+  return Math.max(0, Math.round(num));
+}
+
+function toSafeNumeric(val: any, fallback: number = 0, decimals: number = 2): number {
+  const num = Number(val);
+  if (!Number.isFinite(num)) return fallback;
+  const factor = Math.pow(10, decimals);
+  return Math.round(num * factor) / factor;
+}
+
 // -------------------------------------------------------------
 // Catalog Helpers
 // -------------------------------------------------------------
@@ -51,8 +64,8 @@ export async function getDbCatalog(): Promise<any[] | null> {
     if (rows && rows.length > 0) {
       return rows.map((r: any) => ({
         ...r,
-        selling_price_shopee_idr: Number(r.selling_price_shopee_idr),
-        target_margin_pct: Number(r.target_margin_pct),
+        selling_price_shopee_idr: Number(r.selling_price_shopee_idr) || 0,
+        target_margin_pct: Number(r.target_margin_pct) || 0,
         sellers: typeof r.sellers === "string" ? JSON.parse(r.sellers) : r.sellers || [],
       }));
     }
@@ -63,7 +76,17 @@ export async function getDbCatalog(): Promise<any[] | null> {
 }
 
 export async function saveDbGame(game: any): Promise<boolean> {
+  if (!isDbConfigured() || !game || !game.id || !game.title) return false;
   try {
+    const sellers = Array.isArray(game.sellers) ? game.sellers : [];
+    const safeSellingPrice = toSafeBigInt(game.selling_price_shopee_idr, 100000);
+    const safeMargin = toSafeNumeric(game.target_margin_pct, 25, 2);
+    const rawSelected = String(game.selected_seller_id || "").trim();
+    const resolvedSelected =
+      rawSelected && sellers.some((s: any) => s.seller_id === rawSelected)
+        ? rawSelected
+        : String(sellers[0]?.seller_id || rawSelected || "");
+
     await queryDb(
       `INSERT INTO catalog_games (id, title, platform, category, selling_price_shopee_idr, target_margin_pct, status, selected_seller_id, sellers, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
@@ -78,30 +101,31 @@ export async function saveDbGame(game: any): Promise<boolean> {
          sellers = EXCLUDED.sellers,
          updated_at = NOW()`,
       [
-        game.id,
-        game.title,
-        game.platform,
-        game.category || "Digital Key / Account",
-        Number(game.selling_price_shopee_idr) || 100000,
-        Number(game.target_margin_pct) || 25,
-        game.status || "active",
-        game.selected_seller_id || "",
-        JSON.stringify(game.sellers || []),
+        String(game.id).trim(),
+        String(game.title).trim(),
+        String(game.platform || "PC").trim(),
+        String(game.category || "Digital Key / Account").trim(),
+        safeSellingPrice,
+        safeMargin,
+        String(game.status || "active").trim(),
+        resolvedSelected,
+        JSON.stringify(sellers),
       ]
     );
     return true;
   } catch (err) {
-    console.warn("Notice: saveDbGame failed:", err);
+    console.error("Error: saveDbGame failed:", err);
     return false;
   }
 }
 
 export async function deleteDbGame(gameId: string): Promise<boolean> {
+  if (!isDbConfigured() || !gameId) return false;
   try {
     await queryDb("DELETE FROM catalog_games WHERE id = $1", [gameId]);
     return true;
   } catch (err) {
-    console.warn("Notice: deleteDbGame failed:", err);
+    console.error("Error: deleteDbGame failed:", err);
     return false;
   }
 }
@@ -117,7 +141,7 @@ export async function getDbVault(): Promise<any[] | null> {
     if (rows) {
       return rows.map((r: any) => ({
         ...r,
-        cost_idr: Number(r.cost_idr),
+        cost_idr: Number(r.cost_idr) || 0,
         added_at: r.added_at ? new Date(r.added_at).toISOString().replace("T", " ").substring(0, 19) : "",
         dispatched_at: r.dispatched_at ? new Date(r.dispatched_at).toISOString().replace("T", " ").substring(0, 19) : undefined,
       }));
@@ -129,46 +153,52 @@ export async function getDbVault(): Promise<any[] | null> {
 }
 
 export async function saveDbVaultItem(item: any): Promise<boolean> {
+  if (!isDbConfigured() || !item || !item.id) return false;
   try {
+    const safeStatus = String(item.status || "AVAILABLE").trim();
     await queryDb(
       `INSERT INTO inventory_vault (id, game_title, platform, category, username, password, cost_idr, supplier_name, status, assigned_order_id, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (id) DO UPDATE SET
+         game_title = EXCLUDED.game_title,
+         platform = EXCLUDED.platform,
+         category = EXCLUDED.category,
          username = EXCLUDED.username,
          password = EXCLUDED.password,
          cost_idr = EXCLUDED.cost_idr,
          supplier_name = EXCLUDED.supplier_name,
          status = EXCLUDED.status,
          assigned_order_id = EXCLUDED.assigned_order_id,
-         dispatched_at = CASE WHEN EXCLUDED.status = 'DISPATCHED' THEN NOW() ELSE NULL END,
+         dispatched_at = CASE WHEN EXCLUDED.status = 'DISPATCHED' THEN COALESCE(inventory_vault.dispatched_at, NOW()) ELSE NULL END,
          notes = EXCLUDED.notes`,
       [
-        item.id,
-        item.game_title,
-        item.platform,
-        item.category || "Account (Full Access)",
-        item.username,
-        item.password,
-        Number(item.cost_idr) || 100000,
-        item.supplier_name || "G2G Verified",
-        item.status || "AVAILABLE",
+        String(item.id).trim(),
+        String(item.game_title || "Game License").trim(),
+        String(item.platform || "PC").trim(),
+        String(item.category || "Account (Full Access)").trim(),
+        String(item.username ?? "").trim() || "(Direct Key)",
+        String(item.password ?? ""),
+        toSafeBigInt(item.cost_idr, 0),
+        String(item.supplier_name || "G2G Verified").trim(),
+        safeStatus,
         item.assigned_order_id || null,
-        item.notes || "",
+        String(item.notes ?? ""),
       ]
     );
     return true;
   } catch (err) {
-    console.warn("Notice: saveDbVaultItem failed:", err);
+    console.error("Error: saveDbVaultItem failed:", err);
     return false;
   }
 }
 
 export async function deleteDbVaultItem(itemId: string): Promise<boolean> {
+  if (!isDbConfigured() || !itemId) return false;
   try {
     await queryDb("DELETE FROM inventory_vault WHERE id = $1", [itemId]);
     return true;
   } catch (err) {
-    console.warn("Notice: deleteDbVaultItem failed:", err);
+    console.error("Error: deleteDbVaultItem failed:", err);
     return false;
   }
 }
@@ -184,7 +214,7 @@ export async function getDbOrders(): Promise<any[] | null> {
     if (rows) {
       return rows.map((r: any) => ({
         ...r,
-        price_idr: Number(r.price_idr),
+        price_idr: Number(r.price_idr) || 0,
         credentials: typeof r.credentials === "string" ? JSON.parse(r.credentials) : r.credentials || {},
         messages: typeof r.messages === "string" ? JSON.parse(r.messages) : r.messages || {},
         created_at: r.created_at ? new Date(r.created_at).toISOString().replace("T", " ").substring(0, 19) : "",
@@ -197,45 +227,57 @@ export async function getDbOrders(): Promise<any[] | null> {
 }
 
 export async function saveDbOrder(order: any): Promise<boolean> {
+  if (!isDbConfigured() || !order || !order.id || !order.order_id) return false;
   try {
     await queryDb(
       `INSERT INTO autonomous_orders (id, order_id, channel, buyer_name, buyer_phone, buyer_email, game_title, platform, category, price_idr, credentials, status, dispatched_channels, messages, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
        ON CONFLICT (id) DO UPDATE SET
+         order_id = EXCLUDED.order_id,
+         channel = EXCLUDED.channel,
+         buyer_name = EXCLUDED.buyer_name,
+         buyer_phone = EXCLUDED.buyer_phone,
+         buyer_email = EXCLUDED.buyer_email,
+         game_title = EXCLUDED.game_title,
+         platform = EXCLUDED.platform,
+         category = EXCLUDED.category,
+         price_idr = EXCLUDED.price_idr,
          status = EXCLUDED.status,
          dispatched_channels = EXCLUDED.dispatched_channels,
          credentials = EXCLUDED.credentials,
+         messages = EXCLUDED.messages,
          updated_at = NOW()`,
       [
-        order.id,
-        order.order_id,
-        order.channel || "Shopee",
-        order.buyer_name,
-        order.buyer_phone,
-        order.buyer_email,
-        order.game_title,
-        order.platform,
-        order.category || "Account (Full Access)",
-        Number(order.price_idr) || 190000,
+        String(order.id).trim(),
+        String(order.order_id).trim(),
+        String(order.channel || "Shopee").trim(),
+        String(order.buyer_name || "Kak Pembeli").trim(),
+        String(order.buyer_phone || "-").trim(),
+        String(order.buyer_email || "buyer@customer.akshara-game.id").trim(),
+        String(order.game_title || "Game License").trim(),
+        String(order.platform || "PC").trim(),
+        String(order.category || "Account (Full Access)").trim(),
+        toSafeBigInt(order.price_idr, 0),
         JSON.stringify(order.credentials || {}),
-        order.status || "PROCESSED",
-        order.dispatched_channels || [],
+        String(order.status || "PROCESSED").trim(),
+        Array.isArray(order.dispatched_channels) ? order.dispatched_channels : [],
         JSON.stringify(order.messages || {}),
       ]
     );
     return true;
   } catch (err) {
-    console.warn("Notice: saveDbOrder failed:", err);
+    console.error("Error: saveDbOrder failed:", err);
     return false;
   }
 }
 
 export async function deleteDbOrder(orderId: string): Promise<boolean> {
+  if (!isDbConfigured() || !orderId) return false;
   try {
     await queryDb("DELETE FROM autonomous_orders WHERE id = $1 OR order_id = $1", [orderId]);
     return true;
   } catch (err) {
-    console.warn("Notice: deleteDbOrder failed:", err);
+    console.error("Error: deleteDbOrder failed:", err);
     return false;
   }
 }
@@ -246,17 +288,24 @@ export async function getKV(key: string): Promise<any> {
   try {
     const rows = await queryDb("SELECT value FROM app_kv WHERE key = $1", [key]);
     if (rows && rows.length > 0) return rows[0].value;
-  } catch (err) {}
+  } catch (err) {
+    console.warn("Notice: getKV failed for key:", key, err);
+  }
   return null;
 }
 
 export async function setKV(key: string, value: any): Promise<boolean> {
   if (!isDbConfigured()) return false;
   try {
-    await queryDb("INSERT INTO app_kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP", [key, JSON.stringify(value)]);
+    await queryDb(
+      "INSERT INTO app_kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP",
+      [key, JSON.stringify(value)]
+    );
     return true;
-  } catch (err) {}
-  return false;
+  } catch (err) {
+    console.error("Error: setKV failed for key:", key, err);
+    return false;
+  }
 }
 
 /**
@@ -319,7 +368,7 @@ function mapClaimRow(r: any): any {
 }
 
 export async function upsertDbClaim(claim: any): Promise<boolean> {
-  if (!isDbConfigured()) return false;
+  if (!isDbConfigured() || !claim || !claim.claim_code) return false;
   try {
     await queryDb(
       `INSERT INTO claims_vault (
@@ -348,23 +397,23 @@ export async function upsertDbClaim(claim: any): Promise<boolean> {
         forensics = EXCLUDED.forensics,
         reveal_history = EXCLUDED.reveal_history`,
       [
-        claim.claim_code,
-        claim.passcode,
+        String(claim.claim_code).trim().toUpperCase(),
+        String(claim.passcode || "").trim(),
         claim.order_id || null,
         claim.buyer_username || "anonymous",
         claim.product_title || "Game Account",
         claim.platform || "PC",
         claim.credential_data || "",
-        Boolean(claim.is_encrypted ?? (claim.credential_data && claim.credential_data.startsWith("ENCv1:"))),
-        Number(claim.warranty_days) || 30,
+        Boolean(claim.is_encrypted ?? (claim.credential_data && String(claim.credential_data).startsWith("ENCv1:"))),
+        toSafeBigInt(claim.warranty_days, 30) || 30,
         claim.warranty_code || null,
         claim.status || "UNCLAIMED",
         claim.created_at || new Date().toISOString(),
         claim.revealed_at || null,
         claim.revealed_ip || null,
         claim.revealed_user_agent || null,
-        Number(claim.reveal_count) || 0,
-        Number(claim.failed_attempts) || 0,
+        toSafeBigInt(claim.reveal_count, 0),
+        toSafeBigInt(claim.failed_attempts, 0),
         claim.locked_until || null,
         JSON.stringify(claim.forensics || {}),
         JSON.stringify(claim.reveal_history || []),
@@ -372,7 +421,7 @@ export async function upsertDbClaim(claim: any): Promise<boolean> {
     );
     return true;
   } catch (err) {
-    console.warn("Notice: upsertDbClaim failed:", err);
+    console.error("Error: upsertDbClaim failed:", err);
     return false;
   }
 }
@@ -423,8 +472,7 @@ export async function deleteDbClaim(code: string): Promise<boolean> {
     await queryDb("DELETE FROM claims_vault WHERE UPPER(claim_code) = UPPER($1)", [code.trim()]);
     return true;
   } catch (err) {
-    console.warn("Notice: deleteDbClaim failed:", err);
+    console.error("Error: deleteDbClaim failed:", err);
     return false;
   }
 }
-

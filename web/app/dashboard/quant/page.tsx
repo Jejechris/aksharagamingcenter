@@ -376,7 +376,7 @@ function QuantCalculatorContent() {
     }
     try {
       setAutoSaveStatus('saving');
-      await fetch('/api/catalog', {
+      const res = await fetch('/api/catalog', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -385,10 +385,15 @@ function QuantCalculatorContent() {
           selected_seller_id: id
         })
       });
-      setAutoSaveStatus('saved');
-      setLastSavedTime(new Date().toLocaleTimeString('id-ID'));
+      if (res.ok) {
+        setAutoSaveStatus('saved');
+        setLastSavedTime(new Date().toLocaleTimeString('id-ID'));
+      } else {
+        setAutoSaveStatus('idle');
+      }
     } catch (e) {
       console.error('Failed to auto-save selected seller', e);
+      setAutoSaveStatus('idle');
     }
   };
 
@@ -541,8 +546,12 @@ function QuantCalculatorContent() {
       if (res.ok) {
         setAutoSaveStatus('saved');
         setLastSavedTime(new Date().toLocaleTimeString('id-ID'));
+      } else {
+        setAutoSaveStatus('idle');
       }
-    } catch (_) { }
+    } catch (_) {
+      setAutoSaveStatus('idle');
+    }
   }, []);
 
   const isSwitchingGameRef = useRef(false);
@@ -628,6 +637,7 @@ function QuantCalculatorContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'add',
+          id: currentGameId && currentGameId !== 'custom' ? currentGameId : undefined,
           title: gameTitle,
           platform,
           category,

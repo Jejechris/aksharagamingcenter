@@ -59,35 +59,12 @@ export async function fetchSmartCatalog(): Promise<any[]> {
     console.error("fetch /api/catalog failed", e);
   }
 
-  const mergedMap = new Map<string, any>();
-  for (const g of serverGames) {
-    mergedMap.set(g.id, sanitizeGameUrls(g));
-  }
-
-  for (const lg of localGames) {
-    const cleanLg = sanitizeGameUrls(lg);
-    if (!mergedMap.has(cleanLg.id)) {
-      mergedMap.set(cleanLg.id, cleanLg);
-    } else {
-      const existing = mergedMap.get(cleanLg.id);
-      const existingSellerIds = new Set((existing.sellers || []).map((s: any) => s.seller_id));
-      const additionalSellers = (cleanLg.sellers || []).filter(
-        (s: any) => !existingSellerIds.has(s.seller_id)
-      );
-      if (additionalSellers.length > 0) {
-        mergedMap.set(cleanLg.id, {
-          ...existing,
-          sellers: [...existing.sellers, ...additionalSellers],
-        });
-      }
-    }
-  }
-
-  const mergedList = Array.from(mergedMap.values()).map(sanitizeGameUrls);
+  // Server DB (/api/catalog) is authoritative whenever reachable and non-empty so deleted games/sellers never resurrect from localStorage
+  const finalList = (serverGames.length > 0 ? serverGames : localGames).map(sanitizeGameUrls);
   if (typeof window !== "undefined") {
     try {
-      localStorage.setItem("akshara_custom_catalog_v3", JSON.stringify(mergedList));
+      localStorage.setItem("akshara_custom_catalog_v3", JSON.stringify(finalList));
     } catch (e) {}
   }
-  return mergedList;
+  return finalList;
 }

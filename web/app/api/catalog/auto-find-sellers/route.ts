@@ -424,7 +424,6 @@ export async function POST(req: NextRequest) {
               totalFilteredClickbait += processed.filteredClickbaitCount;
               game.sellers = processed.selectedSellers;
 
-              // Safe select: JANGAN otomatis ganti jika margin < 5%
               const bestCandidate = processed.selectedSellers[0];
               const sellingPrice = game.selling_price_shopee_idr || 100000;
               const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
@@ -432,9 +431,13 @@ export async function POST(req: NextRequest) {
               const netProfit = sellingPrice - totalCost;
               const netMargin =
                 sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+              const selectedStillExists = processed.selectedSellers.some(
+                (s: any) => s.seller_id === game.selected_seller_id
+              );
 
-              if (netMargin >= 5.0 || !game.selected_seller_id) {
+              if (netMargin >= 5.0 || !selectedStillExists) {
                 game.selected_seller_id = bestCandidate.seller_id;
+                game.target_margin_pct = netMargin;
                 game.metrics = {
                   selected_seller: { ...bestCandidate },
                   cogs_g2g_idr: bestCandidate.price_g2g_idr,
@@ -518,16 +521,20 @@ export async function POST(req: NextRequest) {
 
     targetGame.sellers = processed.selectedSellers;
 
-    // Safe select: JANGAN otomatis timpa jika net_margin_pct < 5%
+    // Ensure selected_seller_id never points to a removed/missing seller
     const bestCandidate = processed.selectedSellers[0];
     const sellingPrice = targetGame.selling_price_shopee_idr || 100000;
     const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
     const totalCost = bestCandidate.cogs_net_idr + shopeeFee;
     const netProfit = sellingPrice - totalCost;
     const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+    const selectedStillExists = processed.selectedSellers.some(
+      (s: any) => s.seller_id === targetGame.selected_seller_id
+    );
 
-    if (netMargin >= 5.0 || !targetGame.selected_seller_id) {
+    if (netMargin >= 5.0 || !selectedStillExists) {
       targetGame.selected_seller_id = bestCandidate.seller_id;
+      targetGame.target_margin_pct = netMargin;
       targetGame.metrics = {
         selected_seller: { ...bestCandidate },
         cogs_g2g_idr: bestCandidate.price_g2g_idr,
@@ -542,7 +549,7 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    await writeAuthoritativeCatalog(catalog);
+    await writeAuthoritativeCatalog(catalog, { changedGameIds: [targetGame.id] });
 
     return NextResponse.json({
       status: "success",

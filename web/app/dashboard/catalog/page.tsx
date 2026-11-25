@@ -638,10 +638,14 @@ export default function CatalogDashboardPage() {
   const handleDeleteGame = async (gameId: string, title: string) => {
     if (!confirm(`Hapus "${title}" dari Radar Portofolio?`)) return;
     try {
-      const next = games.filter(g => g.id !== gameId);
-      updateCatalogState(next);
-      await fetch(`/api/catalog?id=${gameId}`, { method: 'DELETE' });
-      showToast(`Game "${title}" telah dihapus.`);
+      const res = await fetch(`/api/catalog?id=${encodeURIComponent(gameId)}`, { method: 'DELETE' });
+      if (res.ok) {
+        const next = games.filter(g => g.id !== gameId);
+        updateCatalogState(next);
+        showToast(`Game "${title}" telah dihapus dari database.`);
+      } else {
+        showToast('Gagal menghapus game dari database.', 'error');
+      }
     } catch (e) {
       showToast('Gagal menghapus game.', 'error');
     }
@@ -697,17 +701,21 @@ export default function CatalogDashboardPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          updateCatalogState(parsed);
-          fetch('/api/catalog', {
+          const res = await fetch('/api/catalog', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(parsed)
-          }).catch(() => {});
-          showToast(`📥 Berhasil memulihkan ${parsed.length} game dari backup!`);
+          });
+          if (res.ok) {
+            await fetchCatalog();
+            showToast(`📥 Berhasil memulihkan ${parsed.length} game ke database!`);
+          } else {
+            showToast("Gagal menyinkronkan backup ke database.", "error");
+          }
         } else {
           showToast("Format file JSON tidak valid.", "error");
         }
