@@ -94,6 +94,7 @@ interface CatalogItem {
   category: string;
   selling_price_shopee_idr: number;
   target_margin_pct: number;
+  selected_seller_id?: string;
   sellers?: Array<{
     seller_id: string;
     seller_name: string;
@@ -159,6 +160,7 @@ export default function AutonomousFulfillmentPage() {
   const [inspectOrder, setInspectOrder] = useState<AutonomousOrder | null>(null);
   const [inspectTab, setInspectTab] = useState<"whatsapp" | "gmail" | "shopee" | "credentials">("whatsapp");
   const [showManualModal, setShowManualModal] = useState(false);
+  const [finalizingOrderId, setFinalizingOrderId] = useState<string | null>(null);
 
   // Manual Order Form States
   const [formName, setFormName] = useState("");
@@ -347,6 +349,72 @@ export default function AutonomousFulfillmentPage() {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // 1-Click Finalize: Claim Token + Ledger Entry + Shopee Delivery Chat
+  const handleFinalizeOrder = async (order: AutonomousOrder) => {
+    setFinalizingOrderId(order.id);
+    try {
+      const matchedCatalog = catalogGames.find(
+        (g) => g.title.toLowerCase() === order.game_title.toLowerCase()
+      );
+      const selectedSeller =
+        matchedCatalog?.sellers?.find(
+          (s) => s.seller_id === matchedCatalog.selected_seller_id
+        ) || matchedCatalog?.sellers?.[0];
+      const estimatedCogs = selectedSeller?.price_g2g_idr || Math.round(order.price_idr * 0.7);
+
+      const res = await fetch("/api/orders/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: order.id,
+          order_id: order.order_id,
+          buyer_username: order.buyer_name,
+          product_title: order.game_title,
+          platform: order.platform,
+          selling_price_shopee_idr: order.price_idr,
+          cogs_g2g_idr: estimatedCogs,
+          username: order.credentials?.username,
+          password: order.credentials?.password,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.status === "success") {
+        if (json.shopee_chat_message) {
+          navigator.clipboard?.writeText(json.shopee_chat_message).catch(() => {});
+        }
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === order.id
+              ? {
+                  ...o,
+                  status: "DISPATCHED",
+                  credentials: {
+                    ...o.credentials,
+                    claim_code: json.claim?.claim_code,
+                    passcode: json.claim?.passcode,
+                  },
+                  dispatched_channels: Array.from(
+                    new Set([...(o.dispatched_channels || []), "ClaimVault"])
+                  ),
+                }
+              : o
+          )
+        );
+        showToast(
+          `✅ Finalized! Claim ${json.claim?.claim_code} (PIN ${json.claim?.passcode}) + Laba Rp ${Math.round(
+            json.economics?.netProfitIdr || 0
+          ).toLocaleString("id-ID")} dicatat ke Kas & template chat disalin!`
+        );
+      } else {
+        showToast(`⚠️ ${json.message || "Gagal memfinalisasi pesanan."}`);
+      }
+    } catch {
+      showToast("⚠️ Kesalahan koneksi saat memfinalisasi pesanan.");
+    } finally {
+      setFinalizingOrderId(null);
     }
   };
 
@@ -989,6 +1057,28 @@ export default function AutonomousFulfillmentPage() {
                       >
                         <Copy className="w-3.5 h-3.5 text-orange-600" />
                         <span>Shopee</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleFinalizeOrder(order)}
+                        disabled={finalizingOrderId === order.id}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border font-semibold inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 ${
+                          order.credentials?.claim_code
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            : "bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
+                        }`}
+                        title="Buat Token Klaim, catat laba bersih ke Buku Kas Operator, dan salin pesan Shopee"
+                      >
+                        {finalizingOrderId === order.id ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {order.credentials?.claim_code
+                            ? `Claim ${order.credentials.claim_code}`
+                            : "1-Klik Finalisasi"}
+                        </span>
                       </button>
 
                       <button

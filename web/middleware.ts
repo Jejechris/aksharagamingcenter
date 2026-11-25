@@ -59,6 +59,7 @@ export function middleware(request: NextRequest) {
     "/api/inventory/detect-link",
     "/api/orders/autonomous",
     "/api/orders/auto-fulfill",
+    "/api/orders/finalize",
     "/api/ai/",
     "/api/research/",
   ];

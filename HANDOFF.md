@@ -1,6 +1,6 @@
 # Akshara Gaming Center — Multi-Device Handoff & Sync Guide
 
-> **Canonical Handoff Document (Updated through FASE 16)**  
+> **Canonical Handoff Document (Updated through FASE 17)**  
 > **Repository:** `https://github.com/Jejechris/aksharagamingcenter.git` (`main`)  
 > **Legacy Reference:** [AKSHARA_PROJECT_CONTEXT_HANDOVER.md](./AKSHARA_PROJECT_CONTEXT_HANDOVER.md) *(arsip awal Oktober 2026 — gunakan dokumen ini sebagai status terbaru)*
 
@@ -37,6 +37,9 @@ Karena riwayat chat Antigravity tersimpan lokal di tiap perangkat (`~/.gemini/an
   - **Tools Operasional**: `/dashboard/quant` (Kalkulator Margin/BEP, biaya packaging digital `Rp 0`), `/dashboard/description`, `/dashboard/formatter`, `/dashboard/research`, `/dashboard/claims`, `/dashboard/autonomous`, `/dashboard/bot`, `/dashboard/health`, `/dashboard/support`.
   - **Komponen & Library Penting**:
     - `web/lib/sellerTrust.ts`: Composite Trust & Value Score (0–100: 40% harga/margin, 35% rating, 15% volume order, 10% stok & kecepatan kirim), klasifikasi `Safe (A+)` / `Moderate (B)` / `Caution (C)`, serta hard-reject rule untuk rating `< 92%` atau transaksi rendah mencurigakan.
+    - `web/lib/pricing.ts`: Single Source of Truth kalkulasi Shopee (`calculateShopeeEconomics`, `calculateBreakEvenPrice`, `calculateTargetSellingPrice`), preset program biaya Shopee (`reguler` 8%+1k, `xtra_ongkir` 12%+1k, `flash_promo` 14.5%+1k), QRIS 0.7%, dan FX Volatility Buffer (`+1.5%`).
+    - `web/app/api/orders/finalize/route.ts`: 1-Klik Finalisasi Order (`POST /api/orders/finalize`) untuk membuat token Claim Vault terenkripsi, mencatat laba bersih ke `financial_ledger` (`/dashboard/operator`), mengupdate order di `/dashboard/autonomous`, serta menghasilkan template pesan Shopee chat siap salin.
+    - `web/app/api/cron/sentry/route.ts`: Cron Market Sentry dengan Trust Guard (auto-failover memfilter keluar seller berisiko tinggi via `evaluateSellerTrust` dan memprioritaskan `Safe (A+)`).
     - `web/lib/gemini.ts`: Memakai `process.env.GEMINI_API_KEY` (tanpa fallback hardcoded key) dengan `FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"]` dan dukungan `jsonMode`.
     - `web/lib/catalog.ts`, `web/lib/g2g.ts`, `web/lib/g2gStock.ts`, `web/lib/eneba.ts`, `web/lib/steamPrice.ts`: Engine katalog (full `await` pada write Supabase/JSON), G2G live IDR pricing (`converted_unit_price` / `display_price`), dan zero-empty links (`?q=<SellerName>` sudah dihapus).
     - `web/app/components/GameSelectorCombobox.tsx`: Searchable combobox memakai `ReactDOM.createPortal(..., document.body)` dengan `position: fixed` dan `z-[9999]` agar selalu di atas kartu `.app-card`.
@@ -45,6 +48,7 @@ Karena riwayat chat Antigravity tersimpan lokal di tiap perangkat (`~/.gemini/an
   - `bot/market_sentry.py`: Cek stok live G2G SLS (`fetch_g2g_offer_live`, `audit_all_catalog_sellers`) dengan ekstraksi `total_success_order`, `total_rating`, `satisfaction_rate`, serta badge rating & `trust_tier` pada laporan Telegram (`build_stock_summary_report`, `get_critical_stock_alerts`).
   - `bot/eneba_data.py`, `bot/telegram_commander.py`, `bot/canvas_drawer.py`, `bot/formatter_data.py`.
 - **`claim-web/`** — Portal klaim pembeli terpisah (`claimakshara.vercel.app`).
+- **`.github/workflows/ci-web.yml`** — CI otomatis di GitHub Actions untuk mengecek `npx tsc --noEmit`, `npm run build` di `web/`, dan `python -m py_compile` pada `bot/*.py` di setiap push/PR ke `main`.
 - **`scripts/`** — Utility sanitasi & inisialisasi katalog (`scripts/sanitize_catalog.js`, `scripts/init_db.js`).
 
 ---
@@ -93,11 +97,10 @@ python -m py_compile bot/market_sentry.py bot/telegram_commander.py bot/eneba_da
 
 ---
 
-## 5. Status Terkini (Per FASE 16)
+## 5. Status Terkini (Per FASE 17)
 
-- **Selesai:** FASE 7 s/d FASE 16 (Real Research Engine, Eneba filter & DRM slugs, Live G2G IDR pricing, Anti-Clickbait Seller Finder, Safe Image Proxy & Official Artwork Engine, Shopee 4-Step Launchpad, Security Hardening, Gemini Strict JSON & Combobox + 60fps polish, Portal `GameSelectorCombobox` + Sentry & Risk Hub consolidation + Seller Trust Engine).
-- **Catatan Audit Terakhir:**
-  - `web`: `npx tsc --noEmit` & `npm run build` hijau (0 error).
-  - `bot/market_sentry.py`: `python -m py_compile` lolos.
-  - UI `/dashboard/stock-sentry`, `/dashboard/risk-officer` redirect, `/dashboard/quant` (0 hydration warning), `/dashboard/description`, `/dashboard/formatter`, `/dashboard/shopee-launchpad`, `/dashboard/catalog`, dan `/dashboard/eneba` sudah diverifikasi via browser lokal.
+- **Selesai:** FASE 7 s/d FASE 17 (termasuk Unified Pricing & Shopee Promo Presets di `web/lib/pricing.ts`, Trust Guard pada Cron Auto-Failover, 1-Klik Finalisasi Order -> Claim + Kas Ledger, serta GitHub Actions CI `ci-web.yml`).
+- **Catatan Penting Environment (`web/.env.local` & Vercel):**
+  - Pastikan `GEMINI_API_KEY` menggunakan API Key valid dari Google AI Studio (`AIza...`, bukan token `AQ.A...` agar tidak 401 `ACCESS_TOKEN_TYPE_UNSUPPORTED`).
+  - Pastikan `VAULT_ENCRYPTION_SECRET` terisi string acak 32+ karakter di lokal & Vercel agar enkripsi kredensial di brankas aman.
 - **Tugas Berikutnya:** Siap melanjutkan ke fase fitur berikutnya setelah memastikan `git pull` terbaru dari `origin/main`.

@@ -6,6 +6,13 @@ import { fetchSmartCatalog } from "@/lib/catalogClient";
 import ThumbnailStudio from "@/app/dashboard/marketer/components/ThumbnailStudio";
 import GameSelectorCombobox from "@/app/components/GameSelectorCombobox";
 import {
+  SHOPEE_FEE_PRESETS,
+  ShopeeFeePresetId,
+  DEFAULT_FX_BUFFER_PCT,
+  calculateShopeeEconomics,
+  calculateTargetSellingPrice,
+} from "@/lib/pricing";
+import {
   ShoppingBag,
   Sparkles,
   Copy,
@@ -56,6 +63,8 @@ export default function ShopeeLaunchpadPage() {
   const [price, setPrice] = useState<number>(189000);
   const [cogsEstimate, setCogsEstimate] = useState<number>(115000);
   const [warrantyDays, setWarrantyDays] = useState<number>(30);
+  const [feePreset, setFeePreset] = useState<ShopeeFeePresetId>("reguler");
+  const [fxBufferEnabled, setFxBufferEnabled] = useState<boolean>(false);
 
   // Description Customizer Toggles
   const [includeSopUnboxing, setIncludeSopUnboxing] = useState(true);
@@ -341,11 +350,26 @@ export default function ShopeeLaunchpadPage() {
   };
 
   // Synchronized Digital Pricing Formula (Packaging = Rp 0)
-  const qrisFee = Math.round(cogsEstimate * 0.007);
-  const shopeeFee = Math.round(price * 0.08) + 1000;
-  const netEarnings = Math.max(0, price - cogsEstimate - qrisFee - shopeeFee);
-  const netMarginPct = price > 0 ? ((netEarnings / price) * 100).toFixed(1) : "0";
-  const isLowMargin = Number(netMarginPct) < 15 || netEarnings <= 0;
+  const activeFxBufferPct = fxBufferEnabled ? DEFAULT_FX_BUFFER_PCT : 0;
+  const economics = calculateShopeeEconomics({
+    sellingPriceIdr: price,
+    cogsIdr: cogsEstimate,
+    presetId: feePreset,
+    fxBufferPct: activeFxBufferPct,
+    packagingCostIdr: 0,
+  });
+  const qrisFee = economics.qrisFeeIdr + economics.fxBufferIdr;
+  const shopeeFee = economics.shopeeFeeIdr;
+  const netEarnings = Math.max(0, economics.netProfitIdr);
+  const netMarginPct = economics.netMarginPct.toFixed(1);
+  const isLowMargin = economics.netMarginPct < 15 || economics.netProfitIdr <= 0;
+  const suggestedSafePrice = calculateTargetSellingPrice({
+    cogsIdr: cogsEstimate,
+    presetId: feePreset,
+    fxBufferPct: activeFxBufferPct,
+    packagingCostIdr: 0,
+    targetMarginPct: 18,
+  });
 
   // Wizard Steps Metadata
   const STEPS = [
@@ -932,11 +956,57 @@ export default function ShopeeLaunchpadPage() {
                   />
                 </div>
 
+                {/* Shopee Fee Preset & FX Guard */}
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                      Mode Program Shopee
+                    </span>
+                    <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={fxBufferEnabled}
+                        onChange={(e) => setFxBufferEnabled(e.target.checked)}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                      <span>Buffer Kurs +{DEFAULT_FX_BUFFER_PCT}%</span>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {Object.values(SHOPEE_FEE_PRESETS).map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setFeePreset(preset.id)}
+                        title={preset.description}
+                        className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold border transition-colors cursor-pointer ${
+                          feePreset === preset.id
+                            ? "bg-slate-900 text-white border-slate-900"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {preset.shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Financial Breakdown Grid */}
                 <div className="pt-2 border-t border-slate-100 space-y-3">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                    Kalkulasi Laba Bersih Transaksi:
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Kalkulasi Laba Bersih Transaksi:
+                    </span>
+                    {isLowMargin && (
+                      <button
+                        type="button"
+                        onClick={() => setPrice(suggestedSafePrice)}
+                        className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer"
+                      >
+                        Set Harga Aman (Rp {suggestedSafePrice.toLocaleString("id-ID")})
+                      </button>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -946,13 +1016,17 @@ export default function ShopeeLaunchpadPage() {
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-[10px] font-mono text-slate-500 block uppercase">Fee Shopee (8%+1k):</span>
+                      <span className="text-[10px] font-mono text-slate-500 block uppercase">
+                        Fee Shopee ({economics.adminFeePct}%+1k):
+                      </span>
                       <span className="text-sm font-bold font-mono text-rose-600 tabular-nums">
                         -Rp {shopeeFee.toLocaleString("id-ID")}
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-[10px] font-mono text-slate-500 block uppercase">Modal + QRIS (0.7%):</span>
+                      <span className="text-[10px] font-mono text-slate-500 block uppercase">
+                        Modal + QRIS{fxBufferEnabled ? "+FX" : ""}:
+                      </span>
                       <span className="text-sm font-bold font-mono text-slate-700 tabular-nums">
                         -Rp {(cogsEstimate + qrisFee).toLocaleString("id-ID")}
                       </span>

@@ -4,6 +4,8 @@ import { queryDb } from "@/lib/db";
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { resolveG2GProductUrl, getG2GGameCategoryUrl } from "@/lib/g2g";
 import { verifyCronOrAdminRequest } from "@/lib/auth";
+import { calculateShopeeEconomics } from "@/lib/pricing";
+import { evaluateSellerTrust, formatOrdersCompact } from "@/lib/sellerTrust";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +67,8 @@ export async function GET(req: NextRequest) {
       recordedPriceIdr: number;
       previousStock: number;
       isSelected: boolean;
+      ratingPct?: number;
+      ordersCount?: number;
     }> = [];
 
     for (const game of catalog) {
@@ -84,6 +88,8 @@ export async function GET(req: NextRequest) {
               recordedPriceIdr: s.price_g2g_idr || 0,
               previousStock: s.stock || 0,
               isSelected: s.seller_id === game.selected_seller_id,
+              ratingPct: s.seller_rating ?? s.rating_pct,
+              ordersCount: s.seller_orders ?? s.reviews_count,
             });
           }
         }
@@ -108,6 +114,10 @@ export async function GET(req: NextRequest) {
       priceAlert: "MARGIN_DANGER" | "NORMAL";
       isSelected: boolean;
       health: "CRITICAL" | "WARNING" | "SAFE";
+      sellerRating: number;
+      sellerOrders: number;
+      trustTier: string;
+      trustScore: number;
       error?: string;
     }> = [];
 
@@ -124,17 +134,29 @@ export async function GET(req: NextRequest) {
             health = "WARNING";
           }
 
-          // Price Spike Guard calculations
+          // Price Spike Guard & Trust Evaluation via unified helpers
           const livePriceIdr =
             live.price_idr > 0
               ? live.price_idr
               : live.price_usd > 0
               ? Math.ceil(live.price_usd * 16850 * 1.045)
               : item.recordedPriceIdr;
-          const liveCogsNet = Math.round(livePriceIdr * 1.007);
-          const shopeeFee = Math.round(item.sellingPriceShopeeIdr * 0.08) + 1000;
-          const liveNetProfit = item.sellingPriceShopeeIdr - liveCogsNet - shopeeFee;
-          const liveMarginPct = item.sellingPriceShopeeIdr > 0 ? (liveNetProfit / item.sellingPriceShopeeIdr) * 100 : 0;
+          const eco = calculateShopeeEconomics({
+            sellingPriceIdr: item.sellingPriceShopeeIdr,
+            cogsIdr: livePriceIdr,
+            presetId: "reguler",
+            packagingCostIdr: 0,
+          });
+          const liveMarginPct = eco.netMarginPct;
+
+          const trust = evaluateSellerTrust({
+            rating: live.rating_pct || item.ratingPct,
+            orders: live.success_orders || live.total_rating || item.ordersCount,
+            stock: live.available_qty,
+            priceIdr: livePriceIdr,
+            sellingPriceShopeeIdr: item.sellingPriceShopeeIdr,
+            isOnline: live.is_online,
+          });
 
           let priceAlert: "MARGIN_DANGER" | "NORMAL" = "NORMAL";
           const isPriceSpike = liveMarginPct < 12.0 || (item.recordedPriceIdr > 0 && livePriceIdr > item.recordedPriceIdr * 1.15);
@@ -159,6 +181,10 @@ export async function GET(req: NextRequest) {
             priceAlert,
             isSelected: item.isSelected,
             health,
+            sellerRating: trust.seller_rating,
+            sellerOrders: trust.seller_orders,
+            trustTier: trust.trust_tier,
+            trustScore: trust.trust_score,
             error: live.error,
           };
         })
@@ -174,17 +200,51 @@ export async function GET(req: NextRequest) {
       if (audited.isSelected && audited.priceAlert === "MARGIN_DANGER") {
         const game = catalog.find((g: any) => g.id === audited.gameId);
         if (game && Array.isArray(game.sellers)) {
-          // Cari seller cadangan di game yang sama dengan stock > 5 dan margin >= 15.0%
-          const backupSeller = game.sellers.find((s: any) => {
-            if (s.seller_id === audited.sellerId) return false;
-            const sStock = s.stock || 0;
-            const sMargin = s.net_margin_pct !== undefined ? s.net_margin_pct : 0;
-            const sStatus = s.live_status || "live";
-            return sStock > 5 && sMargin >= 15.0 && sStatus !== "dead" && sStatus !== "out_of_stock";
-          });
+          // Cari seller cadangan yang lolos Trust Guard (tidak hard-rejected, stok > 5, margin >= 15%) & prioritaskan Safe (A+)
+          const qualifiedBackups = game.sellers
+            .filter((s: any) => s.seller_id !== audited.sellerId)
+            .map((s: any) => {
+              const sStock = Number(s.stock || 0);
+              const sPrice = Number(s.price_g2g_idr || 0);
+              const sEco = calculateShopeeEconomics({
+                sellingPriceIdr: Number(game.selling_price_shopee_idr || 100000),
+                cogsIdr: sPrice,
+                presetId: "reguler",
+                packagingCostIdr: 0,
+              });
+              const sMargin = s.net_margin_pct !== undefined ? Number(s.net_margin_pct) : sEco.netMarginPct;
+              const sStatus = s.live_status || "live";
+              const sTrust = evaluateSellerTrust({
+                rating: s.seller_rating ?? s.rating_pct,
+                orders: s.seller_orders ?? s.reviews_count,
+                stock: sStock,
+                priceIdr: sPrice,
+                sellingPriceShopeeIdr: Number(game.selling_price_shopee_idr || 100000),
+                deliverySpeed: s.delivery_time || s.delivery_speed,
+              });
+              return { seller: s, sStock, sMargin, sStatus, sTrust };
+            })
+            .filter((cand: any) => {
+              return (
+                !cand.sTrust.is_hard_rejected &&
+                cand.sStock > 5 &&
+                cand.sMargin >= 15.0 &&
+                cand.sStatus !== "dead" &&
+                cand.sStatus !== "delisted" &&
+                cand.sStatus !== "out_of_stock"
+              );
+            })
+            .sort((a: any, b: any) => {
+              if (a.sTrust.trust_tier === "Safe (A+)" && b.sTrust.trust_tier !== "Safe (A+)") return -1;
+              if (b.sTrust.trust_tier === "Safe (A+)" && a.sTrust.trust_tier !== "Safe (A+)") return 1;
+              return b.sTrust.trust_score - a.sTrust.trust_score;
+            });
 
-          if (backupSeller) {
-            console.log(`[Auto-Failover] Price spike on ${game.title} (Seller: ${audited.sellerName}). Switching to backup: ${backupSeller.seller_name}`);
+          const bestCandidate = qualifiedBackups[0];
+
+          if (bestCandidate) {
+            const backupSeller = bestCandidate.seller;
+            console.log(`[Auto-Failover] Price spike on ${game.title} (Seller: ${audited.sellerName}). Switching to trusted backup: ${backupSeller.seller_name} (${bestCandidate.sTrust.trust_tier})`);
             game.selected_seller_id = backupSeller.seller_id;
             catalogModified = true;
 
@@ -195,9 +255,9 @@ export async function GET(req: NextRequest) {
               + `⚠️ *Lonjakan Terdeteksi:* Supplier utama (\`${audited.sellerName}\`) mengalami lonjakan harga!\n`
               + `• Modal Baru: *Rp ${audited.livePriceIdr.toLocaleString("id-ID")}* (Sebelumnya: Rp ${audited.recordedPriceIdr.toLocaleString("id-ID")})\n`
               + `• Proyeksi Margin: *${audited.liveMarginPct.toFixed(1)}%* (Batas Bahaya: < 12.0%)\n\n`
-              + `🛡️ *Tindakan Otonom:* Otomatis dialihkan ke Supplier Cadangan Sehat:\n`
-              + `• Supplier Baru: *${backupSeller.seller_name}*\n`
-              + `• Margin Supplier Baru: *${(backupSeller.net_margin_pct || 0).toFixed(1)}%* | Stok: *${backupSeller.stock} Unit*\n`
+              + `🛡️ *Tindakan Otonom (Trust Guard):* Dialihkan ke Supplier Cadangan Sehat:\n`
+              + `• Supplier Baru: *${backupSeller.seller_name}* [${bestCandidate.sTrust.trust_tier} • ★ ${bestCandidate.sTrust.seller_rating}% • ${formatOrdersCompact(bestCandidate.sTrust.seller_orders)}]\n`
+              + `• Margin Baru: *${bestCandidate.sMargin.toFixed(1)}%* | Stok: *${backupSeller.stock} Unit*\n`
               + `━━━━━━━━━━━━━━━━━━━━━━\n`
               + `⚡ _Katalog Shopee & Web Store telah diperbarui otonom tanpa jeda penjualan._`
             );
@@ -228,7 +288,7 @@ export async function GET(req: NextRequest) {
         `🚨 *[ALERT STOK KRITIS / SOLD OUT]*\n`
         + `━━━━━━━━━━━━━━━━━━━━━━\n`
         + `🎮 *Game:* \`${item.gameTitle}\`\n`
-        + `👤 *Seller:* \`${item.sellerName}\` (${item.isOnline ? "🟢 Online" : "⚪ Offline"})\n`
+        + `👤 *Seller:* \`${item.sellerName}\` (${item.isOnline ? "🟢 Online" : "⚪ Offline"}) — ★ ${item.sellerRating}% • ${formatOrdersCompact(item.sellerOrders)} [${item.trustTier}]\n`
         + `🔴 *Sisa Stok:* *0 UNIT (HABIS)*\n`
         + `💵 *Harga Modal:* ${priceStr}\n`
         + `🔗 *Tautan Listing:* ${item.productUrl}\n`
@@ -248,7 +308,7 @@ export async function GET(req: NextRequest) {
         `🟡 *[ALERT STOK MENIPIS]*\n`
         + `━━━━━━━━━━━━━━━━━━━━━━\n`
         + `🎮 *Game:* \`${item.gameTitle}\`\n`
-        + `👤 *Seller:* \`${item.sellerName}\` (${item.isOnline ? "🟢 Online" : "⚪ Offline"})\n`
+        + `👤 *Seller:* \`${item.sellerName}\` (${item.isOnline ? "🟢 Online" : "⚪ Offline"}) — ★ ${item.sellerRating}% • ${formatOrdersCompact(item.sellerOrders)} [${item.trustTier}]\n`
         + `⚠️ *Sisa Stok:* *HANYA ${item.availableQty} UNIT TERSISA!*\n`
         + `💵 *Harga Modal:* ${priceStr}\n`
         + `🔗 *Tautan Listing:* ${item.productUrl}\n`

@@ -12,6 +12,14 @@ import {
   ChevronDown, ChevronUp, Pencil, FileText, ShoppingBag
 } from 'lucide-react';
 import { getG2GSellerUrl } from '@/lib/g2g';
+import {
+  SHOPEE_FEE_PRESETS,
+  ShopeeFeePresetId,
+  DEFAULT_FX_BUFFER_PCT,
+  calculateShopeeEconomics,
+  calculateBreakEvenPrice,
+  calculateTargetSellingPrice,
+} from '@/lib/pricing';
 import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
 import GameSelectorCombobox from '@/app/components/GameSelectorCombobox';
 
@@ -65,6 +73,14 @@ function QuantCalculatorContent() {
   const [shopeeAdminPct, setShopeeAdminPct] = useState(8.0);
   const [shopeeFixedFee, setShopeeFixedFee] = useState(1000);
   const [packaging, setPackaging] = useState(0); // Default Rp 0 for full digital mode
+  const [feePreset, setFeePreset] = useState<ShopeeFeePresetId>('reguler');
+  const [fxBufferEnabled, setFxBufferEnabled] = useState(false);
+
+  const handleFeePresetChange = (presetId: ShopeeFeePresetId) => {
+    setFeePreset(presetId);
+    setShopeeAdminPct(SHOPEE_FEE_PRESETS[presetId].adminFeePct);
+    setShopeeFixedFee(SHOPEE_FEE_PRESETS[presetId].fixedFeeIdr);
+  };
   
   // Multi-seller options for current product
   const [sellers, setSellers] = useState<SellerOption[]>([
@@ -295,30 +311,51 @@ function QuantCalculatorContent() {
     }
   };
 
-  // Calculations
-  const qrisFeeIdr = Math.round(cogsG2gIdr * (qrisFeePct / 100));
-  const modalBersih = cogsG2gIdr + qrisFeeIdr;
-  const fixedTotalCost = modalBersih + shopeeFixedFee + packaging;
+  // Calculations via unified pricing engine
+  const activeFxBufferPct = fxBufferEnabled ? DEFAULT_FX_BUFFER_PCT : 0;
 
   const calculatedRecommendedPrice = useMemo(() => {
-    const adminDecimal = shopeeAdminPct / 100;
-    const targetMarginDecimal = targetMarginPct / 100;
-    const denominator = 1 - adminDecimal - targetMarginDecimal;
-    
-    if (denominator <= 0.05) return 999000;
-    const rawPrice = fixedTotalCost / denominator;
-    const roundedThousand = Math.ceil(rawPrice / 1000) * 1000;
-    return roundedThousand > 900 ? roundedThousand - 100 : roundedThousand;
-  }, [fixedTotalCost, shopeeAdminPct, targetMarginPct]);
+    return calculateTargetSellingPrice({
+      cogsIdr: cogsG2gIdr,
+      presetId: feePreset,
+      adminFeePct: shopeeAdminPct,
+      fixedFeeIdr: shopeeFixedFee,
+      qrisFeePct,
+      fxBufferPct: activeFxBufferPct,
+      packagingCostIdr: packaging,
+      targetMarginPct,
+    });
+  }, [cogsG2gIdr, feePreset, shopeeAdminPct, shopeeFixedFee, qrisFeePct, activeFxBufferPct, packaging, targetMarginPct]);
 
   const effectiveSellingPrice = calcMode === 'target_margin' ? calculatedRecommendedPrice : sellingPrice;
 
-  const potonganShopee = Math.round(effectiveSellingPrice * (shopeeAdminPct / 100)) + shopeeFixedFee;
-  const totalCost = modalBersih + potonganShopee + packaging;
-  const profitBersih = effectiveSellingPrice - totalCost;
-  const netMargin = effectiveSellingPrice > 0 ? (profitBersih / effectiveSellingPrice) * 100 : 0;
+  const economics = calculateShopeeEconomics({
+    sellingPriceIdr: effectiveSellingPrice,
+    cogsIdr: cogsG2gIdr,
+    presetId: feePreset,
+    adminFeePct: shopeeAdminPct,
+    fixedFeeIdr: shopeeFixedFee,
+    qrisFeePct,
+    fxBufferPct: activeFxBufferPct,
+    packagingCostIdr: packaging,
+  });
 
-  const breakEvenPrice = Math.round(fixedTotalCost / (1 - (shopeeAdminPct / 100)));
+  const qrisFeeIdr = economics.qrisFeeIdr;
+  const modalBersih = economics.cogsNetIdr;
+  const potonganShopee = economics.shopeeFeeIdr;
+  const totalCost = economics.totalCostIdr;
+  const profitBersih = economics.netProfitIdr;
+  const netMargin = economics.netMarginPct;
+
+  const breakEvenPrice = calculateBreakEvenPrice({
+    cogsIdr: cogsG2gIdr,
+    presetId: feePreset,
+    adminFeePct: shopeeAdminPct,
+    fixedFeeIdr: shopeeFixedFee,
+    qrisFeePct,
+    fxBufferPct: activeFxBufferPct,
+    packagingCostIdr: packaging,
+  });
 
   const targetBulanan = 10000000;
   const neededTx = profitBersih > 0 ? Math.ceil(targetBulanan / profitBersih) : 0;
@@ -967,15 +1004,47 @@ function QuantCalculatorContent() {
                   </p>
                 </div>
 
-                <div className="space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-                  <div className="font-semibold text-slate-700">Ketentuan Biaya Platform Otomatis:</div>
-                  <div className="flex justify-between text-slate-500 font-mono">
-                    <span>Fee Shopee:</span>
-                    <span className="font-semibold text-slate-700">8.0% + Rp 1.000</span>
+                <div className="space-y-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-700">Program Biaya Shopee:</span>
+                    <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={fxBufferEnabled}
+                        onChange={(e) => setFxBufferEnabled(e.target.checked)}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                      <span>Buffer Kurs +{DEFAULT_FX_BUFFER_PCT}%</span>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(Object.values(SHOPEE_FEE_PRESETS)).map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleFeePresetChange(preset.id)}
+                        title={preset.description}
+                        className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold border transition-colors cursor-pointer ${
+                          feePreset === preset.id
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {preset.shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-slate-500 font-mono pt-1 border-t border-slate-200">
+                    <span>Fee Shopee Aktif:</span>
+                    <span className="font-semibold text-slate-700 tabular-nums">
+                      {shopeeAdminPct}% + Rp {shopeeFixedFee.toLocaleString('id-ID')}
+                    </span>
                   </div>
                   <div className="flex justify-between text-slate-500 font-mono">
-                    <span>Biaya QRIS / Beli:</span>
-                    <span className="font-semibold text-slate-700">0.7% (Instan)</span>
+                    <span>QRIS ({qrisFeePct}%){fxBufferEnabled ? ` + FX (+${DEFAULT_FX_BUFFER_PCT}%)` : ''}:</span>
+                    <span className="font-semibold text-slate-700 tabular-nums">
+                      +{formatRp(qrisFeeIdr + economics.fxBufferIdr)}
+                    </span>
                   </div>
                 </div>
               </div>

@@ -1,7 +1,8 @@
 /**
  * Seller Rating, Reputation & Composite Trust Engine (0-100)
- * Digunakan bersama oleh auto-find-sellers, g2g-crawler, eneba-crawler, catalog, dan Sentry & Risk Hub.
+ * Digunakan bersama oleh auto-find-sellers, g2g-crawler, eneba-crawler, catalog, cron, dan Sentry & Risk Hub.
  */
+import { calculateShopeeEconomics } from "@/lib/pricing";
 
 export type TrustTier = "Safe (A+)" | "Moderate (B)" | "Caution (C)";
 
@@ -66,12 +67,15 @@ export function evaluateSellerTrust(params: {
     deliveryStr.toLowerCase().includes("0-detik") ||
     params.isOnline === true;
 
-  // Rumus full-digital (Packaging = Rp 0, Shopee Fee 8% + Rp 1.000, QRIS 0.7%)
-  const qrisFee = Math.round(priceIdr * 0.007);
-  const shopeeFee = sellingPrice > 0 ? Math.round(sellingPrice * 0.08) + 1000 : 0;
-  const netProfit = sellingPrice > 0 ? sellingPrice - priceIdr - qrisFee - shopeeFee : 0;
-  const netMarginPct =
-    sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+  // Rumus full-digital terpusat via web/lib/pricing.ts
+  const eco = calculateShopeeEconomics({
+    sellingPriceIdr: sellingPrice,
+    cogsIdr: priceIdr,
+    presetId: "reguler",
+    packagingCostIdr: 0,
+  });
+  const netProfit = eco.netProfitIdr;
+  const netMarginPct = eco.netMarginPct;
 
   // Hard Reject Filter
   let isHardRejected = false;

@@ -14,6 +14,7 @@ import {
 import { getG2GSellerUrl, getG2GGameCategoryUrl, resolveG2GProductUrl, getG2GSellerProfileUrl, extractG2GOfferId } from '@/lib/g2g';
 import { getEnebaSearchUrl } from '@/lib/eneba';
 import { evaluateSellerTrust, formatOrdersCompact, getTrustTierBadgeStyle } from '@/lib/sellerTrust';
+import { calculateShopeeEconomics } from '@/lib/pricing';
 import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
 
 interface Seller {
@@ -1633,13 +1634,15 @@ export default function CatalogDashboardPage() {
                                 const isSelected = s.seller_id === game.selected_seller_id;
                                 const isEneba = s.profile_url?.includes("eneba.com") || s.seller_name?.toLowerCase().includes("eneba") || s.tier_label?.includes("ENEBA");
                                 
-                                // Synced calculation without hardcoded +2000:
-                                const qris = Math.round(s.price_g2g_idr * 0.007);
-                                const shopeeFee = Math.round(game.selling_price_shopee_idr * 0.08) + 1000;
-                                const packaging = 0; // Digital mode
-                                const netCost = s.price_g2g_idr + qris + shopeeFee + packaging;
-                                const netProfit = game.selling_price_shopee_idr - netCost;
-                                const netMargin = game.selling_price_shopee_idr > 0 ? (netProfit / game.selling_price_shopee_idr) * 100 : 0;
+                                // Synced calculation via unified pricing helper (Digital mode Rp 0):
+                                const eco = calculateShopeeEconomics({
+                                  sellingPriceIdr: game.selling_price_shopee_idr,
+                                  cogsIdr: s.price_g2g_idr,
+                                  presetId: 'reguler',
+                                  packagingCostIdr: 0,
+                                });
+                                const netProfit = eco.netProfitIdr;
+                                const netMargin = eco.netMarginPct;
                                 const isLoss = netMargin < 0;
 
                                 return (
