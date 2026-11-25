@@ -1,6 +1,6 @@
 # Akshara Gaming Center — Multi-Device Handoff & Sync Guide
 
-> **Canonical Handoff Document (Updated through FASE 17)**  
+> **Canonical Handoff Document (Updated through FASE 18)**  
 > **Repository:** `https://github.com/Jejechris/aksharagamingcenter.git` (`main`)  
 > **Legacy Reference:** [AKSHARA_PROJECT_CONTEXT_HANDOVER.md](./AKSHARA_PROJECT_CONTEXT_HANDOVER.md) *(arsip awal Oktober 2026 — gunakan dokumen ini sebagai status terbaru)*
 
@@ -37,7 +37,10 @@ Karena riwayat chat Antigravity tersimpan lokal di tiap perangkat (`~/.gemini/an
   - **Tools Operasional**: `/dashboard/quant` (Kalkulator Margin/BEP, biaya packaging digital `Rp 0`), `/dashboard/description`, `/dashboard/formatter`, `/dashboard/research`, `/dashboard/claims`, `/dashboard/autonomous`, `/dashboard/bot`, `/dashboard/health`, `/dashboard/support`.
   - **Komponen & Library Penting**:
     - `web/lib/sellerTrust.ts`: Composite Trust & Value Score (0–100: 40% harga/margin, 35% rating, 15% volume order, 10% stok & kecepatan kirim), klasifikasi `Safe (A+)` / `Moderate (B)` / `Caution (C)`, serta hard-reject rule untuk rating `< 92%` atau transaksi rendah mencurigakan.
-    - `web/lib/pricing.ts`: Single Source of Truth kalkulasi Shopee (`calculateShopeeEconomics`, `calculateBreakEvenPrice`, `calculateTargetSellingPrice`), preset program biaya Shopee (`reguler` 8%+1k, `xtra_ongkir` 12%+1k, `flash_promo` 14.5%+1k), QRIS 0.7%, dan FX Volatility Buffer (`+1.5%`).
+    - `web/lib/envLoader.ts` & `web/next.config.mjs`: Fallback loader untuk memuat environment variables dari root `.env` (`../.env`) saat Next.js berjalan di `web/`.
+    - `web/app/api/health/route.ts`: Audit koneksi PostgreSQL aktual + deteksi status `HEALTHY`/`DEGRADED` secara jujur (tidak memalsukan status sehat saat DB offline/tak terkonfigurasi).
+    - `web/app/api/research/eneba-crawler/route.ts`: Ditambah `action: "autonomous_scan"` (menggabungkan Steam Store `featuredcategories` `top_sellers`/`specials` + CheapShark Deals API dengan `User-Agent` valid) + fallback Steam live untuk `discover_trend`.
+    - `web/lib/pricing.ts`: Single Source of Truth kalkulasi Shopee (`calculateShopeeEconomics`, `calculateBreakEvenPrice`, `calculateTargetSellingPrice`), preset program biaya Shopee (`reguler` 8%+1k, `xtra_ongkir` 12%+1k, `flash_promo` 14.5%+1k), QRIS 0.7%, dan FX Volatility Buffer (`+1.5%`). Disinkronkan ke Quant, Launchpad, Catalog, Eneba Terminal (`/dashboard/eneba`), dan Research Center (`/dashboard/research`).
     - `web/app/api/orders/finalize/route.ts`: 1-Klik Finalisasi Order (`POST /api/orders/finalize`) untuk membuat token Claim Vault terenkripsi, mencatat laba bersih ke `financial_ledger` (`/dashboard/operator`), mengupdate order di `/dashboard/autonomous`, serta menghasilkan template pesan Shopee chat siap salin.
     - `web/app/api/cron/sentry/route.ts`: Cron Market Sentry dengan Trust Guard (auto-failover memfilter keluar seller berisiko tinggi via `evaluateSellerTrust` dan memprioritaskan `Safe (A+)`).
     - `web/lib/gemini.ts`: Memakai `process.env.GEMINI_API_KEY` (tanpa fallback hardcoded key) dengan `FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"]` dan dukungan `jsonMode`.
@@ -97,9 +100,9 @@ python -m py_compile bot/market_sentry.py bot/telegram_commander.py bot/eneba_da
 
 ---
 
-## 5. Status Terkini (Per FASE 17)
+## 5. Status Terkini (Per FASE 18)
 
-- **Selesai:** FASE 7 s/d FASE 17 (termasuk Unified Pricing & Shopee Promo Presets di `web/lib/pricing.ts`, Trust Guard pada Cron Auto-Failover, 1-Klik Finalisasi Order -> Claim + Kas Ledger, serta GitHub Actions CI `ci-web.yml`).
+- **Selesai:** FASE 7 s/d FASE 18 (termasuk Unified Pricing & Shopee Promo Presets, Trust Guard pada Cron Auto-Failover, 1-Klik Finalisasi Order -> Claim + Kas Ledger, GitHub Actions CI `ci-web.yml`, Root `.env` fallback loader, Honest DB `/api/health`, serta **Autonomous CDKey Scanner** + sinkronisasi filter **`Saring Margin Bersih`** di `/dashboard/eneba` & `/dashboard/research`).
 - **Catatan Penting Environment (`web/.env.local` & Vercel):**
   - Pastikan `GEMINI_API_KEY` menggunakan API Key valid dari Google AI Studio (`AIza...`, bukan token `AQ.A...` agar tidak 401 `ACCESS_TOKEN_TYPE_UNSUPPORTED`).
   - Pastikan `VAULT_ENCRYPTION_SECRET` terisi string acak 32+ karakter di lokal & Vercel agar enkripsi kredensial di brankas aman.

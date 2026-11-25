@@ -1,5 +1,6 @@
 // Google Gemini AI Client for Akshara Command Center
 // Valid, fast production models with optional strict JSON output mode
+import { ensureRootEnvLoaded } from "@/lib/envLoader";
 
 export const DEFAULT_MODEL = process.env.GEMINI_DEFAULT_MODEL || "gemini-2.5-flash";
 const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"];
@@ -15,6 +16,7 @@ export async function callGemini(
   systemInstruction?: string,
   options?: CallGeminiOptions
 ): Promise<string> {
+  ensureRootEnvLoaded();
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY belum dikonfigurasi di environment variables.");

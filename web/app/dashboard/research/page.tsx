@@ -32,6 +32,12 @@ import {
 } from "lucide-react";
 import { G2GScannedGame } from "@/app/api/research/g2g-crawler/route";
 import { resolveG2GProductUrl } from "@/lib/g2g";
+import {
+  SHOPEE_FEE_PRESETS,
+  ShopeeFeePresetId,
+  DEFAULT_FX_BUFFER_PCT,
+  calculateShopeeEconomics,
+} from "@/lib/pricing";
 import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
 
 export default function ResearchCenterPage() {
@@ -52,6 +58,9 @@ export default function ResearchCenterPage() {
   const [maxBudgetFilter, setMaxBudgetFilter] = useState<number>(0);
   const [selectedPlatform, setSelectedPlatform] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [feePreset, setFeePreset] = useState<ShopeeFeePresetId>("reguler");
+  const [fxBufferEnabled, setFxBufferEnabled] = useState(false);
+  const [sortBy, setSortBy] = useState<"margin_desc" | "profit_desc" | "price_asc">("margin_desc");
 
   // Card details expander
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
@@ -410,25 +419,35 @@ export default function ResearchCenterPage() {
     }).format(num);
   };
 
-  // Filtered Games Calculation
-  const filteredGames = useMemo(() => {
-    return scannedGames.filter((g) => {
-      // Source Marketplace filter (ALL vs ENEBA vs G2G)
+  // Synchronized live margin & profit recalculation
+  const gamesWithLiveEco = useMemo(() => {
+    const fxPct = fxBufferEnabled ? DEFAULT_FX_BUFFER_PCT : 0;
+    return scannedGames.map((g) => {
+      const eco = calculateShopeeEconomics({
+        sellingPriceIdr: g.recommended_shopee_price_idr,
+        cogsIdr: g.price_g2g_idr,
+        presetId: feePreset,
+        fxBufferPct: fxPct,
+        packagingCostIdr: 0,
+      });
+      return {
+        ...g,
+        qris_fee_idr: eco.qrisFeeIdr + eco.fxBufferIdr,
+        shopee_fee_idr: eco.shopeeFeeIdr,
+        net_profit_idr: eco.netProfitIdr,
+        net_margin_pct: eco.netMarginPct,
+      };
+    });
+  }, [scannedGames, feePreset, fxBufferEnabled]);
+
+  const preMarginGames = useMemo(() => {
+    return gamesWithLiveEco.filter((g) => {
       if (sourceFilter === "ENEBA" && (g as any).source_marketplace !== "ENEBA") return false;
       if (sourceFilter === "G2G" && (g as any).source_marketplace === "ENEBA") return false;
-
-      // Margin filter
-      if (minMarginFilter > 0 && g.net_margin_pct < minMarginFilter) return false;
-
-      // Budget filter
       if (maxBudgetFilter > 0 && g.price_g2g_idr > maxBudgetFilter) return false;
-
-      // Platform filter
       if (selectedPlatform !== "ALL" && !g.platform.toLowerCase().includes(selectedPlatform.toLowerCase())) {
         return false;
       }
-
-      // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = g.title.toLowerCase().includes(q);
@@ -436,10 +455,33 @@ export default function ResearchCenterPage() {
         const matchesReason = g.tactical_reason.toLowerCase().includes(q);
         if (!matchesTitle && !matchesSeller && !matchesReason) return false;
       }
-
       return true;
     });
-  }, [scannedGames, sourceFilter, minMarginFilter, maxBudgetFilter, selectedPlatform, searchQuery]);
+  }, [gamesWithLiveEco, sourceFilter, maxBudgetFilter, selectedPlatform, searchQuery]);
+
+  const marginCounts = useMemo(() => {
+    return {
+      all: preMarginGames.length,
+      positive: preMarginGames.filter((g) => g.net_profit_idr > 0).length,
+      healthy: preMarginGames.filter((g) => g.net_margin_pct >= 15).length,
+      good: preMarginGames.filter((g) => g.net_margin_pct >= 20).length,
+      super: preMarginGames.filter((g) => g.net_margin_pct >= 30).length,
+    };
+  }, [preMarginGames]);
+
+  // Filtered & Sorted Games Calculation
+  const filteredGames = useMemo(() => {
+    const list = preMarginGames.filter((g) => {
+      if (minMarginFilter > 0 && minMarginFilter < 1) return g.net_profit_idr > 0;
+      if (minMarginFilter >= 1 && g.net_margin_pct < minMarginFilter) return false;
+      return true;
+    });
+    return [...list].sort((a, b) => {
+      if (sortBy === "profit_desc") return b.net_profit_idr - a.net_profit_idr;
+      if (sortBy === "price_asc") return a.price_g2g_idr - b.price_g2g_idr;
+      return b.net_margin_pct - a.net_margin_pct;
+    });
+  }, [preMarginGames, minMarginFilter, sortBy]);
 
   // Statistics from filtered list
   const stats = useMemo(() => {
@@ -824,24 +866,55 @@ export default function ResearchCenterPage() {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Margin Selector Tabs */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-mono uppercase tracking-wider text-slate-600 font-semibold flex items-center gap-1.5">
-              <Flame className="w-3.5 h-3.5 text-amber-600" />
-              <span>Saring Berdasarkan Margin Bersih:</span>
-            </label>
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
+          {/* Synchronized Margin Selector Tabs */}
+          <div className="space-y-1.5 flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-[11px] font-mono uppercase tracking-wider text-slate-600 font-semibold flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-amber-600" />
+                <span>Saring Margin Bersih ({SHOPEE_FEE_PRESETS[feePreset].shortLabel}):</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                  {Object.values(SHOPEE_FEE_PRESETS).map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setFeePreset(preset.id)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                        feePreset === preset.id
+                          ? "bg-slate-900 text-white"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      {preset.shortLabel}
+                    </button>
+                  ))}
+                </div>
+                <label className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={fxBufferEnabled}
+                    onChange={(e) => setFxBufferEnabled(e.target.checked)}
+                    className="rounded border-slate-300 text-emerald-600 cursor-pointer"
+                  />
+                  <span>FX +{DEFAULT_FX_BUFFER_PCT}%</span>
+                </label>
+              </div>
+            </div>
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200 overflow-x-auto">
               {[
-                { val: 0, label: `Semua (${filteredGames.length})` },
-                { val: 40, label: "🔥 Super Arbitrage (>40%)" },
-                { val: 30, label: "💎 Margin Tinggi (>30%)" },
-                { val: 20, label: "⚡ Margin Sehat (>20%)" },
+                { val: 0, label: `Semua (${marginCounts.all})` },
+                { val: 0.1, label: `💸 Untung (>0%) • ${marginCounts.positive}` },
+                { val: 15, label: `⚡ Sehat (≥15%) • ${marginCounts.healthy}` },
+                { val: 20, label: `💎 Bagus (≥20%) • ${marginCounts.good}` },
+                { val: 30, label: `🔥 Super (≥30%) • ${marginCounts.super}` },
               ].map((tab) => (
                 <button
                   key={tab.val}
+                  type="button"
                   onClick={() => setMinMarginFilter(tab.val)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono transition-colors whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-colors whitespace-nowrap cursor-pointer ${
                     minMarginFilter === tab.val
                       ? "bg-white text-slate-900 border border-slate-200 shadow-sm font-bold"
                       : "text-slate-600 hover:text-slate-900"
@@ -853,22 +926,39 @@ export default function ResearchCenterPage() {
             </div>
           </div>
 
-          {/* Budget Modal Kulakan Filter */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-mono uppercase tracking-wider text-slate-600 font-semibold flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-slate-600" />
-              <span>Batas Modal Kulakan:</span>
-            </label>
-            <select
-              value={maxBudgetFilter}
-              onChange={(e) => setMaxBudgetFilter(Number(e.target.value))}
-              className="bg-white border border-slate-200 text-slate-800 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 w-full sm:w-56"
-            >
-              <option value={0}>Semua Budget Modal</option>
-              <option value={50000}>Modal Ringan (&lt; Rp 50.000)</option>
-              <option value={150000}>Modal Menengah (&lt; Rp 150.000)</option>
-              <option value={300000}>Modal Premium (&lt; Rp 300.000)</option>
-            </select>
+          {/* Budget Modal Kulakan & Sort */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-mono uppercase tracking-wider text-slate-600 font-semibold flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-slate-600" />
+                <span>Batas Modal:</span>
+              </label>
+              <select
+                value={maxBudgetFilter}
+                onChange={(e) => setMaxBudgetFilter(Number(e.target.value))}
+                className="bg-white border border-slate-200 text-slate-800 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 w-full sm:w-44"
+              >
+                <option value={0}>Semua Budget</option>
+                <option value={50000}>Ringan (&lt; Rp 50.000)</option>
+                <option value={150000}>Menengah (&lt; Rp 150.000)</option>
+                <option value={300000}>Premium (&lt; Rp 300.000)</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-mono uppercase tracking-wider text-slate-600 font-semibold flex items-center gap-1.5">
+                <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Urutkan:</span>
+              </label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-white border border-slate-200 text-slate-800 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 w-full sm:w-40"
+              >
+                <option value="margin_desc">Margin % Tertinggi</option>
+                <option value="profit_desc">Laba Bersih (Rp)</option>
+                <option value="price_asc">Modal Termurah</option>
+              </select>
+            </div>
           </div>
         </div>
 

@@ -1,13 +1,16 @@
 import { Pool } from "pg";
+import { ensureRootEnvLoaded } from "@/lib/envLoader";
 
-const rawConnection = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
-
-export function isDbConfigured(): boolean {
-  if (!rawConnection) return false;
-  return rawConnection.startsWith("postgres://") || rawConnection.startsWith("postgresql://");
+function getRawDbConnection(): string {
+  ensureRootEnvLoaded();
+  return process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
 }
 
-const connectionString = isDbConfigured() ? rawConnection : "";
+export function isDbConfigured(): boolean {
+  const raw = getRawDbConnection();
+  if (!raw) return false;
+  return raw.startsWith("postgres://") || raw.startsWith("postgresql://");
+}
 
 // Global singleton pool for Next.js / Serverless environments
 declare global {
@@ -16,13 +19,14 @@ declare global {
 
 export function getDbPool(): Pool | null {
   if (!isDbConfigured()) return null;
+  const connectionString = getRawDbConnection();
   if (!global.__supabase_pg_pool__) {
     global.__supabase_pg_pool__ = new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false },
       max: 5,
       idleTimeoutMillis: 15000,
-      connectionTimeoutMillis: 2000,
+      connectionTimeoutMillis: 2500,
     });
   }
   return global.__supabase_pg_pool__;

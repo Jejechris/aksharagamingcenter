@@ -32,6 +32,12 @@ import {
 import { EnebaScannedGame } from "@/app/api/research/eneba-crawler/route";
 import { getEnebaSearchUrl, getEnebaProductUrl, buildEnebaFilteredUrl } from "@/lib/eneba";
 import { evaluateSellerTrust, formatOrdersCompact, getTrustTierBadgeStyle } from "@/lib/sellerTrust";
+import {
+  SHOPEE_FEE_PRESETS,
+  ShopeeFeePresetId,
+  DEFAULT_FX_BUFFER_PCT,
+  calculateShopeeEconomics,
+} from "@/lib/pricing";
 import ShopeeCompetitorModal from "@/app/components/ShopeeCompetitorModal";
 
 export default function EnebaTerminalPage() {
@@ -47,6 +53,11 @@ export default function EnebaTerminalPage() {
   const [maxBudgetFilter, setMaxBudgetFilter] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [safeSellerOnly, setSafeSellerOnly] = useState(false);
+  const [feePreset, setFeePreset] = useState<ShopeeFeePresetId>("reguler");
+  const [fxBufferEnabled, setFxBufferEnabled] = useState(false);
+  const [sortBy, setSortBy] = useState<"margin_desc" | "profit_desc" | "price_asc" | "discount_desc">("margin_desc");
+  const [isAutonomousScanning, setIsAutonomousScanning] = useState(false);
+  const [scanStrategy, setScanStrategy] = useState<"all" | "trending" | "big_discount" | "cheap_gems">("all");
 
   // Card expanders
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
@@ -170,7 +181,48 @@ export default function EnebaTerminalPage() {
     }
   };
 
-  // AI Live Scan
+  // AI Live & Autonomous Radar Scan
+  const handleAutonomousScan = async (
+    strategy: "all" | "trending" | "big_discount" | "cheap_gems" = "all"
+  ) => {
+    setIsAutonomousScanning(true);
+    setScanStrategy(strategy);
+    try {
+      const res = await fetch("/api/research/eneba-crawler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "autonomous_scan", strategy }),
+      });
+      const json = await res.json();
+      if (res.ok && json.status === "success" && Array.isArray(json.data)) {
+        setGames((prev) => {
+          const existingMap = new Map(prev.map((p) => [p.title.toLowerCase().trim(), p]));
+          for (const item of json.data as EnebaScannedGame[]) {
+            existingMap.set(item.title.toLowerCase().trim(), item);
+          }
+          // Taruh hasil baru di atas agar user langsung melihat temuan otonom
+          const freshTitles = new Set((json.data as EnebaScannedGame[]).map((d) => d.title.toLowerCase().trim()));
+          const fresh = Array.from(existingMap.values()).filter((x) =>
+            freshTitles.has(x.title.toLowerCase().trim())
+          );
+          const rest = Array.from(existingMap.values()).filter(
+            (x) => !freshTitles.has(x.title.toLowerCase().trim())
+          );
+          return [...fresh, ...rest];
+        });
+        showToast(
+          `🚀 Autonomous Scan selesai: ${json.total_found} peluang CDKey ditemukan (Steam Top Sellers + Specials + CheapShark)!`
+        );
+      } else {
+        showToast(json.message || "Gagal menjalankan Autonomous CDKey Scanner.", "error");
+      }
+    } catch {
+      showToast("Kesalahan koneksi saat memindai peluang CDKey.", "error");
+    } finally {
+      setIsAutonomousScanning(false);
+    }
+  };
+
   const handleDiscoverTrend = async () => {
     setIsDiscoveringTrend(true);
     try {
@@ -274,37 +326,45 @@ export default function EnebaTerminalPage() {
     });
   };
 
-  // Filtered CDKey Games
-  const filteredGames = useMemo(() => {
-    return games.filter((g) => {
-      // Platform filter
+  // Hitung ulang ekonomi setiap game secara live sesuai preset Shopee & FX Buffer
+  const gamesWithLiveEco = useMemo(() => {
+    const fxPct = fxBufferEnabled ? DEFAULT_FX_BUFFER_PCT : 0;
+    return games.map((g) => {
+      const eco = calculateShopeeEconomics({
+        sellingPriceIdr: g.recommended_shopee_price_idr,
+        cogsIdr: g.price_eneba_idr,
+        presetId: feePreset,
+        fxBufferPct: fxPct,
+        packagingCostIdr: 0,
+      });
+      return {
+        ...g,
+        qris_fee_idr: eco.qrisFeeIdr + eco.fxBufferIdr,
+        shopee_fee_idr: eco.shopeeFeeIdr,
+        operational_fee_idr: eco.packagingCostIdr,
+        net_profit_idr: eco.netProfitIdr,
+        net_margin_pct: eco.netMarginPct,
+      };
+    });
+  }, [games, feePreset, fxBufferEnabled]);
+
+  // Base filter sebelum filter margin, supaya jumlah chip "Saring Margin Bersih" selalu akurat
+  const preMarginGames = useMemo(() => {
+    return gamesWithLiveEco.filter((g) => {
       if (selectedPlatform !== "ALL" && !g.platform.toLowerCase().includes(selectedPlatform.toLowerCase())) {
         return false;
       }
-
-      // Key Type filter
       if (selectedKeyType !== "ALL" && !g.key_type.toLowerCase().includes(selectedKeyType.toLowerCase())) {
         return false;
       }
-
-      // Margin filter
-      if (minMarginFilter > 0 && g.net_margin_pct < minMarginFilter) {
-        return false;
-      }
-
-      // Budget filter
       if (maxBudgetFilter > 0 && g.price_eneba_idr > maxBudgetFilter) {
         return false;
       }
-
-      // Safe seller filter
       if (safeSellerOnly) {
         const ratingVal = g.seller_rating ?? g.seller_rating_pct ?? 0;
         const ordersVal = g.seller_orders ?? g.seller_reviews_count ?? 0;
         if (ratingVal < 95 || ordersVal < 20) return false;
       }
-
-      // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const mTitle = g.title.toLowerCase().includes(q);
@@ -313,10 +373,39 @@ export default function EnebaTerminalPage() {
         const mReason = g.tactical_reason.toLowerCase().includes(q);
         if (!mTitle && !mSeller && !mKey && !mReason) return false;
       }
-
       return true;
     });
-  }, [games, selectedPlatform, selectedKeyType, minMarginFilter, maxBudgetFilter, safeSellerOnly, searchQuery]);
+  }, [gamesWithLiveEco, selectedPlatform, selectedKeyType, maxBudgetFilter, safeSellerOnly, searchQuery]);
+
+  const marginCounts = useMemo(() => {
+    return {
+      all: preMarginGames.length,
+      positive: preMarginGames.filter((g) => g.net_profit_idr > 0).length,
+      healthy: preMarginGames.filter((g) => g.net_margin_pct >= 15).length,
+      good: preMarginGames.filter((g) => g.net_margin_pct >= 20).length,
+      super: preMarginGames.filter((g) => g.net_margin_pct >= 30).length,
+    };
+  }, [preMarginGames]);
+
+  // Filtered & Sorted CDKey Games
+  const filteredGames = useMemo(() => {
+    const list = preMarginGames.filter((g) => {
+      if (minMarginFilter > 0 && minMarginFilter < 1) {
+        return g.net_profit_idr > 0;
+      }
+      if (minMarginFilter >= 1 && g.net_margin_pct < minMarginFilter) {
+        return false;
+      }
+      return true;
+    });
+
+    return [...list].sort((a, b) => {
+      if (sortBy === "profit_desc") return b.net_profit_idr - a.net_profit_idr;
+      if (sortBy === "price_asc") return a.price_eneba_idr - b.price_eneba_idr;
+      if (sortBy === "discount_desc") return (b.discount_pct || 0) - (a.discount_pct || 0) || b.spread_pct - a.spread_pct;
+      return b.net_margin_pct - a.net_margin_pct;
+    });
+  }, [preMarginGames, minMarginFilter, sortBy]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -437,11 +526,22 @@ export default function EnebaTerminalPage() {
 
             <button
               type="button"
+              onClick={() => handleAutonomousScan("all")}
+              disabled={isAutonomousScanning || loading}
+              className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer select-none disabled:opacity-50"
+              title="Pindai otomatis game trending, diskon besar Steam, & key murah CheapShark"
+            >
+              <Zap className={`w-3.5 h-3.5 text-emerald-400 ${isAutonomousScanning ? "animate-spin" : ""}`} />
+              <span>{isAutonomousScanning ? "Scanning Live..." : "Autonomous Radar"}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setAiScannerOpen(!aiScannerOpen)}
               className="px-3.5 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer select-none"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{aiScannerOpen ? "Tutup Scanner AI" : "Scan CDKey Baru"}</span>
+              <span>{aiScannerOpen ? "Tutup Scanner" : "Scan Manual"}</span>
             </button>
             
             <button
@@ -586,26 +686,93 @@ export default function EnebaTerminalPage() {
           </div>
         )}
 
+        {/* Autonomous CDKey Opportunity Discovery Bar */}
+        <div className="app-card p-4 border-emerald-200/80 bg-white flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              <Flame className="w-4 h-4 text-emerald-600" />
+              <span>Autonomous CDKey Opportunity Scanner (Tanpa Ketik Nama Game)</span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Temukan peluang key game viral, diskon besar Steam Indo (&ge;50%), dan modal murah secara otomatis dari live market feed.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {[
+              { id: "all" as const, label: "🚀 Semua Peluang" },
+              { id: "trending" as const, label: "🔥 Trending Steam" },
+              { id: "big_discount" as const, label: "🏷️ Diskon Besar (≥50%)" },
+              { id: "cheap_gems" as const, label: "💸 Modal Murah (<Rp 65rb)" },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                disabled={isAutonomousScanning}
+                onClick={() => handleAutonomousScan(mode.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer disabled:opacity-50 ${
+                  scanStrategy === mode.id && isAutonomousScanning
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border-slate-200 hover:border-emerald-300"
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Filter Bar */}
         <div className="app-card p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {/* Minimum Margin Filter */}
+          <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
+            {/* Synchronized Margin Filter */}
             <div className="space-y-1.5 flex-1">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                <Flame className="w-3.5 h-3.5 text-violet-600" />
-                <span>Saring Margin Bersih:</span>
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5 text-violet-600" />
+                  <span>Saring Margin Bersih ({SHOPEE_FEE_PRESETS[feePreset].shortLabel}):</span>
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    {Object.values(SHOPEE_FEE_PRESETS).map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setFeePreset(preset.id)}
+                        title={preset.description}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                          feePreset === preset.id
+                            ? "bg-slate-900 text-white"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        {preset.shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={fxBufferEnabled}
+                      onChange={(e) => setFxBufferEnabled(e.target.checked)}
+                      className="rounded border-slate-300 text-emerald-600 cursor-pointer"
+                    />
+                    <span>FX +{DEFAULT_FX_BUFFER_PCT}%</span>
+                  </label>
+                </div>
+              </div>
               <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-100 border border-slate-200 overflow-x-auto scrollbar-thin">
                 {[
-                  { val: 0, label: `Semua (${filteredGames.length})` },
-                  { val: 35, label: "🔥 Super Arbitrage (>35%)" },
-                  { val: 25, label: "💎 High Margin (>25%)" },
-                  { val: 15, label: "⚡ Margin Sehat (>15%)" },
+                  { val: 0, label: `Semua (${marginCounts.all})` },
+                  { val: 0.1, label: `💸 Untung (>0%) • ${marginCounts.positive}` },
+                  { val: 15, label: `⚡ Sehat (≥15%) • ${marginCounts.healthy}` },
+                  { val: 20, label: `💎 Bagus (≥20%) • ${marginCounts.good}` },
+                  { val: 30, label: `🔥 Super (≥30%) • ${marginCounts.super}` },
                 ].map((tab) => (
                   <button
                     key={tab.val}
+                    type="button"
                     onClick={() => setMinMarginFilter(tab.val)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
                       minMarginFilter === tab.val
                         ? "bg-white text-slate-900 font-bold shadow-xs border border-slate-200/80"
                         : "text-slate-600 hover:text-slate-900"
@@ -617,23 +784,41 @@ export default function EnebaTerminalPage() {
               </div>
             </div>
 
-            {/* Budget Filter */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5 text-blue-600" />
-                <span>Batas Modal Kulakan Eneba:</span>
-              </label>
-              <select
-                value={maxBudgetFilter}
-                onChange={(e) => setMaxBudgetFilter(Number(e.target.value))}
-                className="bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-violet-500 w-full sm:w-56 cursor-pointer"
-              >
-                <option value={0}>Semua Budget Modal</option>
-                <option value={100000}>Budget Ringan (&lt; Rp 100.000)</option>
-                <option value={200000}>Budget Menengah (&lt; Rp 200.000)</option>
-                <option value={400000}>Budget Populer (&lt; Rp 400.000)</option>
-                <option value={800000}>Budget AAA / Flagship (&lt; Rp 800.000)</option>
-              </select>
+            {/* Budget Filter & Sort */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Batas Modal:</span>
+                </label>
+                <select
+                  value={maxBudgetFilter}
+                  onChange={(e) => setMaxBudgetFilter(Number(e.target.value))}
+                  className="bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-violet-500 w-full sm:w-44 cursor-pointer"
+                >
+                  <option value={0}>Semua Budget</option>
+                  <option value={65000}>Murah (&lt; Rp 65.000)</option>
+                  <option value={100000}>Ringan (&lt; Rp 100.000)</option>
+                  <option value={200000}>Menengah (&lt; Rp 200.000)</option>
+                  <option value={400000}>Populer (&lt; Rp 400.000)</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Urutkan:</span>
+                </label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="bg-white border border-slate-300 text-slate-900 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-violet-500 w-full sm:w-44 cursor-pointer"
+                >
+                  <option value="margin_desc">Margin % Tertinggi</option>
+                  <option value="profit_desc">Laba Bersih (Rp)</option>
+                  <option value="price_asc">Modal Termurah</option>
+                  <option value="discount_desc">Diskon / Spread</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -858,6 +1043,22 @@ export default function EnebaTerminalPage() {
                             ? "⚡ FAST ROTATION"
                             : "🛡️ STEADY PROFIT"}
                         </span>
+
+                        {game.discount_pct && game.discount_pct > 0 ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white">
+                            -{game.discount_pct}% DISKON
+                          </span>
+                        ) : null}
+
+                        {Array.isArray(game.opportunity_tags) &&
+                          game.opportunity_tags.slice(0, 2).map((tag) => (
+                            <span
+                              key={tag}
+                              className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200"
+                            >
+                              {tag}
+                            </span>
+                          ))}
 
                         <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 border border-slate-200 font-medium">
                           {game.platform}
