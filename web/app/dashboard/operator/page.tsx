@@ -334,6 +334,62 @@ export default function OperatorPage() {
         </div>
       </div>
 
+      {/* Komparasi Kanal Penjualan (Shopee vs Direct Storefront 0% Fee) */}
+      {data?.channel_breakdown && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="app-card p-4 sm:p-5 bg-white border-orange-200/70 flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200 uppercase">
+                  Shopee Marketplace
+                </span>
+                <span className="text-[11px] text-slate-500 tabular-nums">
+                  {data.channel_breakdown.shopee?.orders || 0} Order
+                </span>
+              </div>
+              <div className="text-lg font-bold text-slate-900 tabular-nums">
+                Laba: +{formatCurrency(data.channel_breakdown.shopee?.net_profit_idr || 0)}
+              </div>
+              <p className="text-[11px] text-slate-500 tabular-nums mt-0.5">
+                Omzet {formatCurrency(data.channel_breakdown.shopee?.gmv_idr || 0)} &bull; Fee Shopee -
+                {formatCurrency(data.channel_breakdown.shopee?.platform_fee_idr || 0)}
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-slate-400 uppercase block">Margin</span>
+              <span className="text-lg font-bold font-mono text-orange-600 tabular-nums">
+                {(data.channel_breakdown.shopee?.avg_margin_pct || 0).toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          <div className="app-card p-4 sm:p-5 bg-white border-emerald-200/70 flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
+                  Direct Storefront (0% Fee)
+                </span>
+                <span className="text-[11px] text-slate-500 tabular-nums">
+                  {data.channel_breakdown.direct?.orders || 0} Order
+                </span>
+              </div>
+              <div className="text-lg font-bold text-emerald-700 tabular-nums">
+                Laba: +{formatCurrency(data.channel_breakdown.direct?.net_profit_idr || 0)}
+              </div>
+              <p className="text-[11px] text-slate-500 tabular-nums mt-0.5">
+                Omzet {formatCurrency(data.channel_breakdown.direct?.gmv_idr || 0)} &bull; Tanpa potongan admin marketplace
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-slate-400 uppercase block">Margin</span>
+              <span className="text-lg font-bold font-mono text-emerald-600 tabular-nums">
+                {(data.channel_breakdown.direct?.avg_margin_pct || 0).toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── 3. Selection Action Bar (Mengambang/Inline saat ada order dipilih) ─── */}
       {selectedOrderIds.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-in fade-in duration-150">

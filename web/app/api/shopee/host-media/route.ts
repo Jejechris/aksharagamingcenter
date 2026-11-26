@@ -1,10 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { saveHostedMedia } from "@/lib/mediaHost";
+import { getHostedMediaStats, pruneOldHostedMedia, saveHostedMedia } from "@/lib/mediaHost";
 
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB Shopee rule
+
+export async function GET() {
+  try {
+    const stats = await getHostedMediaStats();
+    return NextResponse.json({ status: "success", stats });
+  } catch (err: any) {
+    return NextResponse.json(
+      { status: "error", message: err?.message || "Gagal mengambil statistik media." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const daysParam = Number(req.nextUrl.searchParams.get("olderThanDays") || "30");
+    const deletedCount = await pruneOldHostedMedia(daysParam);
+    const stats = await getHostedMediaStats();
+    return NextResponse.json({
+      status: "success",
+      deletedCount,
+      stats,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { status: "error", message: err?.message || "Gagal membersihkan media lama." },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,7 +66,7 @@ export async function POST(req: NextRequest) {
     const id = `${prefix}-${hash}`;
     const ext = mimeType === "image/jpeg" ? "jpg" : mimeType === "image/webp" ? "webp" : "png";
 
-    const saved = await saveHostedMedia(id, mimeType, base64Data);
+    const saved = await saveHostedMedia(id, mimeType, base64Data, `${prefix}-`);
     return NextResponse.json({
       status: "success",
       id: saved.id,

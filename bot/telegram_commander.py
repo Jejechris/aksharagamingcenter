@@ -423,7 +423,7 @@ class TelegramCommander:
                 "• `/shopee Terraria | 99000`\n\n"
                 "💡 *Output Otomatis:*\n"
                 "1. Judul SEO Shopee (Maksimal 120 Karakter)\n"
-                "2. Deskripsi Lengkap Siap Copy-Paste (Spek, Fitur, Garansi 30 Hari, SOP Video Unboxing, FAQ)\n"
+                "2. Deskripsi Lengkap Siap Copy-Paste (Spek, Fitur, Garansi 30 Hari, SOP Rekam Layar No-Cut, FAQ Zero-Link)\n"
                 "3. Gambar Cover Banner HD 1080x1080 Ter-Render & Terkirim Langsung!"
             )
             await self.send_message(chat_id, msg)
@@ -446,9 +446,9 @@ class TelegramCommander:
 
         # 1. Judul SEO (Max 120 chars)
         clean_name = game_title.upper()
-        seo_title = f"{clean_name} [PC / DIGITAL] ORIGINAL FULL ACCESS GARANSI RESMI + KARTU A6"
+        seo_title = f"{clean_name} [PC / DIGITAL] ORIGINAL FULL ACCESS GARANSI RESMI 30 HARI"
         if len(seo_title) > 120:
-            seo_title = f"{clean_name} ORIGINAL FULL ACCESS GARANSI RESMI + KARTU A6"
+            seo_title = f"{clean_name} ORIGINAL FULL ACCESS GARANSI RESMI"
         if len(seo_title) > 120:
             seo_title = seo_title[:117] + "..."
 
@@ -505,15 +505,15 @@ class TelegramCommander:
             f"✅ ONLINE MULTIPLAYER RESMI: Bebas main online di seluruh server resmi.\n"
             f"✅ PERMANEN MILIK ANDA: Akun/Lisensi aktif selamanya, bukan sewa.\n"
             f"✅ PENGIRIMAN KILAT: Detail akun dikirim via chat segera setelah order terkonfirmasi.\n"
-            f"✅ BONUS KARTU GARANSI FISIK: Dilengkapi Kartu Garansi Resmi A6 (Art Carton 260gsm) berpita hologram & QR Code serial terdaftar!\n\n"
+            f"✅ PENGIRIMAN DIGITAL QR: Kartu Akses & Sertifikat Garansi Digital ber-QR Code resmi langsung dikirim via Chat Shopee!\n\n"
             f"==================================================\n"
             f"🚀 3 LANGKAH MUDAH AKTIVASI:\n"
             f"1. Selesaikan pembayaran di Shopee dan cek chat Shopee Anda.\n"
-            f"2. Tim Akshara akan mengirimkan data lisensi beserta panduan setup instan.\n"
+            f"2. Scan QR Code pada Kartu Akses & Garansi Digital PNG atau masukkan Kode Klaim + PIN.\n"
             f"3. Login ke launcher resmi, ubah data sesuai keinginan, dan game siap dimainkan!\n\n"
             f"==================================================\n"
             f"⚠️ SYARAT & KETENTUAN KLAIM GARANSI (SOP ANTI-FRAUD):\n"
-            f"1. Wajib membuat VIDEO UNBOXING amplop kartu garansi fisik tanpa jeda (no-cut & unedited) dari awal paket masih tersegel rapi.\n"
+            f"1. Wajib merekam VIDEO REKAM LAYAR (Screen Recording) tanpa jeda (no-cut) dari sebelum membuka brankas kredensial hingga login pertama.\n"
             f"2. Segera lakukan pengecekan dan pergantian data setelah detail diterima.\n"
             f"3. Garansi tidak berlaku jika akun terindikasi menggunakan cheat/third-party mod ilegal.\n"
             f"4. Tim Support Akshara siap membantu 24/7 jika ada kendala login awal.\n\n"
@@ -523,8 +523,8 @@ class TelegramCommander:
             f"A: Selalu READY STOK kak! Sistem kami autonomous, silakan langsung di-checkout saja.\n\n"
             f"Q: Apakah butuh VPN untuk login atau main?\n"
             f"A: Sama sekali TIDAK. 100% region Global dan aman koneksi internet Indonesia.\n\n"
-            f"Q: Apakah dikirim paket fisik ke alamat rumah?\n"
-            f"A: Ya kak, amplop resmi berisi Kartu Garansi Akshara A6 dikirim via kurir Shopee agar order Anda resmi dan aman regulasi.\n\n"
+            f"Q: Apakah dikirim paket atau amplop fisik ke rumah?\n"
+            f"A: Tidak ada pengiriman paket/amplop fisik. 100% pengiriman digital instan via Chat Shopee & Kartu Garansi Digital QR resmi.\n\n"
             f"Terima kasih telah berbelanja di Akshara Gaming Center!\n"
             f"Happy Gaming! 🎮🔥\n\n"
             f"{clean_tags}"
@@ -631,7 +631,7 @@ class TelegramCommander:
             f"📉 *POTONGAN & BIAYA TETAP:*\n"
             f"• Shopee Admin (8%): -Rp {shopee_admin_fee:,.0f}\n"
             f"• Shopee Service Fee: -Rp {shopee_service_fee:,.0f}\n"
-            f"• Amplop & Kartu A6: -Rp {packaging_cost:,.0f}\n\n"
+            f"• Pengiriman Digital QR: Rp 0\n\n"
             f"📊 *HASIL AKHIR:*\n"
             f"• *PROFIT BERSIH:* *Rp {net_profit:,.0f}*\n"
             f"• *Margin Bersih:* *{net_margin:.1f}%* ({health_emoji})\n"
@@ -1023,13 +1023,14 @@ class TelegramCommander:
         claim_url = f"{claim_base}/claim/{claim_code}"
 
         shopee_text = (
-            f"🎮 [AKSHARA GAMING CENTER — PENGIRIMAN LISENSI RESMI]\n"
+            f"🎮 [AKSHARA GAMING CENTER — PENGIRIMAN LISENSI DIGITAL]\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Halo kak {buyer}, pesanan game {game} kakak sudah siap!\n\n"
-            f"🔑 KODE KLAIM: {claim_code}\n"
+            f"Halo kak {buyer}, pesanan game {game} kakak sudah siap 100% digital!\n\n"
+            f"📌 KODE KLAIM: {claim_code}\n"
             f"🔒 PASSCODE PIN RAHASIA: {passcode}\n"
-            f"🔗 LINK BUKA KREDENSIAL: {claim_url}\n\n"
-            f"⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan rekaman video unboxing tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama {warranty_days} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n"
+            f"📜 SERIAL GARANSI DIGITAL: {warranty_code}\n"
+            f"📷 CARA BUKA: Scan QR Code pada Kartu Akses & Garansi Digital PNG yang kami kirim, lalu masukkan Passcode PIN.\n\n"
+            f"⚠️ PENTING: Sebelum scan & memasukkan passcode PIN, siapkan rekaman video layar (screen recording) tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama {warranty_days} hari.\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"Terima kasih dan selamat bermain! 🚀"
         )

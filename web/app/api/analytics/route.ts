@@ -49,6 +49,26 @@ export async function GET() {
     const targetMonthly = 10000000;
     const targetAchievementPct = Math.min(100, Math.round((totalNetProfit / targetMonthly) * 100 * 10) / 10);
 
+    const summarizeChannel = (list: any[]) => {
+      const gmv = list.reduce((acc, t) => acc + (Number(t.gross_revenue_idr) || 0), 0);
+      const profit = list.reduce((acc, t) => acc + (Number(t.net_profit_idr) || 0), 0);
+      const fees = list.reduce((acc, t) => acc + (Number(t.platform_fee_idr) || 0), 0);
+      return {
+        orders: list.length,
+        gmv_idr: Math.round(gmv),
+        net_profit_idr: Math.round(profit),
+        platform_fee_idr: Math.round(fees),
+        avg_margin_pct: gmv > 0 ? Math.round((profit / gmv) * 1000) / 10 : 0,
+      };
+    };
+
+    const directTxs = transactions.filter(
+      (t) =>
+        Number(t.platform_fee_idr || 0) === 0 ||
+        String(t.fee_preset || t.channel || "").toLowerCase().includes("direct")
+    );
+    const shopeeTxs = transactions.filter((t) => !directTxs.includes(t));
+
     return NextResponse.json({
       status: "success",
       data: {
@@ -61,6 +81,10 @@ export async function GET() {
         average_net_margin_pct: Math.round(avgMargin * 10) / 10,
         target_monthly_profit_idr: targetMonthly,
         target_achievement_pct: targetAchievementPct,
+        channel_breakdown: {
+          shopee: summarizeChannel(shopeeTxs),
+          direct: summarizeChannel(directTxs),
+        },
         transactions
       }
     });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPublicStorefrontCatalog, PublicCatalogProduct } from "@/lib/db";
+import { resolvePublicArtworkUrl } from "@/lib/artworkLookup";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -58,7 +59,13 @@ const PUBLIC_FALLBACK_CATALOG: PublicCatalogProduct[] = [
 export async function GET() {
   try {
     const rows = await getPublicStorefrontCatalog();
-    const list = rows && rows.length > 0 ? rows : PUBLIC_FALLBACK_CATALOG;
+    const baseList = rows && rows.length > 0 ? rows : PUBLIC_FALLBACK_CATALOG;
+    const list = await Promise.all(
+      baseList.map(async (item) => ({
+        ...item,
+        artwork_url: await resolvePublicArtworkUrl(item.title),
+      }))
+    );
     return NextResponse.json(
       {
         status: "success",
@@ -72,10 +79,16 @@ export async function GET() {
       }
     );
   } catch (err: any) {
+    const list = await Promise.all(
+      PUBLIC_FALLBACK_CATALOG.map(async (item) => ({
+        ...item,
+        artwork_url: await resolvePublicArtworkUrl(item.title),
+      }))
+    );
     return NextResponse.json({
       status: "success",
-      count: PUBLIC_FALLBACK_CATALOG.length,
-      data: PUBLIC_FALLBACK_CATALOG,
+      count: list.length,
+      data: list,
     });
   }
 }

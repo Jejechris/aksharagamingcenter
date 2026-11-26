@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { getAdminWhatsappNumber } from "@/lib/storeConfig";
 import {
   Shield,
   Lock,
@@ -21,7 +22,8 @@ import {
   Check,
   Zap,
   Terminal,
-  Cpu
+  Cpu,
+  ShoppingBag
 } from "lucide-react";
 
 export default function ClaimPasscodeRevealerPage() {
@@ -244,7 +246,7 @@ export default function ClaimPasscodeRevealerPage() {
               )}
             </p>
             <div className="text-[11px] font-mono text-amber-300/80 pt-2 border-t border-amber-500/20">
-              ⚖️ Sesuai SOP Shopee &amp; Toko Akshara, komplain akun tidak valid setelah waktu pembukaan ini <strong>TIDAK DAPAT DITERIMA</strong> tanpa rekaman video unboxing tanpa jeda dari sebelum link dibuka.
+              ⚖️ Sesuai SOP Toko Akshara, komplain akun tidak valid setelah waktu pembukaan ini <strong>TIDAK DAPAT DITERIMA</strong> tanpa rekaman video rekam layar (screen recording) tanpa jeda dari sebelum brankas dibuka.
             </div>
           </div>
         )}
@@ -297,7 +299,7 @@ export default function ClaimPasscodeRevealerPage() {
             {/* VIP RETENTION FLYWHEEL - 0% MARKETPLACE FEE CONVERSION */}
             {(() => {
               const vipCode = `VIP-${code.replace("AKSH-", "")}`;
-              const supportWa = process.env.NEXT_PUBLIC_SUPPORT_WA || "6282299887766";
+              const supportWa = getAdminWhatsappNumber();
               const buyerUser = claimData.buyer_username || "Kak";
               const waMessage = encodeURIComponent(
                 `Halo Admin Akshara! Saya pembeli resmi (Kode Klaim: ${code} / User: ${buyerUser}). Saya ingin menggunakan Voucher VIP [${vipCode}] untuk repeat order harga khusus tanpa biaya admin marketplace!`
@@ -319,10 +321,10 @@ export default function ClaimPasscodeRevealerPage() {
                   </div>
 
                   <p className="text-xs text-slate-300 leading-relaxed text-left">
-                    Hemat lebih banyak! Pembelian repeat order langsung via <strong>Official Direct Store Akshara</strong> berbiaya <strong>10%–15% lebih murah</strong> dibanding Shopee karena 100% bebas dari potongan admin marketplace.
+                    Hemat lebih banyak! Pembelian repeat order langsung via <strong>Official Direct Store Akshara</strong> berbiaya <strong>10%–15% lebih murah</strong> dibanding marketplace karena 100% bebas dari potongan admin.
                   </p>
 
-                  <div className="p-3.5 rounded-xl bg-black/60 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="p-3.5 rounded-xl bg-black/60 border border-amber-500/30 flex flex-col lg:flex-row items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <span className="text-xs font-mono text-slate-400">Kode Voucher VIP:</span>
                       <code className="text-sm font-mono font-bold text-amber-300 tracking-wider bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
@@ -330,23 +332,31 @@ export default function ClaimPasscodeRevealerPage() {
                       </code>
                     </div>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
                       <button
                         type="button"
                         onClick={() => handleCopy(vipCode)}
-                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs font-mono text-amber-300 border border-amber-500/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                        className="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs font-mono text-amber-300 border border-amber-500/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                       >
                         <Copy className="w-3.5 h-3.5" />
                         <span>Salin Kode VIP</span>
                       </button>
 
+                      <Link
+                        href={`/?vip=${encodeURIComponent(vipCode)}#katalog`}
+                        className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-xs font-bold text-slate-950 shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        <span>Belanja Storefront VIP</span>
+                      </Link>
+
                       <a
                         href={waLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                        className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                       >
-                        <span>Klaim Diskon via WA</span>
+                        <span>Klaim via WA</span>
                         <ExternalLink className="w-3.5 h-3.5" />
                       </a>
                     </div>
@@ -399,10 +409,10 @@ export default function ClaimPasscodeRevealerPage() {
                   Saat Anda menekan tombol di bawah, <strong>waktu pembukaan detik ini, IP Address, dan perangkat Anda akan dicatat permanen</strong> sebagai bukti transaksi resmi ke server Shopee.
                 </li>
                 <li>
-                  <strong>Wajib merekam video unboxing tanpa jeda / no-cut</strong> dari sebelum menekan tombol buka sampai berhasil login ke dalam game.
+                  <strong>Wajib merekam video rekam layar (screen recording) tanpa jeda / no-cut</strong> dari sebelum menekan tombol buka sampai berhasil login ke dalam game.
                 </li>
                 <li>
-                  Segala bentuk klaim akun bermasalah setelah kredensial dibuka tidak akan dilayani tanpa video unboxing no-cut dari detik awal.
+                  Segala bentuk klaim akun bermasalah setelah kredensial dibuka tidak akan dilayani tanpa video rekaman layar no-cut dari detik awal.
                 </li>
               </ul>
             </div>

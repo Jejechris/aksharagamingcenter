@@ -174,7 +174,7 @@ def generate_game_canvas(
         "100% Garansi Uang Kembali",
         "Pengiriman Otomatis 1-5 Menit",
         "0% Hackback Anti-Komplain",
-        "Termasuk Kartu Garansi Fisik A6"
+        "Kartu Garansi Digital QR"
     ]
     feats = features or default_features
     grid_y = max(current_y + 20, 580)
@@ -189,7 +189,7 @@ def generate_game_canvas(
         (560, grid_y + 120)
     ]
 
-    icons = ["[GARANSI]", "[INSTAN]", "[AMAN]", "[FISIK A6]"]
+    icons = ["[GARANSI]", "[INSTAN]", "[AMAN]", "[QR DIGITAL]"]
 
     for idx, feat in enumerate(feats[:4]):
         fx, fy = positions[idx]

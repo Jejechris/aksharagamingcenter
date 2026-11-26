@@ -37,7 +37,8 @@ function getTempPath(id: string): string {
 export async function saveHostedMedia(
   rawId: string,
   mimeType: string,
-  base64Data: string
+  base64Data: string,
+  replacePrefix?: string
 ): Promise<{ ok: boolean; id: string; persistedDb: boolean }> {
   const safeId = rawId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 96);
   if (!safeId || safeId.length < 4) {
@@ -56,6 +57,15 @@ export async function saveHostedMedia(
            created_at = NOW()`,
         [safeId, mimeType, base64Data]
       );
+      if (replacePrefix) {
+        const cleanPrefix = replacePrefix.replace(/[^a-zA-Z0-9_-]/g, "");
+        if (cleanPrefix.length >= 4) {
+          await queryDb(
+            `DELETE FROM hosted_media WHERE id LIKE $1 AND id <> $2`,
+            [`${cleanPrefix}%`, safeId]
+          ).catch(() => {});
+        }
+      }
       persistedDb = true;
     } catch (err) {
       console.warn("[MediaHost] DB upsert failed, saving temp fallback:", err);
@@ -71,6 +81,44 @@ export async function saveHostedMedia(
   } catch {}
 
   return { ok: true, id: safeId, persistedDb };
+}
+
+export async function getHostedMediaStats(): Promise<{
+  totalCount: number;
+  totalBytes: number;
+}> {
+  if (await ensureHostedMediaTable()) {
+    try {
+      const rows = await queryDb<{ total_count: string; total_chars: string }>(
+        `SELECT COUNT(*)::text AS total_count,
+                COALESCE(SUM(LENGTH(data_base64)), 0)::text AS total_chars
+         FROM hosted_media`
+      );
+      const totalCount = Number(rows[0]?.total_count || 0);
+      const totalChars = Number(rows[0]?.total_chars || 0);
+      return {
+        totalCount,
+        totalBytes: Math.round((totalChars * 3) / 4),
+      };
+    } catch {}
+  }
+  return { totalCount: 0, totalBytes: 0 };
+}
+
+export async function pruneOldHostedMedia(olderThanDays = 30): Promise<number> {
+  const safeDays = Math.max(1, Math.min(365, Math.floor(olderThanDays)));
+  if (await ensureHostedMediaTable()) {
+    try {
+      const rows = await queryDb<{ id: string }>(
+        `DELETE FROM hosted_media
+         WHERE created_at < NOW() - ($1::int * INTERVAL '1 day')
+         RETURNING id`,
+        [safeDays]
+      );
+      return Array.isArray(rows) ? rows.length : 0;
+    } catch {}
+  }
+  return 0;
 }
 
 export async function getHostedMedia(

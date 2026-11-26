@@ -70,6 +70,9 @@ export default function MassUploadStudio() {
   const [rulesPreviewDataUrl, setRulesPreviewDataUrl] = useState<string>("");
   const [customArtUrlInput, setCustomArtUrlInput] = useState<string>("");
   const [isRenderingSingle, setIsRenderingSingle] = useState<boolean>(false);
+  const [brokenCandidateIds, setBrokenCandidateIds] = useState<Record<string, boolean>>({});
+  const [mediaStats, setMediaStats] = useState<{ totalCount: number; totalBytes: number } | null>(null);
+  const [isPruningMedia, setIsPruningMedia] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
@@ -123,8 +126,39 @@ export default function MassUploadStudio() {
     }
   };
 
+  const fetchMediaStats = async () => {
+    try {
+      const res = await fetch("/api/shopee/host-media", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.stats) setMediaStats(json.stats);
+      }
+    } catch {}
+  };
+
+  const handlePruneOldMedia = async () => {
+    setIsPruningMedia(true);
+    try {
+      const res = await fetch("/api/shopee/host-media?olderThanDays=30", { method: "DELETE" });
+      const json = await res.json();
+      if (res.ok) {
+        if (json.stats) setMediaStats(json.stats);
+        showToast(
+          json.deletedCount > 0
+            ? `✅ ${json.deletedCount} gambar lama (>30 hari) berhasil dibersihkan dari database.`
+            : "Database media sudah bersih (tidak ada file >30 hari)."
+        );
+      }
+    } catch {
+      showToast("Gagal membersihkan media lama.", "error");
+    } finally {
+      setIsPruningMedia(false);
+    }
+  };
+
   useEffect(() => {
     loadRows();
+    fetchMediaStats();
   }, []);
 
   const selectedRows = useMemo(() => rows.filter((r) => r.selected), [rows]);
@@ -252,6 +286,7 @@ export default function MassUploadStudio() {
           `✅ ${selectedRows.length} Cover unik & Slide 2 Aturan Digital berhasil di-render! Klik thumbnail untuk preview besar.`
         );
       }
+      fetchMediaStats();
     } catch (err: any) {
       showToast(err?.message || "Gagal memproses gambar batch.", "error");
     } finally {
@@ -499,6 +534,22 @@ export default function MassUploadStudio() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {mediaStats && (
+              <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-mono text-slate-600">
+                <span>
+                  DB Media: <strong className="text-slate-900">{mediaStats.totalCount}</strong> file (
+                  {Math.max(1, Math.round(mediaStats.totalBytes / 1024))} KB)
+                </span>
+                <button
+                  type="button"
+                  disabled={isPruningMedia}
+                  onClick={handlePruneOldMedia}
+                  className="text-indigo-700 hover:underline font-sans font-semibold cursor-pointer disabled:opacity-40"
+                >
+                  {isPruningMedia ? "..." : "Bersihkan >30H"}
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={loadRows}
@@ -1092,7 +1143,9 @@ export default function MassUploadStudio() {
                   {Array.isArray(previewRow.artwork_candidates) &&
                   previewRow.artwork_candidates.length > 0 ? (
                     <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
-                      {previewRow.artwork_candidates.map((cand) => {
+                      {previewRow.artwork_candidates
+                        .filter((cand) => !brokenCandidateIds[cand.id])
+                        .map((cand) => {
                         const isPicked = previewRow.selected_artwork_url === cand.rawUrl;
                         return (
                           <button
@@ -1113,6 +1166,9 @@ export default function MassUploadStudio() {
                             <img
                               src={cand.proxyUrl}
                               alt={cand.label}
+                              onError={() =>
+                                setBrokenCandidateIds((prev) => ({ ...prev, [cand.id]: true }))
+                              }
                               className="w-full h-14 object-cover bg-slate-100"
                             />
                             <span className="block px-1 py-0.5 text-[9px] text-slate-600 truncate">
