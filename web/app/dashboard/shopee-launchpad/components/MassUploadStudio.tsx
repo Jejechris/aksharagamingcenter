@@ -43,6 +43,7 @@ interface MassUploadRow extends ShopeeMassProductInput {
   has_artwork?: boolean;
   artwork_candidates?: ArtworkCandidate[];
   selected_artwork_url?: string;
+  frame_color?: string;
 }
 
 export default function MassUploadStudio() {
@@ -216,6 +217,7 @@ export default function MassUploadStudio() {
             warrantyDays,
             publicOrigin: cleanOrigin,
             customArtworkUrl: target.selected_artwork_url,
+            customFrameColor: target.frame_color,
           });
           if (!rendered.hasArtwork) missedArtworkCount++;
           setRows((prev) =>
@@ -229,6 +231,7 @@ export default function MassUploadStudio() {
                     has_artwork: rendered.hasArtwork,
                     artwork_candidates: rendered.artworkCandidates,
                     selected_artwork_url: rendered.selectedArtworkUrl,
+                    frame_color: rendered.frameColor,
                   }
                 : row
             )
@@ -256,7 +259,11 @@ export default function MassUploadStudio() {
     }
   };
 
-  const handleRenderSingleCover = async (rowId: string, overrideArtworkUrl?: string) => {
+  const handleRenderSingleCover = async (
+    rowId: string,
+    overrideArtworkUrl?: string,
+    overrideFrameColor?: string | null
+  ) => {
     const target = rows.find((r) => r.id === rowId);
     if (!target) return;
     const cleanOrigin = (publicOrigin || DEFAULT_VERCEL_ORIGIN).trim().replace(/\/$/, "");
@@ -271,6 +278,12 @@ export default function MassUploadStudio() {
         currentRulesUrl = rulesRes.publicUrl;
         setRulesPreviewDataUrl(rulesRes.previewDataUrl);
       }
+      const nextFrameColor =
+        overrideFrameColor === null
+          ? undefined
+          : overrideFrameColor !== undefined
+          ? overrideFrameColor
+          : target.frame_color;
       const rendered = await renderAndHostBatchCover({
         id: target.id,
         title: target.title,
@@ -280,6 +293,7 @@ export default function MassUploadStudio() {
         warrantyDays,
         publicOrigin: cleanOrigin,
         customArtworkUrl: overrideArtworkUrl ?? target.selected_artwork_url,
+        customFrameColor: nextFrameColor,
       });
       setRows((prev) =>
         prev.map((row) =>
@@ -295,6 +309,7 @@ export default function MassUploadStudio() {
                     ? rendered.artworkCandidates
                     : row.artwork_candidates,
                 selected_artwork_url: rendered.selectedArtworkUrl,
+                frame_color: rendered.frameColor,
               }
             : row
         )
@@ -1000,8 +1015,55 @@ export default function MassUploadStudio() {
                 )}
               </div>
 
-              {/* Right Column: Artwork Picker & Custom Upload */}
+              {/* Right Column: Artwork Picker, Frame Color & Custom Upload */}
               <div className="md:col-span-5 space-y-4">
+                <div className="space-y-1.5 pb-2 border-b border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700">
+                      Warna Border Frame
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isRenderingSingle}
+                      onClick={() => handleRenderSingleCover(previewRow.id, undefined, null)}
+                      className="text-[10px] font-semibold text-indigo-700 hover:underline cursor-pointer disabled:opacity-40"
+                    >
+                      Reset Otomatis
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { label: "Charcoal", hex: "#18181B" },
+                      { label: "Emerald", hex: "#059669" },
+                      { label: "Royal Blue", hex: "#1E3A8A" },
+                      { label: "Crimson", hex: "#881337" },
+                      { label: "Bronze", hex: "#78350F" },
+                      { label: "Slate Navy", hex: "#0F172A" },
+                    ].map((sw) => (
+                      <button
+                        key={sw.hex}
+                        type="button"
+                        disabled={isRenderingSingle}
+                        onClick={() => handleRenderSingleCover(previewRow.id, undefined, sw.hex)}
+                        title={sw.label}
+                        className={`w-6 h-6 rounded-md border transition-transform cursor-pointer hover:scale-110 ${
+                          previewRow.frame_color?.toUpperCase() === sw.hex.toUpperCase()
+                            ? "ring-2 ring-slate-900 ring-offset-1 border-white"
+                            : "border-slate-300"
+                        }`}
+                        style={{ backgroundColor: sw.hex }}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={previewRow.frame_color || "#18181B"}
+                      onChange={(e) => handleRenderSingleCover(previewRow.id, undefined, e.target.value)}
+                      title="Pilih warna kustom"
+                      className="w-7 h-6 p-0 border border-slate-300 rounded cursor-pointer bg-white"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900">

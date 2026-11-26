@@ -1,6 +1,6 @@
 # Akshara Gaming Center — Multi-Device Handoff & Sync Guide
 
-> **Canonical Handoff Document (Updated through FASE 20)**  
+> **Canonical Handoff Document (Updated through FASE 21+ — Shopee Mass Upload & Pure Digital QR)**  
 > **Repository:** `https://github.com/Jejechris/aksharagamingcenter.git` (`main`)  
 > **Legacy Reference:** [AKSHARA_PROJECT_CONTEXT_HANDOVER.md](./AKSHARA_PROJECT_CONTEXT_HANDOVER.md) *(arsip awal Oktober 2026 — gunakan dokumen ini sebagai status terbaru)*
 
@@ -33,7 +33,11 @@ Karena riwayat chat Antigravity tersimpan lokal di tiap perangkat (`~/.gemini/an
     - Route redirect aktif: `/dashboard/risk-officer` -> `/dashboard/stock-sentry?tab=risk`, `/dashboard/risk` -> `/dashboard/stock-sentry?tab=risk`, `/dashboard/stock` -> `/dashboard/stock-sentry`.
   - **Catalog Radar (`/dashboard/catalog`) & Auto-Find Sellers (`/api/catalog/auto-find-sellers`)**: Smart Seller Finder langsung dari API live G2G SLS dengan filter anti-clickbait/price-floor, scoring reputasi, badge trust, serta filter `Hanya Seller Aman (≥ 95% & ≥ 20 Transaksi)`.
   - **Eneba CDKey Terminal (`/dashboard/eneba`)**: Filter region/platform dengan slug `drms[]` resmi Eneba yang sudah diverifikasi, resolver URL bebas-0-hasil (`web/lib/eneba.ts`), plus rating & trust tier badge.
-  - **Shopee 4-Step Launchpad (`/dashboard/shopee-launchpad`) & Thumbnail Studio**: Wizard 4 langkah + unified `ThumbnailStudio` canvas 1080x1080 + safe image proxy (`/api/image-proxy`) dan multi-source artwork (`/api/ai/game-artwork`) bebas Unsplash acak.
+  - **Shopee Launchpad & Mass Upload Studio (`/dashboard/shopee-launchpad`)**:
+  - Mode 1 (**Wizard Satuan 4-Step**): `ThumbnailStudio` canvas 1080×1080 + judul SEO + SOP Pure Digital bebas URL + kalkulasi harga (`web/lib/pricing.ts`).
+  - Mode 2 (**Batch Mass Upload `.xlsx`**): Terintegrasi di tab `Batch Mass Upload (.xlsx)` & shortcut `/dashboard/catalog`. Menghasilkan file Excel resmi Seller Centre 38 kolom (`ps_category|0|0`, signature `basic,32d05d7b1ef8cb794e3c2d4c91ae9cb8,0,1935832174`, sheet `Template` + `Kategori`, variasi garansi 30H/90H, serta mode Mass Update Harga & Stok).
+  - **Public Image Hosting & Batch Renderer**: `web/lib/batchThumbnailRenderer.ts` merender Cover Slide 1 (1:1/full-bleed untuk square art seperti Minecraft + Ambient Blur bebas potong untuk poster portrait + warna border harmonis/customizable + dog-ear peel + logo platform) & Slide 2 Rules, mengunggah ke `POST /api/shopee/host-media` (tersimpan permanen di tabel PostgreSQL `hosted_media` via `web/lib/mediaHost.ts`), dan dilayani publik tanpa auth di `GET /api/public/media/[filename]` (bypass di `web/middleware.ts`, default origin `https://asksharagaming.vercel.app`).
+- **100% Pure Digital & Zero-Link Shopee QR Workflow**: Seluruh modul website (`description`, `formatter`, `marketer`, `claims`, `shopee-launchpad`, `orders/finalize`) telah dihapus dari opsi pengiriman fisik/amplop/kartu A6 fisik. Pengiriman Shopee bebas tautan URL eksternal tersensor dan diganti dengan **Kartu Akses & Sertifikat Garansi Digital PNG ber-QR** (`web/lib/digitalWarrantyCard.ts`, tombol `Kartu QR` + `Chat Shopee` di `/dashboard/claims`).
   - **Tools Operasional**: `/dashboard/quant` (Kalkulator Margin/BEP, biaya packaging digital `Rp 0`), `/dashboard/description`, `/dashboard/formatter`, `/dashboard/research`, `/dashboard/claims`, `/dashboard/autonomous`, `/dashboard/bot`, `/dashboard/health`, `/dashboard/support`.
   - **Komponen & Library Penting**:
     - `web/lib/sellerTrust.ts`: Composite Trust & Value Score (0–100: 40% harga/margin, 35% rating, 15% volume order, 10% stok & kecepatan kirim), klasifikasi `Safe (A+)` / `Moderate (B)` / `Caution (C)`, serta hard-reject rule untuk rating `< 92%` atau transaksi rendah mencurigakan.
@@ -106,10 +110,15 @@ python -m py_compile bot/market_sentry.py bot/telegram_commander.py bot/eneba_da
 
 ---
 
-## 5. Status Terkini (Per FASE 20)
+## 5. Status Terkini (Per FASE 21+ — Siap Pindah Device)
 
-- **Selesai:** FASE 7 s/d FASE 20 — Pemisahan total antara **Internal Admin Command Center (`web/`)** dan **Public Storefront + Warranty Verifier + Claim Vault (`claim-web/`)**, penguncian middleware `web/`, serta provisioning PostgreSQL least-privilege role `akshara_public_portal`.
+- **Selesai:**
+  - **FASE 7 s/d FASE 20**: Pemisahan penuh antara **Internal Admin Command Center (`web/` -> `https://asksharagaming.vercel.app`)** dan **Public Storefront + Warranty Verifier + Claim Vault (`claim-web/` -> `https://claimakshara.vercel.app`)**, penguncian middleware `web/`, serta provisioning PostgreSQL least-privilege role `akshara_public_portal`.
+  - **FASE 21+ (Shopee Mass Upload Studio + Pure Digital Zero-Link QR)**: Penghapusan total mode amplop/kartu fisik dari website, konversi Shopee Chat & Deskripsi menjadi Zero-Link + Kartu Akses Digital PNG ber-QR (`web/lib/digitalWarrantyCard.ts`), Shopee Mass Upload `.xlsx` Generator (`web/lib/shopeeMassUpload.ts` + `MassUploadStudio.tsx`), Public Media Host PostgreSQL (`hosted_media`), dan Visual Cover Inspector Modal dengan default domain `https://asksharagaming.vercel.app`.
 - **Catatan Penting Environment (`web/.env.local`, `claim-web/.env.local`, & Vercel):**
   - Pastikan project Vercel **`claimakshara`** memakai environment variable `DATABASE_URL` dengan role **`akshara_public_portal.<ref>`** dan `VAULT_ENCRYPTION_SECRET` yang identik dengan project admin `web/`.
   - Pastikan `VAULT_ENCRYPTION_SECRET` terisi string acak 32+ karakter di lokal & Vercel agar enkripsi kredensial di brankas aman.
-- **Tugas Berikutnya:** Verifikasi/sinkronkan env project Vercel untuk `claim-web` bila deploy ke production, lalu siap melanjutkan fase berikutnya setelah `git pull` terbaru dari `origin/main`.
+- **Panduan Lanjut di Device Baru:**
+  1. `git pull origin main`
+  2. Cek apakah `.env`, `web/.env.local`, `claim-web/.env.local` sudah terpasang (file env tidak pernah di-push ke git).
+  3. Jalankan `cd web && npm install` (termasuk package `exceljs` yang baru ditambahkan) sebelum menjalankan `npm run dev` atau `npm run build`.

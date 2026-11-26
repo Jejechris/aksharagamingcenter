@@ -27,17 +27,36 @@ const PLATFORM_THEME_MAP: Record<
 
 function resolveTheme(title: string, platform: string) {
   const low = `${title} ${platform}`.toLowerCase();
-  if (low.includes("minecraft") || low.includes("mojang")) return PLATFORM_THEME_MAP.minecraft;
-  if (/\b(rockstar)\b|grand theft auto|\bgta\b|red dead/i.test(low)) return PLATFORM_THEME_MAP.rockstar;
-  if (/\b(ea|ea app|electronic arts|ea sports|fifa|fc\s?2[456])\b/i.test(low)) return PLATFORM_THEME_MAP.ea;
-  if (low.includes("xbox") || low.includes("microsoft")) return PLATFORM_THEME_MAP.xbox;
-  if (low.includes("playstation") || /\bps[45n]\b/i.test(low)) return PLATFORM_THEME_MAP.playstation;
-  if (/\bepic\b/i.test(low)) return PLATFORM_THEME_MAP.epic;
-  if (low.includes("ubisoft")) return PLATFORM_THEME_MAP.ubisoft;
-  if (low.includes("battle.net") || low.includes("blizzard")) return PLATFORM_THEME_MAP.battlenet;
-  if (low.includes("valorant") || low.includes("riot")) return PLATFORM_THEME_MAP.valorant;
-  if (low.includes("roblox")) return PLATFORM_THEME_MAP.roblox;
-  return PLATFORM_THEME_MAP.steam;
+  // Game-specific curated frame colors first (matches ThumbnailStudio aesthetic)
+  if (low.includes("minecraft") || low.includes("mojang")) {
+    return { ...PLATFORM_THEME_MAP.minecraft, frame: "#059669", preferCuratedColor: true };
+  }
+  if (/grand theft auto|\bgta\b/i.test(low)) {
+    return { ...PLATFORM_THEME_MAP.rockstar, frame: "#18181B", preferCuratedColor: true };
+  }
+  if (/red dead/i.test(low)) {
+    return { ...PLATFORM_THEME_MAP.rockstar, frame: "#881337", preferCuratedColor: true };
+  }
+  if (/wukong/i.test(low)) {
+    return { ...PLATFORM_THEME_MAP.steam, frame: "#1E3A8A", preferCuratedColor: true };
+  }
+  if (/terraria/i.test(low)) {
+    return { ...PLATFORM_THEME_MAP.steam, frame: "#047857", preferCuratedColor: true };
+  }
+  if (/\b(rockstar)\b/i.test(low)) return { ...PLATFORM_THEME_MAP.rockstar, preferCuratedColor: false };
+  if (/\b(ea|ea app|electronic arts|ea sports|fifa|fc\s?2[456])\b/i.test(low)) {
+    return { ...PLATFORM_THEME_MAP.ea, preferCuratedColor: false };
+  }
+  if (low.includes("xbox") || low.includes("microsoft")) return { ...PLATFORM_THEME_MAP.xbox, preferCuratedColor: false };
+  if (low.includes("playstation") || /\bps[45n]\b/i.test(low)) {
+    return { ...PLATFORM_THEME_MAP.playstation, preferCuratedColor: false };
+  }
+  if (/\bepic\b/i.test(low)) return { ...PLATFORM_THEME_MAP.epic, preferCuratedColor: false };
+  if (low.includes("ubisoft")) return { ...PLATFORM_THEME_MAP.ubisoft, preferCuratedColor: false };
+  if (low.includes("battle.net") || low.includes("blizzard")) return { ...PLATFORM_THEME_MAP.battlenet, preferCuratedColor: false };
+  if (low.includes("valorant") || low.includes("riot")) return { ...PLATFORM_THEME_MAP.valorant, preferCuratedColor: false };
+  if (low.includes("roblox")) return { ...PLATFORM_THEME_MAP.roblox, preferCuratedColor: false };
+  return { ...PLATFORM_THEME_MAP.steam, preferCuratedColor: false };
 }
 
 function loadImageSafe(src: string): Promise<HTMLImageElement | null> {
@@ -59,8 +78,8 @@ function loadImageSafe(src: string): Promise<HTMLImageElement | null> {
 }
 
 /**
- * Ekstrak warna border harmonis dari gambar poster agar setiap cover terasa menyatu
- * namun tetap vibrant dan kontras dengan teks judul putih.
+ * Ekstrak warna border harmonis dari mayoritas area poster menggunakan histogram bucket
+ * sehingga piksel kecil yang mencolok (misal langit biru kecil di sudut) tidak mengalahkan warna utama poster.
  */
 function extractVibrantFrameColor(img: HTMLImageElement, fallbackHex: string): string {
   try {
@@ -72,10 +91,10 @@ function extractVibrantFrameColor(img: HTMLImageElement, fallbackHex: string): s
     sctx.drawImage(img, 0, 0, 24, 24);
     const { data } = sctx.getImageData(0, 0, 24, 24);
 
-    let bestR = 0;
-    let bestG = 0;
-    let bestB = 0;
-    let bestScore = -1;
+    const buckets = new Map<
+      string,
+      { count: number; sumR: number; sumG: number; sumB: number; satSum: number }
+    >();
 
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
@@ -86,25 +105,43 @@ function extractVibrantFrameColor(img: HTMLImageElement, fallbackHex: string): s
       const sat = max === 0 ? 0 : (max - min) / max;
       const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
-      // Abaikan piksel terlalu putih (judul putih susah dibaca) atau hitam pekat
-      if (lum > 0.72 || lum < 0.12) continue;
-      const score = sat * 2.2 + (0.45 - Math.abs(lum - 0.42));
-      if (score > bestScore) {
-        bestScore = score;
-        bestR = r;
-        bestG = g;
-        bestB = b;
-      }
+      // Abaikan piksel terlalu terang atau hampir hitam murni
+      if (lum > 0.72 || lum < 0.08) continue;
+
+      const key = `${Math.floor(r / 32)}-${Math.floor(g / 32)}-${Math.floor(b / 32)}`;
+      const prev = buckets.get(key) || { count: 0, sumR: 0, sumG: 0, sumB: 0, satSum: 0 };
+      prev.count += 1;
+      prev.sumR += r;
+      prev.sumG += g;
+      prev.sumB += b;
+      prev.satSum += sat;
+      buckets.set(key, prev);
     }
 
-    if (bestScore < 0) return fallbackHex;
+    let bestBucket: { count: number; sumR: number; sumG: number; sumB: number; satSum: number } | null = null;
+    let bestRank = -1;
+    buckets.forEach((bk) => {
+      if (bk.count < 8) return; // Abaikan aksen kecil di bawah ~1.5% gambar
+      const avgSat = bk.satSum / bk.count;
+      const rank = bk.count * (1 + avgSat * 0.8);
+      if (rank > bestRank) {
+        bestRank = rank;
+        bestBucket = bk;
+      }
+    });
 
-    // Pastikan kontras aman dengan teks judul putih (darken ringan jika agak terang)
-    const lum = (0.299 * bestR + 0.587 * bestG + 0.114 * bestB) / 255;
-    const factor = lum > 0.52 ? 0.52 / lum : lum < 0.2 ? 1.25 : 1;
-    const rr = Math.min(220, Math.max(15, Math.round(bestR * factor)));
-    const gg = Math.min(220, Math.max(15, Math.round(bestG * factor)));
-    const bb = Math.min(220, Math.max(15, Math.round(bestB * factor)));
+    if (!bestBucket) return fallbackHex;
+    const chosen = bestBucket as { count: number; sumR: number; sumG: number; sumB: number };
+    const rAvg = chosen.sumR / chosen.count;
+    const gAvg = chosen.sumG / chosen.count;
+    const bAvg = chosen.sumB / chosen.count;
+
+    // Pastikan kontras nyaman dengan teks judul putih
+    const lum = (0.299 * rAvg + 0.587 * gAvg + 0.114 * bAvg) / 255;
+    const factor = lum > 0.46 ? 0.46 / lum : lum < 0.16 ? 1.15 : 1;
+    const rr = Math.min(200, Math.max(18, Math.round(rAvg * factor)));
+    const gg = Math.min(200, Math.max(18, Math.round(gAvg * factor)));
+    const bb = Math.min(200, Math.max(18, Math.round(bAvg * factor)));
     return `#${rr.toString(16).padStart(2, "0")}${gg.toString(16).padStart(2, "0")}${bb.toString(16).padStart(2, "0")}`;
   } catch {
     return fallbackHex;
@@ -170,14 +207,19 @@ export async function renderAndHostBatchCover(params: {
   warrantyDays?: number;
   publicOrigin: string;
   customArtworkUrl?: string;
+  customFrameColor?: string;
 }): Promise<{
   publicUrl: string;
   previewDataUrl: string;
   hasArtwork: boolean;
   artworkCandidates: ArtworkCandidate[];
   selectedArtworkUrl: string;
+  frameColor: string;
 }> {
-  const { frame: defaultFrame, badgeAsset, shape } = resolveTheme(params.title, params.platform);
+  const { frame: defaultFrame, badgeAsset, shape, preferCuratedColor } = resolveTheme(
+    params.title,
+    params.platform
+  );
   const storeBrandName = "Akshara Gaming Center";
 
   // Fetch official game artwork candidates via internal API
@@ -230,7 +272,11 @@ export async function renderAndHostBatchCover(params: {
   }
 
   const artImg = await loadImageSafe(artworkSrc);
-  const frameColor = artImg ? extractVibrantFrameColor(artImg, defaultFrame) : defaultFrame;
+  const frameColor =
+    params.customFrameColor?.trim() ||
+    (preferCuratedColor || !artImg
+      ? defaultFrame
+      : extractVibrantFrameColor(artImg, defaultFrame));
 
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
@@ -277,39 +323,47 @@ export async function renderAndHostBatchCover(params: {
   const boxH = 926;
 
   if (artImg) {
-    // --- SMART AMBIENT BLUR FIT (Zero Cropping, Poster 100% Utuh) ---
-    const bgScale = Math.max(boxW / artImg.width, boxH / artImg.height) * 1.2;
-    const bgW = artImg.width * bgScale;
-    const bgH = artImg.height * bgScale;
-    const bgX = 54 + (boxW - bgW) / 2;
-    const bgY = 100 + (boxH - bgH) / 2;
+    const imgRatio = artImg.width / artImg.height;
+    const boxRatio = boxW / boxH;
 
-    ctx.save();
-    ctx.filter = "blur(28px) brightness(0.6)";
-    ctx.drawImage(artImg, bgX, bgY, bgW, bgH);
-    ctx.restore();
+    if (Math.abs(imgRatio - boxRatio) <= 0.16) {
+      // Poster kotak / near-square (seperti Minecraft 1:1): Full-bleed rapi tanpa celah hitam kiri/kanan!
+      const coverScale = Math.max(boxW / artImg.width, boxH / artImg.height);
+      const drawW = artImg.width * coverScale;
+      const drawH = artImg.height * coverScale;
+      const dx = 54 + (boxW - drawW) / 2;
+      const dy = 100 + (boxH - drawH) / 2;
+      ctx.drawImage(artImg, dx, dy, drawW, drawH);
+    } else {
+      // --- SMART AMBIENT BLUR FIT (Zero Cropping untuk poster portrait/landscape) ---
+      const bgScale = Math.max(boxW / artImg.width, boxH / artImg.height) * 1.25;
+      const bgW = artImg.width * bgScale;
+      const bgH = artImg.height * bgScale;
+      const bgX = 54 + (boxW - bgW) / 2;
+      const bgY = 100 + (boxH - bgH) / 2;
 
-    // Subtle dark tint over ambient blur
-    ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
-    ctx.fillRect(54, 100, boxW, boxH);
+      ctx.save();
+      ctx.filter = "blur(32px) brightness(0.68)";
+      ctx.drawImage(artImg, bgX, bgY, bgW, bgH);
+      ctx.restore();
 
-    // Center Crisp Poster at Natural Aspect Ratio
-    const scale = Math.min(boxW / artImg.width, boxH / artImg.height);
-    const cw = artImg.width * scale;
-    const ch = artImg.height * scale;
-    const cx = 54 + (boxW - cw) / 2;
-    const cy = 100 + (boxH - ch) / 2;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+      ctx.fillRect(54, 100, boxW, boxH);
 
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.65)";
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 8;
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(cx, cy, cw, ch);
-    ctx.restore();
+      const scale = Math.min(boxW / artImg.width, boxH / artImg.height);
+      const cw = artImg.width * scale;
+      const ch = artImg.height * scale;
+      const cx = 54 + (boxW - cw) / 2;
+      const cy = 100 + (boxH - ch) / 2;
 
-    ctx.drawImage(artImg, cx, cy, cw, ch);
+      ctx.save();
+      ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 6;
+      ctx.drawImage(artImg, cx, cy, cw, ch);
+      ctx.restore();
+    }
   } else {
     const grad = ctx.createLinearGradient(54, 100, 1026, 1026);
     grad.addColorStop(0, "#18181b");
@@ -456,6 +510,7 @@ export async function renderAndHostBatchCover(params: {
     hasArtwork: Boolean(artImg),
     artworkCandidates,
     selectedArtworkUrl,
+    frameColor,
   };
 }
 
