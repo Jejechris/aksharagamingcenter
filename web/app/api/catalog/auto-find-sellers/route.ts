@@ -6,7 +6,13 @@ import {
   getG2GDirectOfferUrl,
   getG2GGameCategoryUrl,
 } from "@/lib/g2g";
-import { evaluateSellerTrust, TrustTier } from "@/lib/sellerTrust";
+import {
+  evaluateSellerTrust,
+  evaluateSteamAccountFreshness,
+  isSteamAccountProduct,
+  FreshnessStatus,
+  TrustTier,
+} from "@/lib/sellerTrust";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +39,10 @@ interface SearchOfferItem {
   sellerRating?: number;
   sellerOrders?: number;
   priceIdr?: number;
+  freshStatus?: FreshnessStatus;
+  hasZeroHours?: boolean;
+  hasFirstEmail?: boolean;
+  freshnessBadges?: string[];
 }
 
 // Lapis 1: Blacklist Clickbait, Shared, Cracked, dan Non-Full-Access
@@ -51,12 +61,17 @@ function hasClickbaitSignals(text: string): boolean {
   for (const b of CLICKBAIT_BLACKLIST) {
     if (text.includes(b)) return true;
   }
+  // Cek pola hackback (0-300 hours played, 10+ hours, old account, archive, other paid games, dsb.)
+  const freshness = evaluateSteamAccountFreshness(text);
+  if (freshness.is_rejected_hackback_risk) {
+    return true;
+  }
   // Ban check: hindari false positive jika listing menulis "no ban" atau "unbanned"
   if (text.includes("banned") && !text.includes("unbanned") && !text.includes("no banned") && !text.includes("not banned")) {
     return true;
   }
-  if (/(\bban\b|\bhypixel ban\b)/i.test(text)) {
-    if (!/(\bno ban\b|\bnot ban\b|\bnever ban\b|\bunban|\bzero ban\b)/i.test(text)) {
+  if (/(\bban\b|\bbans\b|\bhypixel ban\b)/i.test(text)) {
+    if (!/(\bno bans?\b|\bnot ban\b|\bnever ban\b|\bunban|\bzero bans?\b)/i.test(text)) {
       return true;
     }
   }
@@ -95,64 +110,77 @@ async function searchG2GOffersForSlug(slug: string): Promise<SearchOfferItem[]> 
     Origin: "https://www.g2g.com",
   };
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
 
-    const [resRec, resLowest] = await Promise.all([
-      fetch(
-        `https://sls.g2g.com/offer/search?seo_term=${slug}&currency=IDR&country=ID&page_size=40`,
-        { headers, signal: controller.signal, cache: "no-store" }
-      ).catch(() => null),
-      fetch(
-        `https://sls.g2g.com/offer/search?seo_term=${slug}&currency=IDR&country=ID&sort=lowest_price&page_size=40`,
-        { headers, signal: controller.signal, cache: "no-store" }
-      ).catch(() => null),
-    ]);
+      const [resRec, resLowest] = await Promise.all([
+        fetch(
+          `https://sls.g2g.com/offer/search?seo_term=${slug}&currency=IDR&country=ID&page_size=40`,
+          { headers, signal: controller.signal, cache: "no-store" }
+        ).catch(() => null),
+        fetch(
+          `https://sls.g2g.com/offer/search?seo_term=${slug}&currency=IDR&country=ID&sort=lowest_price&page_size=40`,
+          { headers, signal: controller.signal, cache: "no-store" }
+        ).catch(() => null),
+      ]);
 
-    clearTimeout(timeout);
+      clearTimeout(timeout);
 
-    const map = new Map<string, SearchOfferItem>();
+      const map = new Map<string, SearchOfferItem>();
 
-    if (resRec && resRec.ok) {
-      const j = await resRec.json();
-      const results = j?.payload?.results;
-      if (Array.isArray(results)) {
-        for (const item of results) {
-          if (item.offer_id) map.set(item.offer_id, item);
-        }
-      }
-    }
-
-    if (resLowest && resLowest.ok) {
-      const j = await resLowest.json();
-      const results = j?.payload?.results;
-      if (Array.isArray(results)) {
-        for (const item of results) {
-          if (item.offer_id && !map.has(item.offer_id)) {
-            map.set(item.offer_id, item);
+      if (resRec && resRec.ok) {
+        const j = await resRec.json();
+        const results = j?.payload?.results;
+        if (Array.isArray(results)) {
+          for (const item of results) {
+            if (item.offer_id) map.set(item.offer_id, item);
           }
         }
       }
-    }
 
-    return Array.from(map.values());
-  } catch (err) {
-    console.warn(`[Auto-Find Sellers] Error querying slug ${slug}:`, err);
+      if (resLowest && resLowest.ok) {
+        const j = await resLowest.json();
+        const results = j?.payload?.results;
+        if (Array.isArray(results)) {
+          for (const item of results) {
+            if (item.offer_id && !map.has(item.offer_id)) {
+              map.set(item.offer_id, item);
+            }
+          }
+        }
+      }
+
+      if (map.size > 0 || attempt === 1) {
+        return Array.from(map.values());
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    } catch (err) {
+      if (attempt === 1) {
+        console.warn(`[Auto-Find Sellers] Error querying slug ${slug}:`, err);
+      }
+    }
   }
   return [];
 }
 
-// 4 Lapis Filter & Composite Trust/Value Scoring Engine (0-100)
+// 4 Lapis Filter, Anti-Hackback Freshness Guard & Composite Trust/Value Scoring Engine (0-100)
 function processBestSellers(
   offers: SearchOfferItem[],
   gameTitle: string,
   sellingPrice: number,
-  safeOnly: boolean = false
+  safeOnly: boolean = false,
+  freshOnly: boolean = true,
+  platform: string = "",
+  category: string = ""
 ): {
   selectedSellers: any[];
   allCleanSellers: any[];
   filteredClickbaitCount: number;
+  filteredNonFreshCount: number;
+  verifiedFreshCount: number;
+  freshFallbackWarning: boolean;
   cleanCandidatesCount: number;
 } | null {
   if (!Array.isArray(offers) || offers.length === 0) return null;
@@ -213,9 +241,14 @@ function processBestSellers(
       sellerLevel: o.seller_level,
       verified: o.verified,
       priceFloorIdr: floor,
+      offerTitle: o.title,
+      offerDescription: o.description,
+      platform,
+      category,
+      gameTitle,
     });
 
-    // Hard Reject (<92% rating or low-transaction scam bait)
+    // Hard Reject (<92% rating, low-transaction scam bait, or played/hackback risk)
     if (trustEval.is_hard_rejected) {
       filteredClickbaitCount++;
       continue;
@@ -227,10 +260,11 @@ function processBestSellers(
       continue;
     }
 
-    // Bonus listing clarity on top of Composite Trust Score
+    // Bonus listing clarity + Steam Freshness (0 Hours / Original Email / Full Data Change)
+    const freshness = evaluateSteamAccountFreshness(`${o.title || ""} ${o.description || ""}`);
     const titleLower = (o.title || "").toLowerCase();
-    let clarityBonus = 0;
-    if (titleLower.includes("full access") || /\bfa\b/.test(titleLower)) clarityBonus += 5;
+    let clarityBonus = freshness.freshness_bonus;
+    if (titleLower.includes("full access") || /\bfa\b/.test(titleLower)) clarityBonus += 4;
     if (
       titleLower.includes("original email") ||
       titleLower.includes("first mail") ||
@@ -238,7 +272,7 @@ function processBestSellers(
       titleLower.includes("key") ||
       titleLower.includes("cdkey")
     ) {
-      clarityBonus += 5;
+      clarityBonus += 4;
     }
 
     scoredCandidates.push({
@@ -248,27 +282,52 @@ function processBestSellers(
       trustTier: trustEval.trust_tier,
       sellerRating: trustEval.seller_rating,
       sellerOrders: trustEval.seller_orders,
+      freshStatus: freshness.fresh_status,
+      hasZeroHours: freshness.has_zero_hours,
+      hasFirstEmail: freshness.has_first_email,
+      freshnessBadges: freshness.badges,
       qualityScore: Math.min(100, trustEval.trust_score + clarityBonus),
     });
   }
 
   if (scoredCandidates.length === 0) return null;
 
-  // Deduplikasi berdasarkan seller: simpan offer dengan Trust & Quality Score tertinggi per seller
+  // Deduplikasi berdasarkan seller: simpan offer dengan Freshness + Trust & Quality Score tertinggi per seller
   const sellerMap = new Map<string, typeof scoredCandidates[0]>();
   for (const c of scoredCandidates) {
     const exist = sellerMap.get(c.username);
+    const cFreshRank = c.freshStatus === "verified_fresh" ? 1 : 0;
+    const existFreshRank = exist?.freshStatus === "verified_fresh" ? 1 : 0;
     if (
       !exist ||
-      (c.qualityScore || 0) > (exist.qualityScore || 0) ||
-      ((c.qualityScore || 0) === (exist.qualityScore || 0) &&
-        (c.priceIdr || 0) < (exist.priceIdr || 0))
+      cFreshRank > existFreshRank ||
+      (cFreshRank === existFreshRank &&
+        ((c.qualityScore || 0) > (exist.qualityScore || 0) ||
+          ((c.qualityScore || 0) === (exist.qualityScore || 0) &&
+            (c.priceIdr || 0) < (exist.priceIdr || 0))))
     ) {
       sellerMap.set(c.username, c);
     }
   }
 
-  const cleanCandidates = Array.from(sellerMap.values());
+  const dedupedCandidates = Array.from(sellerMap.values());
+  const isSteamGame = isSteamAccountProduct(platform, category, gameTitle);
+  const verifiedFreshCandidates = dedupedCandidates.filter((c) => c.freshStatus === "verified_fresh");
+  const verifiedFreshCount = verifiedFreshCandidates.length;
+
+  let cleanCandidates = dedupedCandidates;
+  let filteredNonFreshCount = 0;
+  let freshFallbackWarning = false;
+
+  if (freshOnly && isSteamGame) {
+    if (verifiedFreshCandidates.length > 0) {
+      filteredNonFreshCount = dedupedCandidates.length - verifiedFreshCandidates.length;
+      cleanCandidates = verifiedFreshCandidates;
+    } else {
+      freshFallbackWarning = true;
+    }
+  }
+
   const cleanCandidatesCount = cleanCandidates.length;
 
   // 1. Best Value (Termurah yang lolos Hard Reject & Trust Filter)
@@ -355,6 +414,10 @@ function processBestSellers(
       delivery_speed: offer.delivery_speed === "instant" ? "Instant Delivery" : "Fast Delivery",
       is_online: Boolean(offer.is_online),
       is_recommended: isRecommended,
+      fresh_status: offer.freshStatus || trust.fresh_status || "unverified",
+      has_zero_hours: Boolean(offer.hasZeroHours ?? trust.has_zero_hours),
+      has_first_email: Boolean(offer.hasFirstEmail ?? trust.has_first_email),
+      freshness_badges: offer.freshnessBadges || trust.freshness_badges || [],
       profile_url: directUrl,
       fallback_search_url: catUrl,
       offer_id: offer.offer_id,
@@ -390,6 +453,8 @@ function processBestSellers(
 
   // Kumpulkan semua kandidat bersih (maks 10 terbaik dari seluruh cleanCandidates) untuk preview/sortir admin sebelum simpan ke DB
   const allRankedCandidates = [...cleanCandidates].sort((a, b) => {
+    const fDiff = (b.freshStatus === "verified_fresh" ? 1 : 0) - (a.freshStatus === "verified_fresh" ? 1 : 0);
+    if (fDiff !== 0) return fDiff;
     const scoreDiff = (b.qualityScore || 0) - (a.qualityScore || 0);
     if (scoreDiff !== 0) return scoreDiff;
     return (a.priceIdr || 0) - (b.priceIdr || 0);
@@ -404,7 +469,15 @@ function processBestSellers(
     return buildSellerItem(cand, tier, cand.username === selectedSellers[0]?.seller_name);
   });
 
-  return { selectedSellers, allCleanSellers, filteredClickbaitCount, cleanCandidatesCount };
+  return {
+    selectedSellers,
+    allCleanSellers,
+    filteredClickbaitCount,
+    filteredNonFreshCount,
+    verifiedFreshCount,
+    freshFallbackWarning,
+    cleanCandidatesCount,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -412,6 +485,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { game_id, title, mode, safeOnly } = body;
     const filterSafeOnly = Boolean(safeOnly);
+    const filterFreshOnly = body.freshOnly === undefined ? true : Boolean(body.freshOnly);
     const previewOnly = Boolean(body.preview_only);
 
     const catalog = await readAuthoritativeCatalog();
@@ -485,6 +559,7 @@ export async function POST(req: NextRequest) {
     if (mode === "all") {
       let updatedCount = 0;
       let totalFilteredClickbait = 0;
+      let totalFilteredNonFresh = 0;
       const logs: string[] = [];
       const changedIds: string[] = [];
       const batchPreviews: any[] = [];
@@ -500,11 +575,15 @@ export async function POST(req: NextRequest) {
               offers,
               game.title,
               game.selling_price_shopee_idr || 100000,
-              filterSafeOnly
+              filterSafeOnly,
+              filterFreshOnly,
+              game.platform || "",
+              game.category || ""
             );
 
             if (processed && processed.selectedSellers.length > 0) {
               totalFilteredClickbait += processed.filteredClickbaitCount;
+              totalFilteredNonFresh += processed.filteredNonFreshCount;
               const bestCandidate = processed.selectedSellers[0];
               const sellingPrice = game.selling_price_shopee_idr || 100000;
               const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
@@ -520,11 +599,15 @@ export async function POST(req: NextRequest) {
                 batchPreviews.push({
                   game_id: game.id,
                   game_title: game.title,
+                  platform: game.platform || "Steam",
                   selling_price_shopee_idr: sellingPrice,
                   current_selected_seller_id: game.selected_seller_id,
                   recommended_selected_seller_id: bestCandidate.seller_id,
                   candidates: processed.allCleanSellers,
                   filtered_out_clickbait_count: processed.filteredClickbaitCount,
+                  filtered_out_non_fresh_count: processed.filteredNonFreshCount,
+                  verified_fresh_count: processed.verifiedFreshCount,
+                  fresh_fallback_warning: processed.freshFallbackWarning,
                   clean_candidates_count: processed.cleanCandidatesCount,
                   total_raw_offers: offers.length,
                 });
@@ -565,11 +648,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         status: "success",
         preview_only: previewOnly,
+        fresh_only: filterFreshOnly,
         message: previewOnly
-          ? `Preview siap: Ditemukan kandidat seller bersih untuk ${updatedCount} game (${totalFilteredClickbait} clickbait disaring). Silakan cek & sortir sebelum menyimpan.`
-          : `Autonomous Seller Finder berhasil menyegarkan ${updatedCount} game (${totalFilteredClickbait} listing clickbait/shared diblokir otomatis).`,
+          ? `Preview siap: ${updatedCount} game bersih disiapkan (${totalFilteredClickbait} clickbait/hackback & ${totalFilteredNonFresh} non-0h disaring). Silakan review & sortir.`
+          : `Autonomous Seller Finder berhasil menyegarkan ${updatedCount} game (${totalFilteredClickbait} clickbait/hackback & ${totalFilteredNonFresh} non-0h diblokir).`,
         updated_count: updatedCount,
         filtered_out_clickbait_count: totalFilteredClickbait,
+        filtered_out_non_fresh_count: totalFilteredNonFresh,
         batch_previews: previewOnly ? batchPreviews : undefined,
         allGames: catalog,
         logs,
@@ -607,13 +692,16 @@ export async function POST(req: NextRequest) {
       offers,
       targetGame.title,
       targetGame.selling_price_shopee_idr || 100000,
-      filterSafeOnly
+      filterSafeOnly,
+      filterFreshOnly,
+      targetGame.platform || "",
+      targetGame.category || ""
     );
 
     if (!processed || processed.selectedSellers.length === 0) {
       return NextResponse.json({
         status: "warning",
-        message: `Semua ${offers.length} penawaran untuk "${targetGame.title}" terindikasi clickbait / shared / harga tidak wajar dan diblokir demi keamanan pembeli.`,
+        message: `Semua ${offers.length} penawaran untuk "${targetGame.title}" terindikasi clickbait / played hours / shared dan diblokir demi keamanan anti-hackback.`,
         game: targetGame,
         allGames: catalog,
         filtered_out_clickbait_count: offers.length,
@@ -634,11 +722,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         status: "success",
         preview_only: true,
-        message: `Ditemukan ${processed.allCleanSellers.length} kandidat seller bersih (${processed.filteredClickbaitCount} clickbait/shared disaring). Cek & sortir sebelum menerapkan ke database.`,
+        fresh_only: filterFreshOnly,
+        message: `Ditemukan ${processed.allCleanSellers.length} kandidat bersih (${processed.filteredClickbaitCount} hackback/clickbait & ${processed.filteredNonFreshCount} non-0h disaring).`,
         game: targetGame,
         recommended_selected_seller_id: bestCandidate.seller_id,
         sellers: processed.allCleanSellers,
         filtered_out_clickbait_count: processed.filteredClickbaitCount,
+        filtered_out_non_fresh_count: processed.filteredNonFreshCount,
+        verified_fresh_count: processed.verifiedFreshCount,
+        fresh_fallback_warning: processed.freshFallbackWarning,
         clean_candidates_count: processed.cleanCandidatesCount,
         total_raw_offers: offers.length,
       });

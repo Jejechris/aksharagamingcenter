@@ -11,16 +11,25 @@ import {
   Star,
   AlertTriangle,
 } from "lucide-react";
-import { formatOrdersCompact, getTrustTierBadgeStyle } from "@/lib/sellerTrust";
+import {
+  formatOrdersCompact,
+  getTrustTierBadgeStyle,
+  getFreshnessBadgeStyle,
+  evaluateSteamAccountFreshness,
+} from "@/lib/sellerTrust";
 
 export interface SellerPreviewGameEntry {
   game_id: string;
   game_title: string;
+  platform?: string;
   selling_price_shopee_idr: number;
   current_selected_seller_id?: string;
   recommended_selected_seller_id?: string;
   candidates: any[];
   filtered_out_clickbait_count?: number;
+  filtered_out_non_fresh_count?: number;
+  verified_fresh_count?: number;
+  fresh_fallback_warning?: boolean;
   clean_candidates_count?: number;
   total_raw_offers?: number;
 }
@@ -50,6 +59,7 @@ export default function SellerReviewModal({
 }: SellerReviewModalProps) {
   const [sortBy, setSortBy] = useState<SellerSortKey>("trust_desc");
   const [safeOnly, setSafeOnly] = useState<boolean>(false);
+  const [freshOnly, setFreshOnly] = useState<boolean>(true);
   const [hideLowMargin, setHideLowMargin] = useState<boolean>(false);
 
   // Per-game selections: checked seller IDs + chosen primary seller ID + whether game is included
@@ -77,6 +87,7 @@ export default function SellerReviewModal({
       setPrimarySellerByGame(primMap);
       setSortBy("trust_desc");
       setSafeOnly(false);
+      setFreshOnly(true);
       setHideLowMargin(false);
     }
   }, [open, previews]);
@@ -90,9 +101,22 @@ export default function SellerReviewModal({
 
   const sortedPreviews = useMemo(() => {
     return previews.map((p) => {
+      const hasAnyVerifiedFresh = (p.candidates || []).some(
+        (c: any) =>
+          (c.fresh_status || evaluateSteamAccountFreshness(c.offer_title).fresh_status) ===
+          "verified_fresh"
+      );
       const filtered = (p.candidates || []).filter((s: any) => {
-        if (safeOnly && (Number(s.seller_rating ?? s.rating_pct ?? 0) < 95 || Number(s.seller_orders ?? s.reviews_count ?? 0) < 20)) {
+        if (
+          safeOnly &&
+          (Number(s.seller_rating ?? s.rating_pct ?? 0) < 95 ||
+            Number(s.seller_orders ?? s.reviews_count ?? 0) < 20)
+        ) {
           return false;
+        }
+        if (freshOnly && hasAnyVerifiedFresh) {
+          const fs = s.fresh_status || evaluateSteamAccountFreshness(s.offer_title).fresh_status;
+          if (fs !== "verified_fresh") return false;
         }
         if (hideLowMargin && Number(s.net_margin_pct ?? 0) < 10) {
           return false;
@@ -105,11 +129,14 @@ export default function SellerReviewModal({
           return (b.seller_rating || b.rating_pct || 0) - (a.seller_rating || a.rating_pct || 0) || (b.seller_orders || 0) - (a.seller_orders || 0);
         }
         if (sortBy === "stock_desc") return (b.stock || 0) - (a.stock || 0);
+        const fA = a.fresh_status === "verified_fresh" ? 1 : 0;
+        const fB = b.fresh_status === "verified_fresh" ? 1 : 0;
+        if (fB !== fA) return fB - fA;
         return (b.trust_score || 0) - (a.trust_score || 0) || (a.price_g2g_idr || 0) - (b.price_g2g_idr || 0);
       });
       return { ...p, visibleCandidates: sorted };
     });
-  }, [previews, sortBy, safeOnly, hideLowMargin]);
+  }, [previews, sortBy, safeOnly, freshOnly, hideLowMargin]);
 
   if (!open) return null;
 
@@ -236,6 +263,18 @@ export default function SellerReviewModal({
 
             <button
               type="button"
+              onClick={() => setFreshOnly(!freshOnly)}
+              className={`px-2.5 py-1.5 rounded-lg border font-medium transition-colors cursor-pointer ${
+                freshOnly
+                  ? "bg-teal-600 text-white border-teal-600"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              🛡️ 0h Fresh / OGE Saja (Anti-Hackback)
+            </button>
+
+            <button
+              type="button"
               onClick={() => setHideLowMargin(!hideLowMargin)}
               className={`px-2.5 py-1.5 rounded-lg border font-medium transition-colors cursor-pointer ${
                 hideLowMargin
@@ -279,11 +318,21 @@ export default function SellerReviewModal({
                       <h3 className="text-sm font-bold text-slate-900">{p.game_title}</h3>
                       <p className="text-[11px] font-mono text-slate-500">
                         Harga Jual Shopee: <strong className="text-slate-800">{formatRp(p.selling_price_shopee_idr)}</strong> •{" "}
-                        {p.visibleCandidates.length} kandidat tampil ({p.filtered_out_clickbait_count || 0} clickbait disaring)
+                        {p.visibleCandidates.length} kandidat tampil ({p.filtered_out_clickbait_count || 0} clickbait/hackback
+                        {p.filtered_out_non_fresh_count ? ` + ${p.filtered_out_non_fresh_count} non-0h` : ""} disaring)
                       </p>
                     </div>
                   </div>
                 </div>
+
+                {p.fresh_fallback_warning && (
+                  <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-800 flex items-center gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>
+                      <strong>Perhatian Anti-Hackback:</strong> Tidak ada listing G2G yang menulis eksplisit &quot;0 Hours / Fresh&quot; di judul saat ini. Wajib buka link G2G &amp; tanya seller sebelum order.
+                    </span>
+                  </div>
+                )}
 
                 <div className="divide-y divide-slate-100">
                   {p.visibleCandidates.length === 0 ? (
@@ -337,6 +386,33 @@ export default function SellerReviewModal({
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${getTrustTierBadgeStyle(s.trust_tier)}`}>
                                   {s.trust_tier || "Verified"} ({s.trust_score}/100)
                                 </span>
+                                {(() => {
+                                  const fEval = evaluateSteamAccountFreshness(s.offer_title || "");
+                                  const fs = s.fresh_status || (s.offer_title ? fEval.fresh_status : undefined);
+                                  const hasEmail = Boolean(s.has_first_email || fEval.has_first_email);
+                                  const isSteam =
+                                    String(p.platform || "").toLowerCase().includes("steam") ||
+                                    String(s.offer_title || "").toLowerCase().includes("steam");
+                                  if (!fs && !hasEmail) return null;
+                                  return (
+                                    <>
+                                      {fs === "verified_fresh" ? (
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${getFreshnessBadgeStyle("verified_fresh")}`}>
+                                          🛡️ 0h Fresh
+                                        </span>
+                                      ) : isSteam && fs === "unverified" ? (
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${getFreshnessBadgeStyle("unverified")}`}>
+                                          ⏳ Cek Jam Main
+                                        </span>
+                                      ) : null}
+                                      {hasEmail && (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-semibold bg-sky-50 text-sky-700 border-sky-200">
+                                          ✉️ First Email / OGE
+                                        </span>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                                 <span className="text-[11px] font-mono text-slate-600 flex items-center gap-0.5 tabular-nums">
                                   <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
                                   {Number(s.seller_rating ?? s.rating_pct ?? 0).toFixed(1)}% •{" "}

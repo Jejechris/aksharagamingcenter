@@ -170,6 +170,8 @@ export default function ResearchCenterPage() {
     fetchScannedGames();
   }, []);
 
+  const [freshSteamOnly, setFreshSteamOnly] = useState(true);
+
   // Trigger Autonomous Robot Crawler (Real G2G SLS Live Extraction)
   const handleRunRobotScanner = async () => {
     setIsScanningBot(true);
@@ -183,7 +185,7 @@ export default function ResearchCenterPage() {
       const res = await fetch("/api/research/g2g-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "crawl", preview_only: true }),
+        body: JSON.stringify({ action: "crawl", preview_only: true, freshOnly: freshSteamOnly }),
       });
       const json = await res.json();
 
@@ -746,6 +748,22 @@ export default function ResearchCenterPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <label
+              title="Anti-Hackback: Prioritaskan & saring offer Steam ke akun 0 Hours Played / Fresh New Account + Original Email"
+              className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 cursor-pointer select-none transition-colors ${
+                freshSteamOnly
+                  ? "bg-teal-50 border-teal-300 text-teal-900"
+                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={freshSteamOnly}
+                onChange={(e) => setFreshSteamOnly(e.target.checked)}
+                className="rounded text-teal-600 focus:ring-teal-500"
+              />
+              <span>🛡️ Steam 0h Fresh Only</span>
+            </label>
             <button
               onClick={handleRunRobotScanner}
               disabled={isScanningBot}

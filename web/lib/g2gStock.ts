@@ -10,6 +10,8 @@ export interface G2GLiveOfferResult {
   offer_id: string;
   product_url: string;
   seller_name: string;
+  offer_title?: string;
+  offer_description?: string;
   status: "live" | "delisted" | "sold_out" | "unknown";
   is_sold_out: boolean;
   available_qty: number;
@@ -186,6 +188,8 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
       offer_id: payload.offer_id || offerId,
       product_url: resolveG2GProductUrl(payload.offer_id || offerId, payload.username),
       seller_name: payload.username || "G2G Seller",
+      offer_title: typeof payload.title === "string" ? payload.title : undefined,
+      offer_description: typeof payload.description === "string" ? payload.description : undefined,
       status,
       is_sold_out: isSoldOut,
       available_qty: availableQty,

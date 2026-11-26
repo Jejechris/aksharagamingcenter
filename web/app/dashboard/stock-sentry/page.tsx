@@ -139,6 +139,7 @@ function SentryRiskHubContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "CRITICAL" | "SAFE">("ALL");
   const [safeOnlyFilter, setSafeOnlyFilter] = useState(false);
+  const [freshSteamOnlyFilter, setFreshSteamOnlyFilter] = useState(true);
 
   // Live Sync Audit State
   const [isAuditing, setIsAuditing] = useState(false);
@@ -446,6 +447,7 @@ function SentryRiskHubContent() {
           title: gameTitle,
           mode: "single",
           safeOnly: safeOnlyFilter,
+          freshOnly: freshSteamOnlyFilter,
           preview_only: true,
         }),
       });
@@ -456,11 +458,15 @@ function SentryRiskHubContent() {
           {
             game_id: gameId,
             game_title: target?.title || gameTitle,
+            platform: target?.platform,
             selling_price_shopee_idr: target?.selling_price_shopee_idr || 100000,
             current_selected_seller_id: target?.selected_seller_id,
             recommended_selected_seller_id: json.recommended_selected_seller_id,
             candidates: json.sellers,
             filtered_out_clickbait_count: json.filtered_out_clickbait_count,
+            filtered_out_non_fresh_count: json.filtered_out_non_fresh_count,
+            verified_fresh_count: json.verified_fresh_count,
+            fresh_fallback_warning: json.fresh_fallback_warning,
             clean_candidates_count: json.clean_candidates_count,
             total_raw_offers: json.total_raw_offers,
           },
@@ -868,6 +874,23 @@ function SentryRiskHubContent() {
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
                 <span>Hanya Seller Aman (&ge;95% &amp; &ge;20 Transaksi)</span>
+              </label>
+
+              <label
+                title="Anti-Hackback: Prioritaskan seller Steam 0 Hours Played / Fresh saat mencari pengganti"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer select-none transition-colors ${
+                  freshSteamOnlyFilter
+                    ? "bg-teal-50 border-teal-300 text-teal-900"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={freshSteamOnlyFilter}
+                  onChange={(e) => setFreshSteamOnlyFilter(e.target.checked)}
+                  className="rounded text-teal-600 focus:ring-teal-500"
+                />
+                <span>🛡️ 0h Fresh Steam</span>
               </label>
             </div>
           )}

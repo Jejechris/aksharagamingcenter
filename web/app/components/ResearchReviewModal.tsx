@@ -328,6 +328,16 @@ export default function ResearchReviewModal({
                               ESTIMATED
                             </span>
                           )}
+                          {g.fresh_status === "verified_fresh" && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                              <ShieldCheck className="w-3 h-3" /> 0h Fresh
+                            </span>
+                          )}
+                          {g.has_first_email && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                              ✉️ First Email / OGE
+                            </span>
+                          )}
                           {isUnviable && (
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" /> TIDAK LAYAK / OVERPRICED

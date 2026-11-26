@@ -6,7 +6,13 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { readAuthoritativeCatalog, addOrUpdateGame, bulkAddOrUpdateGames } from "@/lib/catalog";
-import { evaluateSellerTrust, TrustTier } from "@/lib/sellerTrust";
+import {
+  evaluateSellerTrust,
+  evaluateSteamAccountFreshness,
+  isSteamAccountProduct,
+  FreshnessStatus,
+  TrustTier,
+} from "@/lib/sellerTrust";
 import { getPersistedResearchGames, savePersistedResearchGames, deletePersistedResearchGame } from "@/lib/marketResearch";
 
 export interface G2GScannedGame {
@@ -42,6 +48,11 @@ export interface G2GScannedGame {
   crawl_timestamp: string;
   tactical_reason: string;
   is_live_extracted?: boolean;
+  offer_title?: string;
+  fresh_status?: FreshnessStatus;
+  has_zero_hours?: boolean;
+  has_first_email?: boolean;
+  freshness_badges?: string[];
 }
 
 // 25+ Comprehensive factual game listings from g2g.com market categories
@@ -769,6 +780,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const action = body.action || "crawl";
     const previewOnly = Boolean(body.preview_only);
+    const freshOnly = body.freshOnly === undefined ? true : Boolean(body.freshOnly);
 
     if (action === "save_research") {
       const items = Array.isArray(body.games) ? body.games : body.game ? [body.game] : [];
@@ -798,6 +810,7 @@ export async function POST(req: Request) {
           {
             seller_id: `g2g-${(item.seller_name || "seller").toLowerCase().replace(/[^a-z0-9]/g, "")}`,
             seller_name: item.seller_name || "G2G Verified Seller",
+            offer_title: item.offer_title,
             rating_pct: Number(item.seller_rating_pct) || 99.5,
             reviews_count: Number(item.seller_reviews_count) || 10000,
             price_g2g_idr: Number(item.price_g2g_idr) || 20000,
@@ -807,6 +820,10 @@ export async function POST(req: Request) {
             tier: item.supplier_tier || "ultra_safe",
             tier_label: item.supplier_tier === "ultra_safe" ? "🛡️ TOP VERIFIED" : "⚡ LOWEST PRICE",
             tier_desc: "Diimpor langsung oleh Autonomous G2G Arbitrage Crawler.",
+            fresh_status: item.fresh_status || "unverified",
+            has_zero_hours: Boolean(item.has_zero_hours),
+            has_first_email: Boolean(item.has_first_email),
+            freshness_badges: Array.isArray(item.freshness_badges) ? item.freshness_badges : [],
             is_recommended: true,
             profile_url: resolveG2GProductUrl(item.g2g_direct_url || item.profile_url, item.seller_name, item.title),
             fallback_search_url: getG2GSellerUrl(item.seller_name, item.title),
@@ -842,6 +859,7 @@ export async function POST(req: Request) {
           {
             seller_id: `g2g-${(item.seller_name || "seller").toLowerCase().replace(/[^a-z0-9]/g, "")}`,
             seller_name: item.seller_name || "G2G Verified Seller",
+            offer_title: item.offer_title,
             rating_pct: Number(item.seller_rating_pct) || 99.5,
             reviews_count: Number(item.seller_reviews_count) || 10000,
             price_g2g_idr: Number(item.price_g2g_idr) || 20000,
@@ -851,6 +869,10 @@ export async function POST(req: Request) {
             tier: item.supplier_tier || "ultra_safe",
             tier_label: item.supplier_tier === "ultra_safe" ? "🛡️ TOP VERIFIED" : "⚡ LOWEST PRICE",
             tier_desc: "Diimpor langsung oleh Autonomous G2G Arbitrage Crawler.",
+            fresh_status: item.fresh_status || "unverified",
+            has_zero_hours: Boolean(item.has_zero_hours),
+            has_first_email: Boolean(item.has_first_email),
+            freshness_badges: Array.isArray(item.freshness_badges) ? item.freshness_badges : [],
             is_recommended: true,
             profile_url: resolveG2GProductUrl(item.g2g_direct_url || item.profile_url, item.seller_name, item.title),
             fallback_search_url: getG2GSellerUrl(item.seller_name, item.title),
@@ -903,11 +925,14 @@ export async function POST(req: Request) {
       for (const b of CRAWLER_BLACKLIST) {
         if (text.includes(b)) return true;
       }
+      if (evaluateSteamAccountFreshness(text).is_rejected_hackback_risk) {
+        return true;
+      }
       if (text.includes("banned") && !text.includes("unbanned") && !text.includes("no banned") && !text.includes("not banned")) {
         return true;
       }
-      if (/(\bban\b|\bhypixel ban\b)/i.test(text)) {
-        if (!/(\bno ban\b|\bnot ban\b|\bnever ban\b|\bunban|\bzero ban\b)/i.test(text)) {
+      if (/(\bban\b|\bbans\b|\bhypixel ban\b)/i.test(text)) {
+        if (!/(\bno bans?\b|\bnot ban\b|\bnever ban\b|\bunban|\bzero bans?\b)/i.test(text)) {
           return true;
         }
       }
@@ -927,7 +952,7 @@ export async function POST(req: Request) {
       pushLog(`[FETCH] Memindai live offer dari sls.g2g.com untuk kategori ${cat.slug}...`);
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
+        const timeout = setTimeout(() => controller.abort(), 11000);
         const searchRes = await fetch(
           `https://sls.g2g.com/offer/search?seo_term=${cat.slug}&currency=IDR&country=ID&sort=lowest_price&page_size=25`,
           {
@@ -962,6 +987,7 @@ export async function POST(req: Request) {
                 if (estIdr < priceFloor) return null;
 
                 const recShopee = Math.round((estIdr * 1.4) / 1000) * 1000;
+                const freshness = evaluateSteamAccountFreshness(textToCheck);
                 const trust = evaluateSellerTrust({
                   rating: r.satisfaction_rate,
                   orders: r.total_success_order ?? r.total_rating,
@@ -972,16 +998,44 @@ export async function POST(req: Request) {
                   deliverySpeed: r.delivery_speed,
                   isOnline: r.is_online,
                   priceFloorIdr: priceFloor,
+                  offerTitle: r.title,
+                  offerDescription: r.description,
+                  platform: cat.platform,
+                  category: "Account (Full Access)",
+                  gameTitle: cat.title,
                 });
 
                 if (trust.is_hard_rejected) return null;
 
-                return { raw: r, estIdr, recShopee, trust };
+                return { raw: r, estIdr, recShopee, trust, freshness };
               })
-              .filter(Boolean) as Array<{ raw: any; estIdr: number; recShopee: number; trust: ReturnType<typeof evaluateSellerTrust> }>;
+              .filter(Boolean) as Array<{
+                raw: any;
+                estIdr: number;
+                recShopee: number;
+                trust: ReturnType<typeof evaluateSellerTrust>;
+                freshness: ReturnType<typeof evaluateSteamAccountFreshness>;
+              }>;
 
-            evaluatedOffers.sort((a, b) => b.trust.trust_score - a.trust.trust_score || a.estIdr - b.estIdr);
-            const best = evaluatedOffers[0];
+            const isSteamCat = isSteamAccountProduct(cat.platform, "Account (Full Access)", cat.title);
+            const freshPool = evaluatedOffers.filter((o) => o.freshness.fresh_status === "verified_fresh");
+            const activePool =
+              freshOnly && isSteamCat && freshPool.length > 0 ? freshPool : evaluatedOffers;
+
+            if (freshOnly && isSteamCat && freshPool.length > 0 && evaluatedOffers.length > freshPool.length) {
+              pushLog(
+                `[ANTI-HACKBACK] ${cat.slug}: memilih ${freshPool.length} offer 0 Hours / Fresh (menyaring ${evaluatedOffers.length - freshPool.length} listing non-0h).`
+              );
+            }
+
+            activePool.sort((a, b) => {
+              const fDiff =
+                (b.freshness.fresh_status === "verified_fresh" ? 1 : 0) -
+                (a.freshness.fresh_status === "verified_fresh" ? 1 : 0);
+              if (fDiff !== 0) return fDiff;
+              return b.trust.trust_score - a.trust.trust_score || a.estIdr - b.estIdr;
+            });
+            const best = activePool[0];
 
             if (best) {
               const bestOffer = best.raw;
@@ -990,6 +1044,7 @@ export async function POST(req: Request) {
               const priceG2gIdr = best.estIdr > 0 ? best.estIdr : 35000;
               const stock = Number(bestOffer.available_qty ?? 0);
               const trust = best.trust;
+              const freshness = best.freshness;
 
               const recShopee = best.recShopee;
               const qrisFee = Math.round(priceG2gIdr * 0.007);
@@ -1029,11 +1084,16 @@ export async function POST(req: Request) {
                 competition_level: "Sedang",
                 arbitrage_verdict: netMargin >= 25 ? "SUPER_OPPORTUNITY" : "HIGH_MARGIN",
                 crawl_timestamp: "Live Ekstraksi",
-                tactical_reason: `Hasil ekstraksi live SLS: Seller ${sellerName} (${trust.trust_tier}, ★ ${trust.seller_rating}%) menawarkan harga Rp ${priceG2gIdr.toLocaleString("id-ID")} dengan sisa stok ${stock} unit.`,
+                tactical_reason: `${freshness.fresh_status === "verified_fresh" ? "🛡️ [0 HOURS FRESH] " : ""}Seller ${sellerName} (${trust.trust_tier}, ★ ${trust.seller_rating}%) • Rp ${priceG2gIdr.toLocaleString("id-ID")} (Stok ${stock} unit).`,
                 is_live_extracted: true,
+                offer_title: bestOffer.title || "",
+                fresh_status: freshness.fresh_status,
+                has_zero_hours: freshness.has_zero_hours,
+                has_first_email: freshness.has_first_email,
+                freshness_badges: freshness.badges,
               });
 
-              pushLog(`[EXTRACTED] ${cat.title} -> Seller ${sellerName} [${trust.trust_tier} ${trust.trust_score}/100] (Rp ${priceG2gIdr.toLocaleString("id-ID")}, Stok ${stock})`);
+              pushLog(`[EXTRACTED] ${cat.title} -> Seller ${sellerName} [${trust.trust_tier} ${trust.trust_score}/100]${freshness.fresh_status === "verified_fresh" ? " [0h Fresh]" : ""} (Rp ${priceG2gIdr.toLocaleString("id-ID")}, Stok ${stock})`);
             } else {
               pushLog(`[FILTERED] Kategori ${cat.slug}: seluruh kandidat tersaring oleh filter anti-clickbait & price floor.`);
             }

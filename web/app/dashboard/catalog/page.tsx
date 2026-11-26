@@ -13,7 +13,14 @@ import {
 } from 'lucide-react';
 import { getG2GSellerUrl, getG2GGameCategoryUrl, resolveG2GProductUrl, getG2GSellerProfileUrl, extractG2GOfferId } from '@/lib/g2g';
 import { getEnebaSearchUrl } from '@/lib/eneba';
-import { evaluateSellerTrust, formatOrdersCompact, getTrustTierBadgeStyle } from '@/lib/sellerTrust';
+import {
+  evaluateSellerTrust,
+  formatOrdersCompact,
+  getTrustTierBadgeStyle,
+  getFreshnessBadgeStyle,
+  evaluateSteamAccountFreshness,
+  FreshnessStatus,
+} from '@/lib/sellerTrust';
 import { calculateShopeeEconomics } from '@/lib/pricing';
 import ShopeeCompetitorModal from '@/app/components/ShopeeCompetitorModal';
 import SellerReviewModal, { SellerPreviewGameEntry } from '@/app/components/SellerReviewModal';
@@ -22,6 +29,10 @@ interface Seller {
   seller_id: string;
   seller_name: string;
   offer_title?: string;
+  fresh_status?: FreshnessStatus;
+  has_zero_hours?: boolean;
+  has_first_email?: boolean;
+  freshness_badges?: string[];
   quality_score?: number;
   rating_pct: number;
   reviews_count: number;
@@ -204,6 +215,7 @@ export default function CatalogDashboardPage() {
   const [isFindingAllSellers, setIsFindingAllSellers] = useState(false);
   const [findingSellerGameId, setFindingSellerGameId] = useState<string | null>(null);
   const [safeSellerOnly, setSafeSellerOnly] = useState(false);
+  const [freshSteamOnly, setFreshSteamOnly] = useState(true);
   const [sellerReviewOpen, setSellerReviewOpen] = useState(false);
   const [sellerReviewPreviews, setSellerReviewPreviews] = useState<SellerPreviewGameEntry[]>([]);
   const [isApplyingSellerReview, setIsApplyingSellerReview] = useState(false);
@@ -214,7 +226,7 @@ export default function CatalogDashboardPage() {
       const res = await fetch('/api/catalog/auto-find-sellers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'all', safeOnly: safeSellerOnly, preview_only: true }),
+        body: JSON.stringify({ mode: 'all', safeOnly: safeSellerOnly, freshOnly: freshSteamOnly, preview_only: true }),
       });
       const json = await res.json();
       if (res.ok && json.status === 'success') {
@@ -242,7 +254,7 @@ export default function CatalogDashboardPage() {
       const res = await fetch('/api/catalog/auto-find-sellers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_id: gameId, title, mode: 'single', safeOnly: safeSellerOnly, preview_only: true }),
+        body: JSON.stringify({ game_id: gameId, title, mode: 'single', safeOnly: safeSellerOnly, freshOnly: freshSteamOnly, preview_only: true }),
       });
       const json = await res.json();
       if (res.ok && json.status === 'success' && Array.isArray(json.sellers) && json.sellers.length > 0) {
@@ -251,11 +263,15 @@ export default function CatalogDashboardPage() {
           {
             game_id: gameId,
             game_title: target?.title || title,
+            platform: target?.platform,
             selling_price_shopee_idr: target?.selling_price_shopee_idr || 100000,
             current_selected_seller_id: target?.selected_seller_id,
             recommended_selected_seller_id: json.recommended_selected_seller_id,
             candidates: json.sellers,
             filtered_out_clickbait_count: json.filtered_out_clickbait_count,
+            filtered_out_non_fresh_count: json.filtered_out_non_fresh_count,
+            verified_fresh_count: json.verified_fresh_count,
+            fresh_fallback_warning: json.fresh_fallback_warning,
             clean_candidates_count: json.clean_candidates_count,
             total_raw_offers: json.total_raw_offers,
           },
@@ -1110,6 +1126,22 @@ export default function CatalogDashboardPage() {
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span>Hanya Seller Aman (≥ 95% & ≥ 20 Transaksi)</span>
           </label>
+          <label
+            title="Anti-Hackback: Prioritaskan & saring listing G2G Steam ke akun 0 Hours Played / Fresh New Account + Original Email"
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border shadow-xs text-xs font-medium cursor-pointer transition-colors shrink-0 ${
+              freshSteamOnly
+                ? "bg-teal-50 border-teal-300 text-teal-900"
+                : "bg-white border-slate-200 text-slate-700 hover:border-teal-300"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={freshSteamOnly}
+              onChange={(e) => setFreshSteamOnly(e.target.checked)}
+              className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+            />
+            <span>🛡️ 0h Fresh Steam (Anti-Hackback)</span>
+          </label>
         </div>
 
         {/* 3-TIER SOURCING STRATEGY BANNER */}
@@ -1771,6 +1803,30 @@ export default function CatalogDashboardPage() {
                                             );
                                           }
                                           return null;
+                                        })()}
+                                        {(() => {
+                                          const evalF = evaluateSteamAccountFreshness(s.offer_title || "");
+                                          const fs = s.fresh_status || (s.offer_title ? evalF.fresh_status : undefined);
+                                          const hasOge = Boolean(s.has_first_email || evalF.has_first_email);
+                                          return (
+                                            <>
+                                              {fs === "verified_fresh" && (
+                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${getFreshnessBadgeStyle("verified_fresh")}`}>
+                                                  0h Fresh
+                                                </span>
+                                              )}
+                                              {fs === "risky_played" && (
+                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${getFreshnessBadgeStyle("risky_played")}`}>
+                                                  Risiko Hackback
+                                                </span>
+                                              )}
+                                              {hasOge && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                                                  OGE
+                                                </span>
+                                              )}
+                                            </>
+                                          );
                                         })()}
                                       </div>
                                       {s.offer_title && (

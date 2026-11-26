@@ -5,7 +5,12 @@ import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { resolveG2GProductUrl, getG2GGameCategoryUrl } from "@/lib/g2g";
 import { verifyCronOrAdminRequest } from "@/lib/auth";
 import { calculateShopeeEconomics, calculateTargetSellingPrice } from "@/lib/pricing";
-import { evaluateSellerTrust, formatOrdersCompact } from "@/lib/sellerTrust";
+import {
+  evaluateSellerTrust,
+  evaluateSteamAccountFreshness,
+  isSteamAccountProduct,
+  formatOrdersCompact,
+} from "@/lib/sellerTrust";
 import { recordAlert } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +73,7 @@ export async function GET(req: NextRequest) {
       isSelected: boolean;
       ratingPct?: number;
       ordersCount?: number;
+      offerTitle?: string;
     }> = [];
 
     for (const game of catalog) {
@@ -89,6 +95,7 @@ export async function GET(req: NextRequest) {
               isSelected: s.seller_id === game.selected_seller_id,
               ratingPct: s.seller_rating ?? s.rating_pct,
               ordersCount: s.seller_orders ?? s.reviews_count,
+              offerTitle: s.offer_title,
             });
           }
         }
@@ -158,6 +165,9 @@ export async function GET(req: NextRequest) {
             priceIdr: livePriceIdr,
             sellingPriceShopeeIdr: item.sellingPriceShopeeIdr,
             isOnline: live.is_online,
+            offerTitle: live.offer_title || item.offerTitle,
+            offerDescription: live.offer_description,
+            gameTitle: item.gameTitle,
           });
 
           let priceAlert: "MARGIN_DANGER" | "NORMAL" = "NORMAL";
@@ -202,7 +212,9 @@ export async function GET(req: NextRequest) {
       if (audited.isSelected && audited.priceAlert === "MARGIN_DANGER") {
         const game = catalog.find((g: any) => g.id === audited.gameId);
         if (game && Array.isArray(game.sellers)) {
-          // Cari seller cadangan yang lolos Trust Guard (tidak hard-rejected, stok > 5, margin >= 15%) & prioritaskan Safe (A+)
+          // Cari seller cadangan yang lolos Trust Guard & Anti-Hackback (tidak hard-rejected, tidak risky_played, stok > 5, margin >= 15%)
+          // Untuk game Steam, prioritaskan backup yang Verified 0 Hours Fresh terlebih dahulu!
+          const isSteamGame = isSteamAccountProduct(game.platform, game.category, game.title);
           const qualifiedBackups = game.sellers
             .filter((s: any) => s.seller_id !== audited.sellerId)
             .map((s: any) => {
@@ -223,12 +235,20 @@ export async function GET(req: NextRequest) {
                 priceIdr: sPrice,
                 sellingPriceShopeeIdr: Number(game.selling_price_shopee_idr || 100000),
                 deliverySpeed: s.delivery_time || s.delivery_speed,
+                offerTitle: s.offer_title,
+                platform: game.platform,
+                category: game.category,
+                gameTitle: game.title,
               });
-              return { seller: s, sStock, sMargin, sStatus, sTrust };
+              const sFreshStatus =
+                s.fresh_status ||
+                (s.offer_title ? evaluateSteamAccountFreshness(s.offer_title).fresh_status : "unverified");
+              return { seller: s, sStock, sMargin, sStatus, sTrust, sFreshStatus };
             })
             .filter((cand: any) => {
               return (
                 !cand.sTrust.is_hard_rejected &&
+                cand.sFreshStatus !== "risky_played" &&
                 cand.sStock > 5 &&
                 cand.sMargin >= 15.0 &&
                 cand.sStatus !== "dead" &&
@@ -237,6 +257,11 @@ export async function GET(req: NextRequest) {
               );
             })
             .sort((a: any, b: any) => {
+              if (isSteamGame) {
+                const fA = a.sFreshStatus === "verified_fresh" ? 1 : 0;
+                const fB = b.sFreshStatus === "verified_fresh" ? 1 : 0;
+                if (fB !== fA) return fB - fA;
+              }
               if (a.sTrust.trust_tier === "Safe (A+)" && b.sTrust.trust_tier !== "Safe (A+)") return -1;
               if (b.sTrust.trust_tier === "Safe (A+)" && a.sTrust.trust_tier !== "Safe (A+)") return 1;
               return b.sTrust.trust_score - a.sTrust.trust_score;
