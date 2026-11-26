@@ -66,33 +66,35 @@ export default function ClaimHomePage() {
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col justify-between">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur-md">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-4xl mx-auto px-3 sm:px-6 min-h-[60px] py-2 sm:py-0 sm:h-16 flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Link
               href="/"
-              className="btn-secondary px-3 py-1.5 text-xs gap-1.5"
+              className="btn-secondary px-2.5 sm:px-3 py-1.5 text-xs gap-1.5 shrink-0"
+              aria-label="Kembali ke Storefront"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Storefront</span>
+              <span className="hidden sm:inline">Storefront</span>
             </Link>
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
                 <Shield className="w-4 h-4" />
               </div>
-              <div>
-                <span className="font-bold text-sm tracking-tight text-slate-900 block">
+              <div className="min-w-0">
+                <span className="font-bold text-xs sm:text-sm tracking-tight text-slate-900 block truncate">
                   Akshara Claim Vault
                 </span>
-                <span className="text-[10px] text-slate-500 font-mono tracking-wider uppercase">
+                <span className="hidden sm:block text-[10px] text-slate-500 font-mono tracking-wider uppercase truncate">
                   Secure Digital License Portal
                 </span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-mono font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              AES-256 ENCRYPTED
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] sm:text-[11px] font-mono font-semibold whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="sm:hidden">AES-256</span>
+              <span className="hidden sm:inline">AES-256 ENCRYPTED</span>
             </span>
           </div>
         </div>

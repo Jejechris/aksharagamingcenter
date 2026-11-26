@@ -1,6 +1,6 @@
 # Akshara Gaming Center — Multi-Device Handoff & Sync Guide
 
-> **Canonical Handoff Document (Updated through FASE 21+ — Shopee Mass Upload & Pure Digital QR)**  
+> **Canonical Handoff Document (Updated through FASE 22+ — Mobile Responsive, Anti-Hackback, Strict Guard, & Eneba Deep Discover)**  
 > **Repository:** `https://github.com/Jejechris/aksharagamingcenter.git` (`main`)  
 > **Legacy Reference:** [AKSHARA_PROJECT_CONTEXT_HANDOVER.md](./AKSHARA_PROJECT_CONTEXT_HANDOVER.md) *(arsip awal Oktober 2026 — gunakan dokumen ini sebagai status terbaru)*
 
@@ -113,12 +113,12 @@ python -m py_compile bot/market_sentry.py bot/telegram_commander.py bot/eneba_da
 
 ---
 
-## 5. Status Terkini (Per FASE 21+ — Siap Pindah Device)
+## 5. Status Terkini (Per FASE 22+ — Siap Pindah Device)
 
 - **Selesai:**
   - **FASE 7 s/d FASE 20**: Pemisahan penuh antara **Internal Admin Command Center (`web/` -> `https://asksharagaming.vercel.app`)** dan **Public Storefront + Warranty Verifier + Claim Vault (`claim-web/` -> `https://claimakshara.vercel.app`)**, penguncian middleware `web/`, serta provisioning PostgreSQL least-privilege role `akshara_public_portal`.
   - **FASE 21+ (Shopee Mass Upload Studio + Pure Digital Zero-Link QR)**: Penghapusan total mode amplop/kartu fisik dari website, konversi Shopee Chat & Deskripsi menjadi Zero-Link + Kartu Akses Digital PNG ber-QR (`web/lib/digitalWarrantyCard.ts`), Shopee Mass Upload `.xlsx` Generator (`web/lib/shopeeMassUpload.ts` + `MassUploadStudio.tsx`), Public Media Host PostgreSQL (`hosted_media`), dan Visual Cover Inspector Modal dengan default domain `https://asksharagaming.vercel.app`.
-  - **FASE 22+ (Shopee Strict Guard, Price & Incident Guard, & Anti-Hackback Steam 0-Hours Shield)**: Penyesuaian judul/deskripsi aman Shopee (`web/lib/shopeeCompliance.ts`), pusat insiden lonjakan harga & Circuit Breaker (`/dashboard/alerts`), penyaringan ketat Anti-Hackback Steam pada G2G (`freshOnly` default ON, pemblokiran akun played `>0h`/`0-300h`/`Community Ban`/`Corrupted Email`/`+ Bonus Games`/multi-game log, prioritas `0 Hours Fresh` + `OGE`), **Title Relevance Guard** + pencarian `&q=` untuk kategori umum (`steam-global-account`, `GTA V`), pemetaan `fc-26-accounts`, serta **Eneba Deep Multi-Page Auto-Discover** (`web/lib/marketResearch.ts`) berotasi dengan cursor `eneba_discover_cursor` & strategi diskon tanpa pengulangan game.
+  - **FASE 22+ (Shopee Strict Guard, Price & Incident Guard, Anti-Hackback Steam 0-Hours Shield, Eneba Deep Discover, & Mobile Responsive Overhaul)**: Penyesuaian judul/deskripsi aman Shopee (`web/lib/shopeeCompliance.ts`), pusat insiden lonjakan harga & Circuit Breaker (`/dashboard/alerts`), penyaringan ketat Anti-Hackback Steam pada G2G (`freshOnly` default ON, pemblokiran akun played `>0h`/`0-300h`/`Community Ban`/`Corrupted Email`/`+ Bonus Games`/multi-game log, prioritas `0 Hours Fresh` + `OGE`), **Title Relevance Guard** + pencarian `&q=` untuk kategori umum (`steam-global-account`, `GTA V`), pemetaan `fc-26-accounts`, **Eneba Deep Multi-Page Auto-Discover** (`web/lib/marketResearch.ts`), serta audit & perbaikan **100% Mobile Responsive (`375x812`, `0px` horizontal overflow)** di `web/` (shell `SidebarLayout.tsx`, mobile Bell sheet, stacked Alert Banner, card view mobile `md:hidden` untuk `MassUploadStudio`, `Catalog` seller drawer, `Claims`, `Stock Sentry`, `Operator`, serta perbaikan `Marketer`/`ThumbnailStudio`, `Quant`, `Research`, `Eneba`, `Shopee Launchpad`) dan `claim-web/` (`/`, `/claim`, `/claim/[code]`).
 - **Catatan Penting Environment (`web/.env.local`, `claim-web/.env.local`, & Vercel):**
   - Pastikan project Vercel **`claimakshara`** memakai environment variable `DATABASE_URL` dengan role **`akshara_public_portal.<ref>`** dan `VAULT_ENCRYPTION_SECRET` yang identik dengan project admin `web/`.
   - Pastikan `VAULT_ENCRYPTION_SECRET` terisi string acak 32+ karakter di lokal & Vercel agar enkripsi kredensial di brankas aman.

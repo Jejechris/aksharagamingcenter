@@ -1008,57 +1008,57 @@ export default function CatalogDashboardPage() {
         </div>
 
         {/* 4 KPI SUMMARY CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="app-card card-interactive animate-fade-up stagger-1 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500">Portofolio Game</span>
-              <div className="p-2 rounded-lg bg-slate-100 text-slate-600">
-                <Store className="w-4 h-4" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
+          <div className="app-card card-interactive animate-fade-up stagger-1 p-3.5 sm:p-5 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-2.5 sm:mb-3">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Portofolio Game</span>
+              <div className="p-1.5 sm:p-2 rounded-lg bg-slate-100 text-slate-600 shrink-0">
+                <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight tabular-nums">
+            <div className="text-lg sm:text-2xl font-bold font-mono text-slate-900 tracking-tight tabular-nums truncate">
               {portfolioStats.count}
             </div>
-            <div className="text-[11px] text-slate-400 mt-2">Item terdaftar aktif</div>
+            <div className="text-[11px] text-slate-400 mt-1.5 sm:mt-2 truncate">Item terdaftar aktif</div>
           </div>
 
-          <div className="app-card card-interactive animate-fade-up stagger-2 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500">Nilai Portofolio (GMV)</span>
-              <div className="p-2 rounded-lg bg-slate-100 text-slate-600">
-                <DollarSign className="w-4 h-4" />
+          <div className="app-card card-interactive animate-fade-up stagger-2 p-3.5 sm:p-5 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-2.5 sm:mb-3">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Nilai Portofolio (GMV)</span>
+              <div className="p-1.5 sm:p-2 rounded-lg bg-slate-100 text-slate-600 shrink-0">
+                <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight tabular-nums">
+            <div className="text-base sm:text-2xl font-bold font-mono text-slate-900 tracking-tight tabular-nums truncate">
               {formatRp(portfolioStats.totalGMVPotential)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-2">Potensi omset total</div>
+            <div className="text-[11px] text-slate-400 mt-1.5 sm:mt-2 truncate">Potensi omset total</div>
           </div>
 
-          <div className="app-card card-interactive animate-fade-up stagger-3 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500">Total Laba Bersih</span>
-              <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-                <TrendingUp className="w-4 h-4" />
+          <div className="app-card card-interactive animate-fade-up stagger-3 p-3.5 sm:p-5 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-2.5 sm:mb-3">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Total Laba Bersih</span>
+              <div className="p-1.5 sm:p-2 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
+                <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold font-mono text-emerald-600 tracking-tight tabular-nums">
+            <div className="text-base sm:text-2xl font-bold font-mono text-emerald-600 tracking-tight tabular-nums truncate">
               {formatRp(portfolioStats.totalNetProfit)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-2">Setelah fee Shopee & QRIS</div>
+            <div className="text-[11px] text-slate-400 mt-1.5 sm:mt-2 truncate">Setelah fee Shopee & QRIS</div>
           </div>
 
-          <div className="app-card card-interactive animate-fade-up stagger-4 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500">Rata-rata Margin</span>
-              <div className="p-2 rounded-lg bg-slate-100 text-slate-600">
-                <BarChart3 className="w-4 h-4" />
+          <div className="app-card card-interactive animate-fade-up stagger-4 p-3.5 sm:p-5 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-2.5 sm:mb-3">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Rata-rata Margin</span>
+              <div className="p-1.5 sm:p-2 rounded-lg bg-slate-100 text-slate-600 shrink-0">
+                <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight tabular-nums">
+            <div className="text-lg sm:text-2xl font-bold font-mono text-slate-900 tracking-tight tabular-nums truncate">
               {formatNum(portfolioStats.avgMargin)}%
             </div>
-            <div className="text-[11px] text-slate-400 mt-2">Target minimal: 15%</div>
+            <div className="text-[11px] text-slate-400 mt-1.5 sm:mt-2 truncate">Target minimal: 15%</div>
           </div>
         </div>
 
@@ -1102,7 +1102,7 @@ export default function CatalogDashboardPage() {
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 shadow-sm transition-all"
             />
           </div>
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200/60 overflow-x-auto w-full md:w-auto">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200/60 w-full md:w-auto min-w-0">
             {['ALL', 'Steam', 'Microsoft', 'Rockstar', 'EA', 'Trade'].map((plat) => (
               <button
                 key={plat}
@@ -1252,7 +1252,7 @@ export default function CatalogDashboardPage() {
                           {selectedSeller?.profile_url?.includes("eneba.com") ||
                           selectedSeller?.seller_name?.toLowerCase().includes("eneba") ||
                           selectedSeller?.tier_label?.includes("ENEBA") ? (
-                            <span className="flex items-center gap-1.5">
+                            <span className="flex flex-wrap items-center gap-1.5 min-w-0">
                               <span className="text-indigo-600 font-semibold">Supplier Eneba:</span>
                               <a
                                 href={getValidSellerUrl(selectedSeller, game.title, game.category)}
@@ -1265,7 +1265,7 @@ export default function CatalogDashboardPage() {
                               </a>
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1.5">
+                            <span className="flex flex-wrap items-center gap-1.5 min-w-0">
                               <span className="text-slate-600 font-semibold">Supplier Aktif:</span>
                               <a
                                 href={getValidSellerUrl(selectedSeller, game.title, game.category)}
@@ -1693,8 +1693,125 @@ export default function CatalogDashboardPage() {
                         </div>
                       )}
 
-                      {/* SELLER TABLE */}
-                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
+                      {/* SELLER CARDS (MOBILE) */}
+                      <div className="md:hidden space-y-2.5">
+                        {game.sellers
+                          .filter(s => {
+                            const currentFilter = drawerTierFilter[game.id] || 'ALL';
+                            if (currentFilter !== 'ALL' && s.tier !== currentFilter) return false;
+                            if (safeSellerOnly) {
+                              const ratingVal = s.seller_rating ?? s.rating_pct ?? 0;
+                              const ordersVal = s.seller_orders ?? s.reviews_count ?? 0;
+                              if (ratingVal < 95 || ordersVal < 20) return false;
+                            }
+                            return true;
+                          })
+                          .map((s) => {
+                            const isSelected = s.seller_id === game.selected_seller_id;
+                            const eco = calculateShopeeEconomics({
+                              sellingPriceIdr: game.selling_price_shopee_idr,
+                              cogsIdr: s.price_g2g_idr,
+                              presetId: 'reguler',
+                              packagingCostIdr: 0,
+                            });
+                            const netProfit = eco.netProfitIdr;
+                            const netMargin = eco.netMarginPct;
+                            const isLoss = netMargin < 0;
+                            const evalF = evaluateSteamAccountFreshness(s.offer_title || "");
+                            const fs = s.fresh_status || (s.offer_title ? evalF.fresh_status : undefined);
+                            return (
+                              <div
+                                key={`mob-sel-${s.seller_id}`}
+                                className={`rounded-xl border p-3.5 space-y-2 text-xs ${
+                                  isSelected ? 'bg-emerald-50/60 border-emerald-300' : 'bg-white border-slate-200'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <a
+                                        href={getValidSellerUrl(s, game.title, game.category)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="font-bold text-slate-900 underline inline-flex items-center gap-1"
+                                      >
+                                        <span>{s.seller_name}</span>
+                                        <ExternalLink className="w-3 h-3 text-slate-400" />
+                                      </a>
+                                      {isSelected && (
+                                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                          Utama
+                                        </span>
+                                      )}
+                                      {fs === "verified_fresh" && (
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${getFreshnessBadgeStyle("verified_fresh")}`}>
+                                          0h Fresh
+                                        </span>
+                                      )}
+                                    </div>
+                                    {s.offer_title && (
+                                      <p className="text-[11px] font-mono text-slate-500 line-clamp-2 mt-1">
+                                        {s.offer_title}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <span className="font-mono font-bold text-slate-900 shrink-0 tabular-nums">
+                                    {formatRp(s.price_g2g_idr)}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-[11px] font-mono">
+                                  <span className="text-slate-600 tabular-nums">
+                                    ★ {Number(s.seller_rating ?? s.rating_pct ?? 0).toFixed(1)}% • Stok {s.stock}
+                                  </span>
+                                  <span className={isLoss ? "text-rose-600 font-bold" : "text-emerald-700 font-bold tabular-nums"}>
+                                    {formatNum(netMargin)}% ({netProfit >= 0 ? "+" : ""}{formatRp(netProfit)})
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-end gap-1.5 pt-1">
+                                  <button
+                                    onClick={() => setEditingSellerData({
+                                      gameId: game.id,
+                                      gameTitle: game.title,
+                                      sellerId: s.seller_id,
+                                      sellerName: s.seller_name,
+                                      priceG2gIdr: s.price_g2g_idr,
+                                      tier: (s.tier as any) || 'mid_level',
+                                      ratingPct: s.rating_pct,
+                                      reviewsCount: s.reviews_count,
+                                      deliverySpeed: s.delivery_speed || 'Instant Delivery',
+                                      profileUrl: s.profile_url || '',
+                                      isSelected
+                                    })}
+                                    className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-medium"
+                                  >
+                                    Edit
+                                  </button>
+                                  {!isSelected && (
+                                    <button
+                                      onClick={() => handleSwitchSeller(game.id, s.seller_id)}
+                                      className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold"
+                                    >
+                                      Pilih Utama
+                                    </button>
+                                  )}
+                                  {!isSelected && game.sellers.length > 1 && (
+                                    <button
+                                      onClick={() => handleDeleteSellerFromGame(game.id, s.seller_id, s.seller_name)}
+                                      className="px-2 py-1 rounded-lg bg-rose-50 text-rose-600 text-[11px] font-medium"
+                                    >
+                                      Hapus
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                      {/* SELLER TABLE (DESKTOP) */}
+                      <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
                         <table className="w-full text-left text-xs font-mono min-w-[760px]">
                           <thead className="bg-slate-50 border-b border-slate-200">
                             <tr className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">

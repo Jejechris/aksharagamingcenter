@@ -165,28 +165,30 @@ export default function ClaimPasscodeRevealerPage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col justify-between">
+    <div className="min-h-screen min-w-0 max-w-full overflow-x-clip bg-[#F8FAFC] text-slate-900 flex flex-col justify-between">
       {/* Header */}
       <header className="border-b border-slate-200 bg-white/95 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-3 sm:px-6 min-h-[60px] py-2 sm:py-0 sm:h-16 flex items-center justify-between gap-2">
           <Link
             href="/"
-            className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+            className="flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors min-w-0 truncate"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Storefront &amp; Portal Klaim</span>
+            <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">
+              <span className="hidden sm:inline">Storefront &amp; </span>Portal Klaim
+            </span>
           </Link>
 
-          <div className="flex items-center gap-2 font-mono text-xs">
+          <div className="flex items-center gap-2 font-mono text-[11px] sm:text-xs shrink-0">
             <span className="text-slate-400 hidden sm:inline">Status Vault:</span>
             {isRevealed ? (
-              <span className="px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-semibold flex items-center gap-1.5">
-                <Eye className="w-3.5 h-3.5 text-amber-600" />
+              <span className="px-2.5 sm:px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-semibold flex items-center gap-1.5 whitespace-nowrap">
+                <Eye className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 Sudah Dibuka ({claimData.reveal_count || 1}x)
               </span>
             ) : (
-              <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="px-2.5 sm:px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold flex items-center gap-1.5 whitespace-nowrap">
+                <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 Terkunci Passcode
               </span>
             )}

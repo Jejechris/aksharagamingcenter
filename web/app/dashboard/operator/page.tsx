@@ -420,8 +420,8 @@ export default function OperatorPage() {
 
       {/* ─── 4. Tabel Buku Kas Digital ─── */}
       <div className="app-card overflow-hidden bg-white">
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
-          <div>
+        <div className="px-4 sm:px-5 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-white">
+          <div className="min-w-0">
             <h3 className="text-sm font-semibold text-slate-900">
               Catatan Transaksi Penjualan
             </h3>
@@ -429,12 +429,58 @@ export default function OperatorPage() {
               Buku kas tersinkronisasi otomatis dari database dan transaksi operasional
             </p>
           </div>
-          <span className="text-xs font-medium text-slate-500 tabular-nums">
+          <span className="text-xs font-medium text-slate-500 tabular-nums shrink-0">
             {transactions.length} Order
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Ledger Cards */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {isSyncing && transactions.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500">Menghubungkan ke buku kas...</div>
+          ) : transactions.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500">Belum ada transaksi di financial ledger.</div>
+          ) : (
+            transactions.map((trx: any, index: number) => {
+              const isSelected = selectedOrderIds.includes(trx.order_id);
+              const gross = Number(trx.gross_revenue_idr) || 0;
+              const cogs = Number(trx.cogs_net_idr) || 0;
+              const profit = Number(trx.net_profit_idr) || 0;
+              const margin = Number(trx.net_margin_pct) || (gross > 0 ? (profit / gross) * 100 : 0);
+              return (
+                <div
+                  key={`mob-${trx.order_id || index}`}
+                  className={`p-3.5 space-y-2 text-xs ${isSelected ? "bg-emerald-50/70" : "bg-white"}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <label className="flex items-start gap-2 min-w-0 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectOrder(trx.order_id)}
+                        className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <span className="font-mono font-bold text-slate-900 block truncate">{trx.order_id}</span>
+                        <span className="text-[11px] text-slate-600 block truncate">{trx.product_name || "Game Digital"}</span>
+                        <span className="text-[10px] text-slate-400">@{trx.buyer_username || "pembeli"} &bull; {trx.timestamp || "-"}</span>
+                      </div>
+                    </label>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                      Fulfilled
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] font-mono bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 tabular-nums">
+                    <span className="text-slate-600">Jual {formatCurrency(gross)} | Modal {formatCurrency(cogs)}</span>
+                    <span className="text-emerald-600 font-bold">+{formatCurrency(profit)} ({margin.toFixed(1)}%)</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 text-slate-500 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200">
               <tr>

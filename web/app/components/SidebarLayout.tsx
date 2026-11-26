@@ -505,28 +505,28 @@ export default function SidebarLayout({
       </aside>
 
       {/* ─── Main Content Shell ─── */}
-      <div className="md:pl-64 flex flex-col min-h-screen">
+      <div className="md:pl-64 flex flex-col min-h-screen min-w-0 overflow-x-clip">
         {/* Top Header Bar (Height 60px, Sticky) */}
-        <header className="sticky top-0 z-30 h-[60px] bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-30 h-[60px] bg-white border-b border-slate-200 flex items-center justify-between gap-2 px-3 sm:px-6 lg:px-8">
           {/* Left: Mobile hamburger + Dynamic Breadcrumb */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className="md:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
               aria-label="Buka navigasi"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm">
-              <span className="text-slate-400">Dashboard</span>
-              <span className="text-slate-300">/</span>
-              <span className="font-semibold text-slate-800">{currentTitle}</span>
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm min-w-0">
+              <span className="hidden sm:inline text-slate-400 shrink-0">Dashboard</span>
+              <span className="hidden sm:inline text-slate-300 shrink-0">/</span>
+              <span className="font-semibold text-slate-800 truncate">{currentTitle}</span>
             </div>
           </div>
 
           {/* Right: Notification Bell + WIB Clock + Fast Order CTA */}
-          <div className="flex items-center gap-2.5 sm:gap-4 relative">
+          <div className="flex items-center gap-2 sm:gap-4 relative shrink-0">
             <div className="relative">
               <button
                 type="button"
@@ -554,7 +554,7 @@ export default function SidebarLayout({
               </button>
 
               {bellOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="fixed inset-x-3 top-[64px] sm:inset-x-auto sm:top-auto sm:absolute sm:right-0 sm:mt-2 sm:w-96 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                     <span className="text-xs font-bold text-slate-900">
                       Notifikasi Harga &amp; Sistem ({alertUnread})
@@ -624,27 +624,28 @@ export default function SidebarLayout({
 
             <Link
               href="/dashboard/autonomous"
-              className="btn-primary-emerald btn-tactile text-xs font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 shadow-sm"
+              className="btn-primary-emerald btn-tactile text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 shadow-sm whitespace-nowrap"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Proses Order</span>
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span className="sm:hidden">Order</span>
+              <span className="hidden sm:inline">Proses Order</span>
             </Link>
           </div>
         </header>
 
         {/* Global Critical Alert Banner */}
         {alertCritical > 0 && !bannerDismissed && pathname !== "/dashboard/alerts" && (
-          <div className="bg-rose-50 border-b border-rose-200 px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3 text-xs text-rose-900">
-            <div className="flex items-center gap-2 min-w-0">
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span className="truncate font-medium">
+          <div className="bg-rose-50 border-b border-rose-200 px-3 sm:px-6 lg:px-8 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs text-rose-900">
+            <div className="flex items-start sm:items-center gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5 sm:mt-0" />
+              <span className="line-clamp-2 sm:truncate font-medium">
                 <strong>{alertCritical} Peringatan Kritis:</strong> Ada lonjakan harga supplier / stok habis / insiden sistem yang memerlukan peninjauan.
               </span>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center justify-end gap-2 shrink-0">
               <Link
                 href="/dashboard/alerts"
-                className="px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px]"
+                className="px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] whitespace-nowrap"
               >
                 Tindak Lanjut &rarr;
               </Link>
@@ -661,7 +662,7 @@ export default function SidebarLayout({
         )}
 
         {/* Content Area */}
-        <main className="flex-1 bg-[#F8FAFC]">
+        <main className="flex-1 bg-[#F8FAFC] min-w-0">
           {children}
         </main>
 

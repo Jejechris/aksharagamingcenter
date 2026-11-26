@@ -276,8 +276,8 @@ export default function MarketerPage() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 min-w-0 overflow-x-clip">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6 min-w-0">
 
         {/* Header & Breadcrumb */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-slate-200">
@@ -302,12 +302,12 @@ export default function MarketerPage() {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200 overflow-x-auto scrollbar-thin">
+        <div className="grid grid-cols-2 sm:flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200 min-w-0">
           {tabs.map(tab => (
             <button 
               key={tab.id} 
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap min-w-[120px] ${
+              className={`sm:flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                 activeTab === tab.id 
                   ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80 font-bold' 
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'

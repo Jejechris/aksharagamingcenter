@@ -507,7 +507,7 @@ export default function MassUploadStudio() {
     publicOrigin.includes("localhost") || publicOrigin.includes("127.0.0.1");
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-200">
+    <div className="space-y-5 animate-in fade-in duration-200 min-w-0 max-w-full overflow-x-hidden">
       {toast && (
         <div
           className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-xl border text-xs font-medium flex items-center gap-2 ${
@@ -761,13 +761,13 @@ export default function MassUploadStudio() {
         )}
       </div>
 
-      {/* Spreadsheet Preview Table */}
-      <div className="app-card bg-white border border-slate-200 overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+      {/* Spreadsheet Preview Table (Desktop) + Responsive Cards (Mobile) */}
+      <div className="app-card bg-white border border-slate-200 overflow-hidden min-w-0 max-w-full">
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="font-bold text-slate-800">
             Preview Produk Siap Export ({selectedRows.length} / {rows.length} dipilih)
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setRows((prev) => prev.map((r) => ({ ...r, selected: true })))}
@@ -786,7 +786,122 @@ export default function MassUploadStudio() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Editable Card View */}
+        <div className="md:hidden divide-y divide-slate-200">
+          {loading ? (
+            <div className="p-8 text-center text-xs text-slate-400">
+              Memuat katalog produk untuk Mass Upload...
+            </div>
+          ) : (
+            rows.map((row) => {
+              const eco = calculateShopeeEconomics({
+                sellingPriceIdr: row.price_idr,
+                cogsIdr: row.cogs_net_idr,
+                presetId: feePreset,
+                packagingCostIdr: 0,
+              });
+              return (
+                <div
+                  key={`mob-${row.id}`}
+                  className={`p-3.5 space-y-2.5 text-xs ${
+                    row.selected ? "bg-white" : "bg-slate-50/70 opacity-65"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <label className="flex items-start gap-2.5 min-w-0 flex-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={row.selected}
+                        onChange={(e) =>
+                          setRows((prev) =>
+                            prev.map((r) =>
+                              r.id === row.id ? { ...r, selected: e.target.checked } : r
+                            )
+                          )
+                        }
+                        className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 truncate">{row.title}</div>
+                        <div className="text-[10px] font-mono text-slate-500 truncate">{row.sku_parent}</div>
+                      </div>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setEditingDescRowId(row.id)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold shrink-0"
+                    >
+                      Edit Teks
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-semibold text-slate-500 block">Judul SEO Shopee</span>
+                    <input
+                      type="text"
+                      value={row.seo_title}
+                      maxLength={120}
+                      onChange={(e) =>
+                        setRows((prev) =>
+                          prev.map((r) =>
+                            r.id === row.id ? { ...r, seo_title: e.target.value } : r
+                          )
+                        )
+                      }
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-900"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-semibold text-slate-500 block">Harga (Rp)</span>
+                      <input
+                        type="number"
+                        value={row.price_idr}
+                        step={500}
+                        onChange={(e) =>
+                          setRows((prev) =>
+                            prev.map((r) =>
+                              r.id === row.id ? { ...r, price_idr: Number(e.target.value) || 0 } : r
+                            )
+                          )
+                        }
+                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-900 tabular-nums"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-semibold text-slate-500 block">Stok</span>
+                      <input
+                        type="number"
+                        value={row.stock}
+                        min={0}
+                        onChange={(e) =>
+                          setRows((prev) =>
+                            prev.map((r) =>
+                              r.id === row.id ? { ...r, stock: Number(e.target.value) || 0 } : r
+                            )
+                          )
+                        }
+                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-slate-900 tabular-nums"
+                      />
+                    </div>
+                  </div>
+
+                  {row.cogs_net_idr > 0 && (
+                    <div className="flex items-center justify-between text-[11px] font-mono pt-1 border-t border-slate-100">
+                      <span className="text-slate-500">Est. Laba:</span>
+                      <span className={`font-bold tabular-nums ${eco.netMarginPct >= 15 ? "text-emerald-700" : "text-amber-700"}`}>
+                        {eco.netMarginPct.toFixed(1)}% (+Rp {eco.netProfitIdr.toLocaleString("id-ID")})
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-xs text-left min-w-[980px]">
             <thead className="bg-slate-50/70 border-b border-slate-200 text-slate-600 font-semibold">
               <tr>

@@ -216,18 +216,18 @@ export default function AksharaUnifiedPublicPortal() {
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-20">
       {/* ── TOP UTILITY NAVIGATION BAR ── */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 h-16 flex items-center">
-        <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl w-full mx-auto flex items-center justify-between gap-2 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="relative w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
               <ShieldCheck className="w-4 h-4" />
               <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm sm:text-base tracking-tight text-slate-900">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-bold text-sm sm:text-base tracking-tight text-slate-900 truncate">
                   Akshara Gaming Center
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-mono font-semibold text-emerald-700 uppercase tracking-wider">
+                <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-mono font-semibold text-emerald-700 uppercase tracking-wider shrink-0">
                   Store &amp; Claim Vault
                 </span>
               </div>
@@ -265,7 +265,7 @@ export default function AksharaUnifiedPublicPortal() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-8 space-y-6 pt-7">
+      <div className="max-w-6xl w-full mx-auto px-4 sm:px-8 space-y-6 pt-6 sm:pt-7 min-w-0">
         {/* ── HERO BANNER ── */}
         <section className="app-card p-6 sm:p-9 relative overflow-hidden bg-gradient-to-br from-white via-white to-emerald-50/50">
           <div className="max-w-3xl relative z-10">
@@ -417,8 +417,8 @@ export default function AksharaUnifiedPublicPortal() {
         </div>
 
         {/* ── FILTER & SEARCH BAR ── */}
-        <div id="katalog" className="scroll-mt-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <div id="katalog" className="scroll-mt-20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pt-2 min-w-0">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 pb-1 min-w-0">
             {["ALL", "STEAM", "MICROSOFT", "ROCKSTAR", "EA"].map((plat) => (
               <button
                 key={plat}
@@ -447,18 +447,18 @@ export default function AksharaUnifiedPublicPortal() {
         </div>
 
         {/* ── LIVE GAME CATALOG GRID ── */}
-        <section>
-          <div className="flex items-center justify-between mb-5">
-            <div>
+        <section className="min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+            <div className="min-w-0">
               <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <ShoppingBag className="w-5 h-5 text-emerald-600" />
+                <ShoppingBag className="w-5 h-5 text-emerald-600 shrink-0" />
                 <span>Katalog Game Pilihan</span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 Harga langsung hemat 10% dibanding marketplace tanpa biaya admin
               </p>
             </div>
-            <span className="text-xs font-mono font-medium text-slate-600 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-subtle">
+            <span className="self-start sm:self-auto text-xs font-mono font-medium text-slate-600 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-subtle shrink-0">
               {filteredCatalog.length} Produk Tersedia
             </span>
           </div>
@@ -492,7 +492,7 @@ export default function AksharaUnifiedPublicPortal() {
                 return (
                   <div
                     key={game.id}
-                    className="app-card overflow-hidden flex flex-col justify-between group hover:-translate-y-0.5"
+                    className="app-card overflow-hidden flex flex-col justify-between group hover:-translate-y-0.5 min-w-0 w-full"
                   >
                     <div>
                       <div className="relative h-40 w-full bg-slate-900 overflow-hidden border-b border-slate-200">

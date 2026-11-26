@@ -864,7 +864,7 @@ export default function EnebaTerminalPage() {
                   </label>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-100 border border-slate-200 overflow-x-auto scrollbar-thin">
+              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-slate-100 border border-slate-200 min-w-0">
                 {[
                   { val: 0, label: `Semua (${marginCounts.all})` },
                   { val: 0.1, label: `💸 Untung (>0%) • ${marginCounts.positive}` },

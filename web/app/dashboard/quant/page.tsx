@@ -818,13 +818,13 @@ function QuantCalculatorContent() {
           </button>
           <button
             onClick={() => setCalcMode('target_margin')}
-            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
               calcMode === 'target_margin'
                 ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Mode B: Target Margin &rarr; Harga
+            Mode B: Target Margin
           </button>
         </div>
 
@@ -853,7 +853,7 @@ function QuantCalculatorContent() {
                     <label className="text-xs font-semibold text-slate-700">Nama Produk</label>
                     {researchMsg && <span className="text-[10px] text-emerald-700 font-semibold">{researchMsg}</span>}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 min-w-0">
                     <input
                       type="text"
                       value={gameTitle}
@@ -861,8 +861,8 @@ function QuantCalculatorContent() {
                         setGameTitle(e.target.value);
                         setActivePreset('custom');
                       }}
-                      placeholder="Contoh: Monster Hunter Wilds"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                      placeholder="Contoh: Monster Hunter"
+                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
                     />
                     <button
                       type="button"
@@ -1230,31 +1230,31 @@ function QuantCalculatorContent() {
                   <Activity className="w-4 h-4 text-emerald-600" /> Analisis Sensitivitas Harga
                 </h3>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs font-mono text-left min-w-[360px]">
+              <div className="overflow-x-auto min-w-0">
+                <table className="w-full text-[11px] sm:text-xs font-mono text-left">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Skenario</th>
-                      <th className="px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Harga Jual</th>
-                      <th className="px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Laba Bersih</th>
-                      <th className="px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px] text-right">Margin</th>
+                      <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Skenario</th>
+                      <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Harga</th>
+                      <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Laba</th>
+                      <th className="px-2.5 sm:px-4 py-2.5 sm:py-3 font-semibold text-slate-500 uppercase tracking-wider text-[10px] text-right">Margin</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {sensitivityScenarios.map((sc: any) => (
                       <tr key={sc.delta} className={sc.isCurrent ? 'bg-emerald-50/60 font-bold' : 'hover:bg-slate-50'}>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
+                        <td className="px-2.5 sm:px-4 py-2.5 whitespace-nowrap">
                           {sc.delta === 0 ? (
                             <span className="text-emerald-700 font-bold">AKTIF</span>
                           ) : (
                             <span className="text-slate-500">{sc.delta > 0 ? '+' : ''}{formatRp(sc.delta)}</span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5 text-slate-900 whitespace-nowrap tabular-nums">{formatRp(sc.price)}</td>
-                        <td className={`px-4 py-2.5 whitespace-nowrap tabular-nums ${sc.profit > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                        <td className="px-2.5 sm:px-4 py-2.5 text-slate-900 whitespace-nowrap tabular-nums">{formatRp(sc.price)}</td>
+                        <td className={`px-2.5 sm:px-4 py-2.5 whitespace-nowrap tabular-nums ${sc.profit > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                           {formatRp(sc.profit)}
                         </td>
-                        <td className={`px-4 py-2.5 text-right whitespace-nowrap tabular-nums ${
+                        <td className={`px-2.5 sm:px-4 py-2.5 text-right whitespace-nowrap tabular-nums ${
                           sc.margin >= 20 ? 'text-emerald-700 font-bold' : sc.margin >= 10 ? 'text-amber-700' : 'text-rose-600'
                         }`}>
                           {formatNum(sc.margin)}%

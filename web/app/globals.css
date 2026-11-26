@@ -31,15 +31,24 @@ html, body {
 }
 
 html {
-  scrollbar-gutter: stable;
   scroll-behavior: smooth;
   background-color: #F8FAFC;
   color: #0F172A;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+@media (min-width: 768px) {
+  html {
+    scrollbar-gutter: stable;
+  }
 }
 
 body {
   background-color: #F8FAFC;
   color: #0F172A;
+  max-width: 100%;
+  overflow-x: clip;
   font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
   letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;

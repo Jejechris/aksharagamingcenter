@@ -414,8 +414,103 @@ export default function ClaimsAdminDashboardPage() {
           </div>
         </div>
 
-        {/* List of Claims */}
-        <div className="overflow-x-auto">
+        {/* List of Claims — Mobile Cards */}
+        <div className="md:hidden divide-y divide-slate-200">
+          {loading ? (
+            <div className="p-8 text-center text-xs font-mono text-slate-500">Memuat database klaim...</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500">Tidak ada token klaim yang sesuai pencarian.</div>
+          ) : (
+            filtered.map((item) => {
+              const isRevealed = item.status === "REVEALED";
+              const origin = typeof window !== "undefined" ? window.location.origin : "";
+              const baseUrl = claimBaseUrl && claimBaseUrl.trim() ? claimBaseUrl.trim() : origin;
+              const claimUrl = `${baseUrl.replace(/\/$/, "")}/claim/${item.claim_code}`;
+              return (
+                <div key={`mob-${item.claim_code}`} className="p-3.5 space-y-2.5 text-xs bg-white">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-mono font-bold text-slate-900">{item.claim_code}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                          PIN: {item.passcode}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-medium text-slate-700 truncate mt-0.5">{item.product_title}</div>
+                      <div className="text-[10px] font-mono text-slate-500 mt-0.5">
+                        @{item.buyer_username} &bull; Garansi {item.warranty_days || 30}H
+                      </div>
+                    </div>
+                    {isRevealed ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                        REVEALED ({item.reveal_count || 1}x)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                        UNCLAIMED
+                      </span>
+                    )}
+                  </div>
+
+                  {item.revealed_at && (
+                    <div className="text-[10px] font-mono text-indigo-700 bg-indigo-50/60 px-2.5 py-1.5 rounded-lg border border-indigo-100">
+                      Dibuka {new Date(item.revealed_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB &bull; IP: {item.revealed_ip || item.forensics?.ip || "-"}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {isRevealed && (
+                      <button
+                        type="button"
+                        onClick={() => setDossierClaim(item)}
+                        className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold inline-flex items-center gap-1"
+                      >
+                        <Scale className="w-3 h-3" />
+                        <span>Bukti</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadClaimCardPng(item)}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-medium inline-flex items-center gap-1"
+                    >
+                      <QrCode className="w-3 h-3" />
+                      <span>Kartu QR</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyShopeeChat(item)}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-800 text-[11px] font-medium inline-flex items-center gap-1"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>{copiedCode === item.claim_code ? "Tersalin" : "Chat Shopee"}</span>
+                    </button>
+                    <a
+                      href={claimUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1.5 text-slate-500 hover:text-slate-900 rounded-lg border border-slate-200"
+                      title="Buka portal klaim"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item.claim_code)}
+                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg border border-rose-200 ml-auto"
+                      title="Hapus token"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* List of Claims — Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-50 text-[10px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
