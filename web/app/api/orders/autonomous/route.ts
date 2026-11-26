@@ -4,6 +4,9 @@ import path from "path";
 import os from "os";
 import { getDbOrders, saveDbOrder, deleteDbOrder, getDbVault, saveDbVaultItem, getKV, setKV } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const DATA_FILE = path.resolve(process.cwd(), "data", "autonomous_orders.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "autonomous_orders.json");
 const TMP_FILE = path.resolve(os.tmpdir(), "akshara_autonomous_orders.json");

@@ -33,6 +33,7 @@ import {
   Image as ImageIcon
 } from "lucide-react";
 import ThumbnailStudio from "./components/ThumbnailStudio";
+import WarrantyCardStudio from "./components/WarrantyCardStudio";
 
 export default function MarketerPage() {
   const [mounted, setMounted] = useState(false);
@@ -227,15 +228,6 @@ export default function MarketerPage() {
       setIsGeneratingBatch(false);
     }
   };
-
-  // ==========================================
-  // TAB 3: WARRANTY CARD STATE
-  // ==========================================
-  const [cardSide, setCardSide] = useState<"front" | "back">("front");
-  const [cardBuyer, setCardBuyer] = useState("Dimas Prasetyo");
-  const [cardGame, setCardGame] = useState("Terraria (Steam Account)");
-  const [cardSerial, setCardSerial] = useState("AK-2026-9827364");
-  const [cardDate, setCardDate] = useState("16 September 2026");
 
   // ==========================================
   // TAB 4: VOUCHER MANAGEMENT STATE
@@ -706,160 +698,7 @@ export default function MarketerPage() {
 
         {/* TAB: WARRANTY CARD */}
         {activeTab === "warranty_card" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
-              {/* Preview 3D Container (Light Mode wrapper around premium card) */}
-              <div className="lg:col-span-6 space-y-4">
-                <div className="app-card p-6 flex flex-col items-center justify-center min-h-[480px] bg-slate-50 border border-slate-200 [perspective:1000px]">
-                  <div className="flex items-center justify-between w-full mb-4">
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Preview Sertifikat Digital</h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Interactive 3D preview</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setCardSide(cardSide === "front" ? "back" : "front")}
-                      className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Layers className="w-3.5 h-3.5 text-purple-600" />
-                      {cardSide === "front" ? "Sisi Belakang" : "Sisi Depan"}
-                    </button>
-                  </div>
-
-                  {/* The dark/gold card itself */}
-                  <div className="relative w-full max-w-sm aspect-[1/1.414] transition-all duration-500 ease-out hover:[transform:rotateX(6deg)_rotateY(-8deg)] [transform-style:preserve-3d] shadow-xl group cursor-pointer" onClick={() => setCardSide(cardSide === "front" ? "back" : "front")}>
-                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-zinc-900 to-black rounded-2xl border border-amber-500/30 p-6 flex flex-col justify-between overflow-hidden shadow-2xl">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
-
-                      {cardSide === "front" ? (
-                        <div className="relative z-10 flex flex-col justify-between h-full [transform:translateZ(20px)]">
-                          <div className="flex justify-between items-start border-b border-white/10 pb-3">
-                            <div>
-                              <div className="text-lg font-black tracking-widest text-white">AKSHARA</div>
-                              <div className="text-[9px] uppercase tracking-wider text-amber-400 font-mono">Gaming Center</div>
-                            </div>
-                            <Award className="w-6 h-6 text-amber-400" />
-                          </div>
-
-                          <div className="space-y-2 py-4">
-                            <div className="w-8 h-1 bg-amber-500 rounded-full mb-3" />
-                            <h4 className="text-lg font-serif text-slate-100 font-bold">Sertifikat Keaslian</h4>
-                            <p className="text-[10px] text-slate-400 leading-relaxed">
-                              Lisensi game ini dijamin 100% legal dan dilindungi oleh garansi resmi Akshara Gaming Center.
-                            </p>
-                            <div className="pt-3 space-y-1.5 font-mono text-[10px]">
-                              <div className="flex justify-between text-slate-400">
-                                <span>Pemilik:</span>
-                                <span className="text-white font-semibold">{cardBuyer}</span>
-                              </div>
-                              <div className="flex justify-between text-slate-400">
-                                <span>Item:</span>
-                                <span className="text-amber-300 font-semibold">{cardGame}</span>
-                              </div>
-                              <div className="flex justify-between text-slate-400">
-                                <span>Aktivasi:</span>
-                                <span className="text-slate-200">{cardDate}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="pt-3 border-t border-white/10 flex justify-between items-end">
-                            <div>
-                              <span className="text-[9px] font-mono text-slate-400 block uppercase">No. Seri</span>
-                              <span className="text-xs font-mono font-bold text-slate-200">{cardSerial}</span>
-                            </div>
-                            <QrCode className="w-8 h-8 text-amber-400" />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="relative z-10 flex flex-col h-full [transform:translateZ(20px)] text-xs font-sans">
-                          <div className="border-b border-white/10 pb-3 mb-4">
-                            <span className="text-xs font-bold text-white font-mono uppercase tracking-wider flex items-center gap-1.5">
-                              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                              SOP Klaim Garansi
-                            </span>
-                          </div>
-                          <div className="space-y-3 text-[10px] text-slate-300 flex-1">
-                            <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800">
-                              <strong className="text-white block mb-0.5">1. Garansi Digital:</strong>
-                              Klaim garansi dapat dilakukan secara digital melalui CS kami kapan saja.
-                            </div>
-                            <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800">
-                              <strong className="text-white block mb-0.5">2. Amankan Kredensial:</strong>
-                              Ganti password dan email max 24 jam setelah serah terima akun.
-                            </div>
-                            <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800">
-                              <strong className="text-white block mb-0.5">3. Support 24/7:</strong>
-                              Scan QR untuk verifikasi keaslian via Akshara Concierge.
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form Controls */}
-              <div className="lg:col-span-6 space-y-4">
-                <div className="app-card p-5 space-y-4">
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-purple-600" />
-                    Kustomisasi Kartu Sertifikat
-                  </h3>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-600">Nama Pembeli</label>
-                      <input
-                        type="text"
-                        value={cardBuyer}
-                        onChange={(e) => setCardBuyer(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-600">Nama Game</label>
-                      <input
-                        type="text"
-                        value={cardGame}
-                        onChange={(e) => setCardGame(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-600">No. Seri</label>
-                      <input
-                        type="text"
-                        value={cardSerial}
-                        onChange={(e) => setCardSerial(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-600">Tanggal Terbit</label>
-                      <input
-                        type="text"
-                        value={cardDate}
-                        onChange={(e) => setCardDate(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors mt-2 shadow-sm"
-                  >
-                    <Printer className="w-4 h-4" />
-                    Cetak / Download Sertifikat
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <WarrantyCardStudio onToast={showToast} />
         )}
 
         {/* TAB: VOUCHERS */}

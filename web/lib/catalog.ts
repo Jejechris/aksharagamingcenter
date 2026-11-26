@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { getDbCatalog, saveDbGame, deleteDbGame, isDbConfigured, getKV, setKV } from "@/lib/db";
+import { getDbCatalog, saveDbGame, deleteDbGame, isDbConfigured, getKV, setKV, getLastDbError } from "@/lib/db";
 import { resolveG2GProductUrl } from "@/lib/g2g";
 import { getEnebaProductUrl, getEnebaSearchUrl } from "@/lib/eneba";
 
@@ -135,6 +135,17 @@ function tryReadJson(filePath: string): any[] | null {
   return null;
 }
 
+let lastStorageSource: "supabase_pg" | "supabase_kv" | "local_fallback" = "local_fallback";
+let lastStorageError: string | null = null;
+
+export function getCatalogStorageMeta() {
+  return {
+    storage_source: lastStorageSource,
+    db_configured: isDbConfigured(),
+    db_error: lastStorageError || getLastDbError(),
+  };
+}
+
 export async function readAuthoritativeCatalog(): Promise<any[]> {
   // If DB is configured, try reading DB first
   if (isDbConfigured()) {
@@ -144,6 +155,8 @@ export async function readAuthoritativeCatalog(): Promise<any[]> {
       if (dbData && dbData.length > 0) {
         inMemoryCatalogCache = dbData;
         lastCacheTimestamp = Date.now();
+        lastStorageSource = "supabase_pg";
+        lastStorageError = null;
         return dbData;
       }
       // 2. Try KV table if relational is empty
@@ -151,9 +164,20 @@ export async function readAuthoritativeCatalog(): Promise<any[]> {
       if (kvData && Array.isArray(kvData) && kvData.length > 0) {
         inMemoryCatalogCache = kvData;
         lastCacheTimestamp = Date.now();
+        lastStorageSource = "supabase_kv";
+        lastStorageError = null;
         return kvData;
       }
-    } catch (err) {}
+      lastStorageSource = "local_fallback";
+      lastStorageError = getLastDbError() || "Tabel catalog_games Supabase kosong, memakai fallback.";
+    } catch (err: any) {
+      lastStorageSource = "local_fallback";
+      lastStorageError = err?.message || getLastDbError() || "Koneksi PostgreSQL Supabase gagal.";
+      console.warn("[Catalog DB Fallback]", lastStorageError);
+    }
+  } else {
+    lastStorageSource = "local_fallback";
+    lastStorageError = "DATABASE_URL / POSTGRES_URL belum terpasang di environment server ini.";
   }
 
   // Find candidate files on disk and pick the one with most entries or highest priority

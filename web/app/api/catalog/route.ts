@@ -7,7 +7,11 @@ import {
   addOrUpdateGame,
   bulkAddOrUpdateGames,
   deleteGameFromCatalog,
+  getCatalogStorageMeta,
 } from "@/lib/catalog";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 import { deleteDbGame } from "@/lib/db";
 import { resolveG2GProductUrl, extractG2GOfferId } from "@/lib/g2g";
 import { getEnebaProductUrl } from "@/lib/eneba";
@@ -189,11 +193,22 @@ export async function GET() {
   try {
     const rawCatalog = await loadCatalog();
     const enriched = rawCatalog.map(calculateItemMetrics);
-    return NextResponse.json({
-      status: "success",
-      count: enriched.length,
-      data: enriched,
-    });
+    const meta = getCatalogStorageMeta();
+    return NextResponse.json(
+      {
+        status: "success",
+        count: enriched.length,
+        storage_source: meta.storage_source,
+        db_configured: meta.db_configured,
+        db_error: meta.db_error,
+        data: enriched,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
   }

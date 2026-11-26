@@ -3,6 +3,9 @@ import fs from "fs";
 import path from "path";
 import { getDbClaimByCode, getDbClaims, getKV } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function getClaimsData(): Promise<any[]> {
   const dbClaims = await getDbClaims();
   if (dbClaims && Array.isArray(dbClaims) && dbClaims.length > 0) {

@@ -15,6 +15,11 @@ export function isDbConfigured(): boolean {
 // Global singleton pool for Next.js / Serverless environments
 declare global {
   var __supabase_pg_pool__: Pool | undefined;
+  var __last_db_error__: string | null | undefined;
+}
+
+export function getLastDbError(): string | null {
+  return global.__last_db_error__ || null;
 }
 
 export function getDbPool(): Pool | null {
@@ -26,7 +31,7 @@ export function getDbPool(): Pool | null {
       ssl: { rejectUnauthorized: false },
       max: 5,
       idleTimeoutMillis: 15000,
-      connectionTimeoutMillis: 2500,
+      connectionTimeoutMillis: 8000,
     });
   }
   return global.__supabase_pg_pool__;
@@ -35,8 +40,14 @@ export function getDbPool(): Pool | null {
 export async function queryDb<T = any>(text: string, params?: any[]): Promise<T[]> {
   const pool = getDbPool();
   if (!pool) return [] as T[];
-  const res = await pool.query(text, params);
-  return res.rows as T[];
+  try {
+    const res = await pool.query(text, params);
+    global.__last_db_error__ = null;
+    return res.rows as T[];
+  } catch (err: any) {
+    global.__last_db_error__ = err?.message || String(err);
+    throw err;
+  }
 }
 
 function toSafeBigInt(val: any, fallback: number = 0): number {

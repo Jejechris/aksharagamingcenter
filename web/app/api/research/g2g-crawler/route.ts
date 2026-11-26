@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getG2GSellerUrl, resolveG2GProductUrl, getG2GDirectOfferUrl } from "@/lib/g2g";
+import { isDbConfigured } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { readAuthoritativeCatalog, addOrUpdateGame, bulkAddOrUpdateGames } from "@/lib/catalog";
 import { evaluateSellerTrust, TrustTier } from "@/lib/sellerTrust";
@@ -741,11 +745,19 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({
-      status: "success",
-      count: enriched.length,
-      data: enriched,
-    });
+    return NextResponse.json(
+      {
+        status: "success",
+        db_configured: isDbConfigured(),
+        count: enriched.length,
+        data: enriched,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
   }

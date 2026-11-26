@@ -77,6 +77,7 @@ export default function ResearchCenterPage() {
   const [manualPlatform, setManualPlatform] = useState("Steam");
   const [isManualScanning, setIsManualScanning] = useState(false);
   const [isDiscoveringTrend, setIsDiscoveringTrend] = useState(false);
+  const [discoverCount, setDiscoverCount] = useState<number>(5);
 
   // Shopee Competitor Modal
   const [competitorModalGame, setCompetitorModalGame] = useState<G2GScannedGame | null>(null);
@@ -127,8 +128,8 @@ export default function ResearchCenterPage() {
     setLoading(true);
     try {
       const [g2gRes, enebaRes] = await Promise.all([
-        fetch("/api/research/g2g-crawler"),
-        fetch("/api/research/eneba-crawler"),
+        fetch("/api/research/g2g-crawler", { cache: "no-store" }),
+        fetch("/api/research/eneba-crawler", { cache: "no-store" }),
       ]);
       const g2gJson = await g2gRes.json();
       const enebaJson = await enebaRes.json();
@@ -211,28 +212,31 @@ export default function ResearchCenterPage() {
     }
   };
 
-  // Auto-Discover Trend (Pre-Save Review Mode)
+  // Auto-Discover Trend (Multi-Game Pre-Save Review Mode)
   const handleDiscoverTrend = async () => {
     setIsDiscoveringTrend(true);
     try {
       const res = await fetch("/api/research/eneba-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "discover_trend", preview_only: true }),
+        body: JSON.stringify({ action: "discover_trend", count: discoverCount, preview_only: true }),
       });
       const json = await res.json();
-      if (res.ok && json.status === "success" && json.data) {
-        const trendItem = {
-          ...json.data,
+      const rawItems = Array.isArray(json.data) ? json.data : json.data ? [json.data] : [];
+      if (res.ok && json.status === "success" && rawItems.length > 0) {
+        const mapped = rawItems.map((it: any) => ({
+          ...it,
           source_marketplace: "ENEBA",
-          price_g2g_idr: json.data.price_eneba_idr || json.data.price_g2g_idr,
-          g2g_direct_url: json.data.eneba_direct_url || json.data.g2g_direct_url,
+          price_g2g_idr: it.price_eneba_idr || it.price_g2g_idr,
+          g2g_direct_url: it.eneba_direct_url || it.g2g_direct_url,
           g2g_category_slug: "eneba-cdkey",
-        };
-        setReviewCandidates([trendItem]);
-        setReviewModalTitle(`Review Auto-Discover Trend: ${json.data.title}`);
+        }));
+        setReviewCandidates(mapped);
+        setReviewModalTitle(`Review Auto-Discover Trend (${mapped.length} Game Terverifikasi)`);
         setReviewModalOpen(true);
-        showToast(`🎯 Trend ditemukan (${json.data.title}). Cek harga asli & margin lalu simpan bila cocok!`);
+        showToast(
+          `🎯 Ditemukan ${mapped.length} game trending live. Sortir & cek harga asli sebelum simpan ke DB!`
+        );
       } else {
         showToast(json.message || "Gagal mencari trend game saat ini.", "error");
       }
@@ -646,16 +650,33 @@ export default function ResearchCenterPage() {
             <Layers className="w-3.5 h-3.5 text-amber-600" />
             <span>Katalog Radar</span>
           </Link>
-          <button
-            type="button"
-            onClick={handleDiscoverTrend}
-            disabled={isDiscoveringTrend || loading || isScanningBot}
-            className="text-xs font-mono flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-medium shadow-sm transition-colors disabled:opacity-50"
-            title="Auto-discover game yang sedang tren di pasar global"
-          >
-            <Flame className={`w-3.5 h-3.5 text-amber-600 ${isDiscoveringTrend ? "animate-pulse" : ""}`} />
-            <span>{isDiscoveringTrend ? "Mencari Trend..." : "Auto-Discover Trend"}</span>
-          </button>
+          <div className="inline-flex items-center rounded-xl bg-amber-50 border border-amber-200 shadow-sm overflow-hidden">
+            <button
+              type="button"
+              onClick={handleDiscoverTrend}
+              disabled={isDiscoveringTrend || loading || isScanningBot}
+              className="text-xs font-mono flex items-center gap-1.5 px-3 py-2 hover:bg-amber-100 text-amber-800 font-medium transition-colors disabled:opacity-50"
+              title="Auto-discover beberapa game yang sedang tren di pasar global"
+            >
+              <Flame className={`w-3.5 h-3.5 text-amber-600 ${isDiscoveringTrend ? "animate-pulse" : ""}`} />
+              <span>
+                {isDiscoveringTrend
+                  ? `Mencari ${discoverCount} Game...`
+                  : `Auto-Discover Trend (${discoverCount})`}
+              </span>
+            </button>
+            <select
+              value={discoverCount}
+              onChange={(e) => setDiscoverCount(Number(e.target.value))}
+              disabled={isDiscoveringTrend || loading || isScanningBot}
+              aria-label="Jumlah game Auto-Discover Trend"
+              className="bg-amber-100/80 text-amber-900 font-mono text-[11px] font-bold px-2 py-2 border-l border-amber-200 focus:outline-none cursor-pointer"
+            >
+              <option value={3}>3</option>
+              <option value={5}>5</option>
+              <option value={8}>8</option>
+            </select>
+          </div>
           <button
             onClick={handleRunRobotScanner}
             disabled={isScanningBot}

@@ -370,131 +370,13 @@ export async function verifyLiveGameOpportunity(params: {
  * + saran judul trending Gemini AI, lalu MEMVALIDASI setiap kandidat ke Eneba Live SSR + Steam ID.
  * Hanya mengembalikan peluang yang BENAR-BENAR ada di Eneba dengan margin bersih positif & harga di bawah Steam ID!
  */
-export async function discoverRealTrendingOpportunity(
-  excludeTitles: Set<string> = new Set()
-): Promise<{
+export interface DiscoveredTrendOpportunity {
   verified: VerifiedMarketOpportunity;
   tactical_reason: string;
   instant_redeem_guide: string;
-}> {
-  const csHeaders = {
-    "User-Agent": "AksharaGamingCenter/2.0 (ops@aksharagaming.id)",
-    Accept: "application/json",
-  };
+}
 
-  const [steamFeatured, cheapDealsRated, cheapDealsSavings, aiTitlesRaw] = await Promise.all([
-    fetch("https://store.steampowered.com/api/featuredcategories/?cc=id&l=indonesian", {
-      signal: AbortSignal.timeout(6000),
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null),
-    fetch("https://www.cheapshark.com/api/1.0/deals?pageSize=30&sortBy=DealRating&upperPrice=18&onSale=1", {
-      headers: csHeaders,
-      signal: AbortSignal.timeout(6000),
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : []))
-      .catch(() => []),
-    fetch("https://www.cheapshark.com/api/1.0/deals?pageSize=30&sortBy=Savings&upperPrice=15&onSale=1", {
-      headers: csHeaders,
-      signal: AbortSignal.timeout(6000),
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : []))
-      .catch(() => []),
-    callGemini(
-      `Berikan 8 judul game PC populer non-indie-obscure yang sering dicari gamer Indonesia dan harga normal Steam-nya mahal (>= Rp 200.000) sementara key global-nya sering diskon besar (misal: Hogwarts Legacy, Resident Evil 4, Cyberpunk 2077, Red Dead Redemption 2, Monster Hunter World, Mortal Kombat 11, Batman Arkham Knight, Middle-earth Shadow of War, Elden Ring, GTA V).
-Hanya kembalikan JSON array string judul game (JANGAN tulis harga):
-{"titles": ["..."]}`,
-      "Kembalikan hanya daftar judul game populer dalam JSON.",
-      { jsonMode: true, temperature: 0.8 }
-    ).catch(() => ""),
-  ]);
-
-  const candidateTitles: string[] = [];
-  const seen = new Set<string>();
-
-  const pushCandidate = (raw?: string) => {
-    const clean = (raw || "").trim();
-    const low = clean.toLowerCase();
-    if (!clean || clean.length < 3) return;
-    if (/steam machine|steam deck|soundtrack|upgrade|dlc|pack|bundle|skin/i.test(low)) return;
-    if (seen.has(low) || excludeTitles.has(low)) return;
-    seen.add(low);
-    candidateTitles.push(clean);
-  };
-
-  // 1. CheapShark deals with steamAppID & real savings (most likely cheaper than Steam ID!)
-  const allCheap = [
-    ...(Array.isArray(cheapDealsRated) ? cheapDealsRated : []),
-    ...(Array.isArray(cheapDealsSavings) ? cheapDealsSavings : []),
-  ];
-  for (const d of allCheap) {
-    if (Number(d.savings || 0) >= 50 && Number(d.salePrice || 0) >= 1.5 && d.steamAppID) {
-      pushCandidate(d.title);
-    }
-  }
-
-  // 2. AI trending title ideas (judul saja, harga 100% diverifikasi API!)
-  if (aiTitlesRaw) {
-    try {
-      const cleaned = aiTitlesRaw.replace(/```json/gi, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-      if (Array.isArray(parsed?.titles)) {
-        for (const t of parsed.titles) pushCandidate(String(t));
-      }
-    } catch {}
-  }
-
-  // 3. Steam Featured Top Sellers & Specials (prioritaskan yg diskonnya < 50% atau non-promo supaya key global berpotensi lebih murah!)
-  const steamItems = [
-    ...(Array.isArray(steamFeatured?.top_sellers?.items) ? steamFeatured.top_sellers.items : []),
-    ...(Array.isArray(steamFeatured?.specials?.items) ? steamFeatured.specials.items : []),
-  ].sort((a: any, b: any) => (Number(a.discount_percent) || 0) - (Number(b.discount_percent) || 0));
-  for (const it of steamItems) {
-    if ((Number(it.final_price) || 0) >= 8000000) {
-      pushCandidate(it.name);
-    }
-  }
-
-  // Cek bertahap (1 per 1 dengan jeda singkat 180ms agar Eneba SSR tidak memblokir/throttle & harga asli Rp 73rb terbaca akurat!)
-  const pool = candidateTitles.slice(0, 18);
-  const verifiedEnebaViable: VerifiedMarketOpportunity[] = [];
-  const verifiedAnyViable: VerifiedMarketOpportunity[] = [];
-  const verifiedLastResort: VerifiedMarketOpportunity[] = [];
-
-  for (let i = 0; i < pool.length; i++) {
-    const title = pool[i];
-    const item = await verifyLiveGameOpportunity({
-      query: title,
-      preferredPlatform: "Steam",
-      targetMarginPct: 18,
-    }).catch(() => null);
-    if (item) {
-      if (item.eneba_live_verified && item.arbitrage_viable && item.net_margin_pct >= 12) {
-        verifiedEnebaViable.push(item);
-      } else if (item.arbitrage_viable && item.net_margin_pct >= 12) {
-        verifiedAnyViable.push(item);
-      } else if (item.eneba_live_verified || item.cheapshark_live_verified) {
-        verifiedLastResort.push(item);
-      }
-    }
-    if (verifiedEnebaViable.length >= 2) break;
-    if (i >= 10 && verifiedEnebaViable.length >= 1) break;
-    if (i < pool.length - 1) {
-      await new Promise((r) => setTimeout(r, 180));
-    }
-  }
-
-  verifiedEnebaViable.sort((a, b) => b.net_margin_pct - a.net_margin_pct || b.net_profit_idr - a.net_profit_idr);
-  verifiedAnyViable.sort((a, b) => b.net_margin_pct - a.net_margin_pct || b.net_profit_idr - a.net_profit_idr);
-
-  const chosen = verifiedEnebaViable[0] || verifiedAnyViable[0] || verifiedLastResort[0];
-  if (!chosen) {
-    throw new Error("Tidak ada kandidat trend yang lolos verifikasi harga live Eneba & Steam Indonesia saat ini.");
-  }
-
+function buildDiscoveredItemMeta(chosen: VerifiedMarketOpportunity): DiscoveredTrendOpportunity {
   const baseInfo = chosen.eneba_live_verified
     ? `Harga Eneba Live terverifikasi Rp ${chosen.eneba_base_price_idr.toLocaleString("id-ID")} (mendarat ~Rp ${chosen.price_eneba_idr.toLocaleString("id-ID")} + fee checkout)`
     : `Harga Global API terverifikasi $${chosen.cheapshark_usd.toFixed(2)} USD (~Rp ${chosen.price_eneba_idr.toLocaleString("id-ID")})`;
@@ -517,6 +399,163 @@ Hanya kembalikan JSON array string judul game (JANGAN tulis harga):
         ? "Buka redeem.microsoft.com > Login akun Microsoft pribadi pembeli > Masukkan kode lisensi 25-digit."
         : "Buka Steam Client > Klik '+ Add a Game' > 'Activate a Product on Steam' > Masukkan kode CDKey resmi.",
   };
+}
+
+/**
+ * Multi-Game Auto-Discover Trend: Menemukan BANYAK game trending/diskon live sekaligus (default 5 game)
+ * yang terverifikasi ke harga Eneba SSR + Steam Indonesia agar siap disortir & dipilih sebelum masuk DB.
+ */
+export async function discoverRealTrendingOpportunities(
+  excludeTitles: Set<string> = new Set(),
+  options: { count?: number } = {}
+): Promise<DiscoveredTrendOpportunity[]> {
+  const desiredCount = Math.min(10, Math.max(1, Number(options.count) || 5));
+  const csHeaders = {
+    "User-Agent": "AksharaGamingCenter/2.0 (ops@aksharagaming.id)",
+    Accept: "application/json",
+  };
+
+  const [steamFeatured, cheapDealsRated, cheapDealsSavings, aiTitlesRaw] = await Promise.all([
+    fetch("https://store.steampowered.com/api/featuredcategories/?cc=id&l=indonesian", {
+      signal: AbortSignal.timeout(6000),
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null),
+    fetch("https://www.cheapshark.com/api/1.0/deals?pageSize=35&sortBy=DealRating&upperPrice=20&onSale=1", {
+      headers: csHeaders,
+      signal: AbortSignal.timeout(6000),
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => []),
+    fetch("https://www.cheapshark.com/api/1.0/deals?pageSize=35&sortBy=Savings&upperPrice=18&onSale=1", {
+      headers: csHeaders,
+      signal: AbortSignal.timeout(6000),
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => []),
+    callGemini(
+      `Berikan 12 judul game PC populer non-indie-obscure yang sering dicari gamer Indonesia dan harga normal Steam-nya mahal (>= Rp 150.000) sementara key global-nya sering diskon besar (misal: Hogwarts Legacy, Resident Evil 4, Cyberpunk 2077, Red Dead Redemption 2, Monster Hunter World, Mortal Kombat 11, Batman Arkham Knight, Middle-earth Shadow of War, Devil May Cry 5, Doom Eternal, Dying Light 2, Tekken 8).
+Hanya kembalikan JSON array string judul game (JANGAN tulis harga):
+{"titles": ["..."]}`,
+      "Kembalikan hanya daftar judul game populer dalam JSON.",
+      { jsonMode: true, temperature: 0.85 }
+    ).catch(() => ""),
+  ]);
+
+  const candidateTitles: string[] = [];
+  const seen = new Set<string>();
+
+  const pushCandidate = (raw?: string) => {
+    const clean = (raw || "").trim();
+    const low = clean.toLowerCase();
+    if (!clean || clean.length < 3) return;
+    if (/steam machine|steam deck|soundtrack|upgrade|dlc|pack|bundle|skin/i.test(low)) return;
+    if (seen.has(low) || excludeTitles.has(low)) return;
+    seen.add(low);
+    candidateTitles.push(clean);
+  };
+
+  // 1. CheapShark deals with steamAppID & real savings (most likely cheaper than Steam ID!)
+  const allCheap = [
+    ...(Array.isArray(cheapDealsRated) ? cheapDealsRated : []),
+    ...(Array.isArray(cheapDealsSavings) ? cheapDealsSavings : []),
+  ];
+  for (const d of allCheap) {
+    if (Number(d.savings || 0) >= 45 && Number(d.salePrice || 0) >= 1.2 && d.steamAppID) {
+      pushCandidate(d.title);
+    }
+  }
+
+  // 2. AI trending title ideas (judul saja, harga 100% diverifikasi API!)
+  if (aiTitlesRaw) {
+    try {
+      const cleaned = aiTitlesRaw.replace(/```json/gi, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+      if (Array.isArray(parsed?.titles)) {
+        for (const t of parsed.titles) pushCandidate(String(t));
+      }
+    } catch {}
+  }
+
+  // 3. Steam Featured Top Sellers & Specials
+  const steamItems = [
+    ...(Array.isArray(steamFeatured?.top_sellers?.items) ? steamFeatured.top_sellers.items : []),
+    ...(Array.isArray(steamFeatured?.specials?.items) ? steamFeatured.specials.items : []),
+  ].sort((a: any, b: any) => (Number(a.discount_percent) || 0) - (Number(b.discount_percent) || 0));
+  for (const it of steamItems) {
+    if ((Number(it.final_price) || 0) >= 6000000) {
+      pushCandidate(it.name);
+    }
+  }
+
+  // Cek bertahap (1 per 1 dengan jeda singkat 160ms agar Eneba SSR tidak throttle)
+  const poolLimit = Math.min(24, Math.max(14, desiredCount * 3));
+  const pool = candidateTitles.slice(0, poolLimit);
+  const verifiedEnebaViable: VerifiedMarketOpportunity[] = [];
+  const verifiedAnyViable: VerifiedMarketOpportunity[] = [];
+  const verifiedLastResort: VerifiedMarketOpportunity[] = [];
+
+  for (let i = 0; i < pool.length; i++) {
+    const title = pool[i];
+    const item = await verifyLiveGameOpportunity({
+      query: title,
+      preferredPlatform: "Steam",
+      targetMarginPct: 18,
+    }).catch(() => null);
+    if (item) {
+      if (item.eneba_live_verified && item.arbitrage_viable && item.net_margin_pct >= 10) {
+        verifiedEnebaViable.push(item);
+      } else if (item.arbitrage_viable && item.net_margin_pct >= 10) {
+        verifiedAnyViable.push(item);
+      } else if (item.eneba_live_verified || item.cheapshark_live_verified) {
+        verifiedLastResort.push(item);
+      }
+    }
+    if (verifiedEnebaViable.length >= desiredCount) break;
+    if (i >= desiredCount * 2 && verifiedEnebaViable.length + verifiedAnyViable.length >= desiredCount) break;
+    if (i < pool.length - 1) {
+      await new Promise((r) => setTimeout(r, 160));
+    }
+  }
+
+  const byScore = (a: VerifiedMarketOpportunity, b: VerifiedMarketOpportunity) =>
+    b.net_margin_pct - a.net_margin_pct || b.net_profit_idr - a.net_profit_idr;
+
+  verifiedEnebaViable.sort(byScore);
+  verifiedAnyViable.sort(byScore);
+  verifiedLastResort.sort(byScore);
+
+  const merged: VerifiedMarketOpportunity[] = [];
+  const pickedTitles = new Set<string>();
+  for (const list of [verifiedEnebaViable, verifiedAnyViable, verifiedLastResort]) {
+    for (const item of list) {
+      const k = item.title.toLowerCase().trim();
+      if (pickedTitles.has(k)) continue;
+      pickedTitles.add(k);
+      merged.push(item);
+      if (merged.length >= desiredCount) break;
+    }
+    if (merged.length >= desiredCount) break;
+  }
+
+  if (merged.length === 0) {
+    throw new Error("Tidak ada kandidat trend yang lolos verifikasi harga live Eneba & Steam Indonesia saat ini.");
+  }
+
+  return merged.map(buildDiscoveredItemMeta);
+}
+
+/**
+ * Wrapper tunggal (kompatibilitas mundur)
+ */
+export async function discoverRealTrendingOpportunity(
+  excludeTitles: Set<string> = new Set()
+): Promise<DiscoveredTrendOpportunity> {
+  const results = await discoverRealTrendingOpportunities(excludeTitles, { count: 1 });
+  return results[0];
 }
 
 // =========================================================================

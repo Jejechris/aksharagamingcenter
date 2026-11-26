@@ -193,6 +193,91 @@ export const GAME_PRESETS: GamePreset[] = [
   }
 ];
 
+interface RulesCardConfig {
+  badge: string;
+  title: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  bg: string;
+  border: string;
+  accent: string;
+  titleColor: string;
+  bullets: string[][];
+}
+
+const RULES_SLIDE_CARDS: RulesCardConfig[] = [
+  {
+    badge: "01",
+    title: "KETENTUAN GARANSI",
+    x: 84,
+    y: 232,
+    w: 444,
+    h: 298,
+    bg: "#F0FDF4",
+    border: "#86EFAC",
+    accent: "#059669",
+    titleColor: "#064E3B",
+    bullets: [
+      ["✓ Garansi aktif 30 Hari sejak tanggal", "   pembelian & ulasan bintang 5."],
+      ["✓ Klaim wajib sertakan video unboxing /", "   screen recording tanpa jeda (no-cut)."],
+      ["✓ Penggantian unit baru penuh sesuai", "   prosedur SOP resmi toko."],
+    ],
+  },
+  {
+    badge: "02",
+    title: "LARANGAN (HANGUS)",
+    x: 552,
+    y: 232,
+    w: 444,
+    h: 298,
+    bg: "#FFF1F2",
+    border: "#FDA4AF",
+    accent: "#E11D48",
+    titleColor: "#881337",
+    bullets: [
+      ["✕ Dilarang ubah Negara / Region akun", "   minimal 2–4 minggu setelah terima."],
+      ["✕ Dilarang ubah Email atau Password", "   tanpa konfirmasi admin terlebih dulu."],
+      ["✕ Dilarang pakai cheat, mod ilegal, atau", "   melanggar ToS publisher / Shopee."],
+    ],
+  },
+  {
+    badge: "03",
+    title: "KEAMANAN AKUN",
+    x: 84,
+    y: 554,
+    w: 444,
+    h: 274,
+    bg: "#EEF2FF",
+    border: "#A5B4FC",
+    accent: "#4F46E5",
+    titleColor: "#1E1B4B",
+    bullets: [
+      ["• Segera amankan akun mengikuti", "  panduan resmi yang dikirim admin."],
+      ["• Aktifkan 2FA / Steam Guard setelah", "  akun terverifikasi berjalan lancar."],
+      ["• Jangan bagikan kredensial login ke", "  pihak ketiga atau publik."],
+    ],
+  },
+  {
+    badge: "04",
+    title: "TRANSAKSI & KLAIM",
+    x: 552,
+    y: 554,
+    w: 444,
+    h: 274,
+    bg: "#F8FAFC",
+    border: "#CBD5E1",
+    accent: "#0F172A",
+    titleColor: "#0F172A",
+    bullets: [
+      ["• Semua komunikasi, panduan & klaim", "  diproses resmi via Chat Shopee."],
+      ["• Klik 'Pesanan Diterima' setelah sukses", "  login agar garansi tercatat aktif."],
+      ["• Tim CS siap membantu kendala", "  instalasi & aktivasi setiap hari."],
+    ],
+  },
+];
+
 export interface ThumbnailStudioProps {
   externalGameTitle?: string;
   externalPlatform?: string;
@@ -628,7 +713,7 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
     ctx.fillRect(0, 0, 1080, 1080);
 
     // 2. Header Title at Top Margin (x=54, y=64)
-    const topTitle = currentSlide === "rules" ? "RULES & TERMS" : cleanTitle;
+    const topTitle = currentSlide === "rules" ? "ATURAN & GARANSI RESMI" : cleanTitle;
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 36px 'Inter', system-ui, -apple-system, sans-serif";
     ctx.textAlign = "left";
@@ -732,61 +817,93 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
       });
 
     } else {
-      // Slide 2: Rules & Terms White Card
+      // Slide 2: Crisp Structured Editorial Rules & Terms Sheet
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(54, 100, 972, 926);
 
-      // Draw Typography
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 23px 'Inter', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("1. Ketentuan Garansi", 540, 155);
+      // Top Header Ribbon (x: 54..1026, y: 100..212)
+      ctx.fillStyle = "#F8FAFC";
+      ctx.fillRect(54, 100, 972, 112);
+      ctx.fillStyle = "#E2E8F0";
+      ctx.fillRect(54, 211, 972, 2);
 
-      ctx.font = "500 17px 'Inter', sans-serif";
-      ctx.fillStyle = "#1f2937";
-      let y = 195;
-      y = drawCanvasWrappedText(ctx, "• Garansi berlaku selama 1 bulan sejak tanggal pembelian.", 540, y, 820, 26, "center");
-      y = drawCanvasWrappedText(ctx, "• Garansi hanya berlaku jika pembeli mematuhi seluruh aturan yang ditetapkan penjual.", 540, y, 820, 26, "center");
-      y = drawCanvasWrappedText(ctx, "• Garansi hangus jika pembeli melakukan pelanggaran terhadap aturan berikut:", 540, y, 820, 26, "center");
-      ctx.font = "500 16px 'Inter', sans-serif";
-      ctx.fillStyle = "#374151";
-      y = drawCanvasWrappedText(ctx, "1. Mengubah negara akun dalam waktu 2-4 minggu setelah pembelian.", 540, y, 820, 24, "center");
-      y = drawCanvasWrappedText(ctx, "2. Melakukan perubahan data penting pada akun tanpa izin penjual.", 540, y, 820, 24, "center");
-      y = drawCanvasWrappedText(ctx, "3. Melakukan tindakan yang dilarang oleh developer game atau marketplace.", 540, y, 820, 24, "center");
+      // Brand Eyebrow Pill
+      ctx.fillStyle = "#0F172A";
+      ctx.beginPath();
+      ctx.roundRect(84, 118, 430, 26, 6);
+      ctx.fill();
+      ctx.fillStyle = "#F8FAFC";
+      ctx.font = "bold 12px 'Inter', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`SYARAT & KETENTUAN • ${storeBrandName.toUpperCase()}`, 96, 131);
 
-      // Section 2
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 23px 'Inter', sans-serif";
-      ctx.fillText("2. Aturan Khusus Akun Game", 540, 420);
+      // Main Banner Title & Subtitle
+      ctx.fillStyle = "#0F172A";
+      ctx.font = "800 28px 'Inter', sans-serif";
+      ctx.fillText("PANDUAN GARANSI & ATURAN AKUN RESMI", 84, 166);
+      ctx.fillStyle = "#475569";
+      ctx.font = "500 15px 'Inter', sans-serif";
+      ctx.fillText("Wajib dibaca sebelum memesan agar masa garansi penuh tetap berlaku tanpa kendala.", 84, 195);
 
-      ctx.font = "500 17px 'Inter', sans-serif";
-      ctx.fillStyle = "#1f2937";
-      y = 460;
-      y = drawCanvasWrappedText(ctx, "• Dilarang mengubah negara akun selama minimal 2-4 minggu setelah pembelian. Jika aturan ini dilanggar, garansi otomatis hangus.", 540, y, 820, 26, "center");
-      y = drawCanvasWrappedText(ctx, "• Segala bentuk perubahan data akun (email, password, negara, dsb.) tanpa konfirmasi penjual dapat menyebabkan garansi tidak berlaku.", 540, y, 820, 26, "center");
-      y = drawCanvasWrappedText(ctx, "• Penjual tidak bertanggung jawab atas kerusakan atau kehilangan akses akun akibat pelanggaran aturan ini.", 540, y, 820, 26, "center");
+      // Render 4 Structured Modular Cards
+      for (const card of RULES_SLIDE_CARDS) {
+        ctx.fillStyle = card.bg;
+        ctx.strokeStyle = card.border;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(card.x, card.y, card.w, card.h, 18);
+        ctx.fill();
+        ctx.stroke();
 
-      // Section 3
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 23px 'Inter', sans-serif";
-      ctx.fillText("4. Proses Transaksi & Pengiriman", 540, 645);
+        // Card Header Number Badge
+        ctx.fillStyle = card.accent;
+        ctx.beginPath();
+        ctx.roundRect(card.x + 22, card.y + 20, 38, 28, 8);
+        ctx.fill();
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold 14px 'JetBrains Mono', monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(card.badge, card.x + 41, card.y + 34);
 
-      ctx.font = "500 17px 'Inter', sans-serif";
-      ctx.fillStyle = "#1f2937";
-      y = 685;
-      y = drawCanvasWrappedText(ctx, "• Semua transaksi dan komunikasi dilakukan melalui fitur chat resmi marketplace.", 540, y, 820, 26, "center");
-      y = drawCanvasWrappedText(ctx, "• Penjual wajib mengirimkan akun sesuai dengan pesanan dan dalam kondisi sesuai deskripsi.", 540, y, 820, 26, "center");
-      y = drawCanvasWrappedText(ctx, "• Pembeli disarankan segera mengamankan akun setelah menerima data dari penjual", 540, y, 820, 26, "center");
+        // Card Title
+        ctx.fillStyle = card.titleColor;
+        ctx.font = "800 20px 'Inter', sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(card.title, card.x + 72, card.y + 34);
 
-      // Section 4
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 23px 'Inter', sans-serif";
-      ctx.fillText("5. Lain-lain", 540, 810);
+        // Divider Line
+        ctx.fillStyle = card.border;
+        ctx.fillRect(card.x + 22, card.y + 62, card.w - 44, 1.5);
 
-      ctx.font = "500 17px 'Inter', sans-serif";
-      ctx.fillStyle = "#1f2937";
-      y = 850;
-      drawCanvasWrappedText(ctx, "Penjual dan pembeli wajib mematuhi seluruh kebijakan marketplace terkait penjualan produk digital dan akun game.", 540, y, 820, 26, "center");
+        // Bullet Lines
+        ctx.fillStyle = "#1E293B";
+        ctx.font = "600 16.5px 'Inter', sans-serif";
+        let cy = card.y + 92;
+        for (const bullet of card.bullets) {
+          for (let li = 0; li < bullet.length; li++) {
+            ctx.fillText(bullet[li], card.x + 22, cy);
+            cy += 24;
+          }
+          cy += 14;
+        }
+      }
+
+      // Bottom Footer CTA Banner (x: 84, w: 745 -> safely avoids bottom-right 860,1026 curl!)
+      ctx.fillStyle = "#0F172A";
+      ctx.beginPath();
+      ctx.roundRect(84, 852, 745, 136, 18);
+      ctx.fill();
+      ctx.fillStyle = "#34D399";
+      ctx.font = "bold 14px 'Inter', sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("🛡️ PERLINDUNGAN KONSUMEN & GARANSI DIGITAL", 112, 886);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 22px 'Inter', sans-serif";
+      ctx.fillText("Butuh Bantuan atau Klaim Garansi?", 112, 922);
+      ctx.fillStyle = "#CBD5E1";
+      ctx.font = "500 15.5px 'Inter', sans-serif";
+      ctx.fillText("Hubungi CS Shopee Chat & siapkan No. Pesanan + Video Unboxing No-Cut.", 112, 956);
     }
 
     // --- COMBINED ANTI-THEFT: INNER OVERLAYS (INSIDE POSTER CLIP) ---
@@ -794,7 +911,7 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
       // Layer 1: Micro-Security Nano-Text Guilloche Border (Banknote-style microprint)
       ctx.save();
       ctx.font = "600 10px 'Courier New', monospace";
-      ctx.fillStyle = currentSlide === "rules" ? "rgba(0, 0, 0, 0.28)" : "rgba(255, 255, 255, 0.35)";
+      ctx.fillStyle = currentSlide === "rules" ? "rgba(15, 23, 42, 0.22)" : "rgba(255, 255, 255, 0.35)";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       const microTop = `• ${storeBrandName.toUpperCase()} OFFICIAL LICENSED STORE • AUTHENTIC PRODUCT • DO NOT COPY • `.repeat(4);
@@ -804,13 +921,13 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
       ctx.fillText(microBottom, 62, 1012);
       ctx.restore();
 
-      // Layer 3: Anti-AI Watermark Removal Poisoning (Disrupts inpainting AI)
+      // Layer 3: Anti-AI Watermark Removal Poisoning (keep Slide 2 very subtle so rules stay crisp)
       if (antiTheftMode === "full") {
         ctx.save();
         ctx.translate(540, 560);
         ctx.rotate((-35 * Math.PI) / 180);
         const poisonAlpha = (watermarkOpacity / 100) * 0.35;
-        ctx.fillStyle = currentSlide === "rules" ? `rgba(0, 0, 0, ${poisonAlpha * 0.65})` : `rgba(255, 255, 255, ${poisonAlpha})`;
+        ctx.fillStyle = currentSlide === "rules" ? `rgba(15, 23, 42, ${poisonAlpha * 0.18})` : `rgba(255, 255, 255, ${poisonAlpha})`;
         ctx.font = "bold 32px 'Inter', sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(`${storeBrandName.toUpperCase()} • ORIGINAL`, 0, -90);
@@ -888,11 +1005,11 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
 
     // --- COMBINED ANTI-THEFT: OUTER OVERLAYS ---
     if (antiTheftMode !== "off") {
-      // Layer 2: Holographic Store Trust Seal (Pill Badge at Top-Left)
+      // Layer 2: Holographic Store Trust Seal (Top-Right on Rules slide so banner pill stays clear)
       ctx.save();
-      const sealX = 66;
+      const sealW = 248;
+      const sealX = currentSlide === "rules" ? 748 : 66;
       const sealY = 114;
-      const sealW = 216;
       const sealH = 34;
       const sealAlpha = Math.min(Math.max(watermarkOpacity / 100, 0.3), 0.9);
 
@@ -915,10 +1032,10 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
 
       // Seal brand name
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 11px 'Inter', sans-serif";
+      ctx.font = "bold 10.5px 'Inter', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(`🛡️ ${storeBrandName.slice(0, 17).toUpperCase()}`, sealX + 10, sealY + sealH / 2);
+      ctx.fillText(`🛡️ ${storeBrandName.slice(0, 22).toUpperCase()}`, sealX + 10, sealY + sealH / 2);
 
       // Official tag
       ctx.fillStyle = "#10b981";
@@ -1965,7 +2082,7 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
                   fontFamily="Inter, system-ui, sans-serif"
                   letterSpacing="-0.5px"
                 >
-                  {activeSlide === "rules" ? "RULES & TERMS" : cleanTitle}
+                  {activeSlide === "rules" ? "ATURAN & GARANSI RESMI" : cleanTitle}
                 </text>
 
                 {/* 3. Inner Poster or Rules Card */}
@@ -2055,76 +2172,107 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
                     )}
                   </g>
                 ) : (
-                  /* Slide 2: Rules & Terms White Card */
+                  /* Slide 2: Structured Editorial Rules & Terms Sheet (1:1 synced with Canvas PNG) */
                   <g clipPath="url(#innerPosterClip)">
                     <rect x="54" y="100" width="972" height="926" fill="#ffffff" />
-                    
-                    {/* Section 1 */}
-                    <text x="540" y="155" fill="#111827" fontSize="23" fontWeight="bold" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      1. Ketentuan Garansi
+
+                    {/* Top Header Ribbon */}
+                    <rect x="54" y="100" width="972" height="112" fill="#F8FAFC" />
+                    <rect x="54" y="211" width="972" height="2" fill="#E2E8F0" />
+                    <rect x="84" y="118" width="430" height="26" rx="6" fill="#0F172A" />
+                    <text x="96" y="135" fill="#F8FAFC" fontSize="12" fontWeight="bold" fontFamily="Inter, sans-serif">
+                      {`SYARAT & KETENTUAN • ${storeBrandName.toUpperCase()}`}
                     </text>
-                    <text x="540" y="195" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      • Garansi berlaku selama 1 bulan sejak tanggal pembelian.
+                    <text x="84" y="175" fill="#0F172A" fontSize="28" fontWeight="800" fontFamily="Inter, sans-serif">
+                      PANDUAN GARANSI &amp; ATURAN AKUN RESMI
                     </text>
-                    <text x="540" y="225" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      • Garansi hanya berlaku jika pembeli mematuhi seluruh aturan yang ditetapkan penjual.
-                    </text>
-                    <text x="540" y="255" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      • Garansi hangus jika pembeli melakukan pelanggaran terhadap aturan berikut:
-                    </text>
-                    <text x="540" y="285" fill="#374151" fontSize="16" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      1. Mengubah negara akun dalam waktu 2-4 minggu setelah pembelian.
-                    </text>
-                    <text x="540" y="312" fill="#374151" fontSize="16" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      2. Melakukan perubahan data penting pada akun tanpa izin penjual.
-                    </text>
-                    <text x="540" y="339" fill="#374151" fontSize="16" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      3. Melakukan tindakan yang dilarang oleh developer game atau marketplace.
+                    <text x="84" y="200" fill="#475569" fontSize="15" fontWeight="500" fontFamily="Inter, sans-serif">
+                      Wajib dibaca sebelum memesan agar masa garansi penuh tetap berlaku tanpa kendala.
                     </text>
 
-                    {/* Section 2 */}
-                    <text x="540" y="420" fill="#111827" fontSize="23" fontWeight="bold" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      2. Aturan Khusus Akun Game
-                    </text>
-                    <text x="540" y="460" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      • Dilarang mengubah negara akun selama minimal 2-4 minggu setelah pembelian. Jika aturan ini dilanggar, garansi otomatis hangus.
-                    </text>
-                    <text x="540" y="492" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      • Segala bentuk perubahan data akun (email, password, negara, dsb.) tanpa konfirmasi penjual dapat menyebabkan garansi tidak berlaku.
-                    </text>
-                    <text x="540" y="524" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      • Penjual tidak bertanggung jawab atas kerusakan atau kehilangan akses akun akibat pelanggaran aturan ini.
-                    </text>
+                    {/* 4 Modular Structured Cards */}
+                    {RULES_SLIDE_CARDS.map((card) => {
+                      let lineCursor = card.y + 92;
+                      return (
+                        <g key={card.badge}>
+                          <rect
+                            x={card.x}
+                            y={card.y}
+                            width={card.w}
+                            height={card.h}
+                            rx="18"
+                            fill={card.bg}
+                            stroke={card.border}
+                            strokeWidth="2"
+                          />
+                          <rect x={card.x + 22} y={card.y + 20} width="38" height="28" rx="8" fill={card.accent} />
+                          <text
+                            x={card.x + 41}
+                            y={card.y + 39}
+                            fill="#FFFFFF"
+                            fontSize="14"
+                            fontWeight="bold"
+                            fontFamily="JetBrains Mono, monospace"
+                            textAnchor="middle"
+                          >
+                            {card.badge}
+                          </text>
+                          <text
+                            x={card.x + 72}
+                            y={card.y + 40}
+                            fill={card.titleColor}
+                            fontSize="20"
+                            fontWeight="800"
+                            fontFamily="Inter, sans-serif"
+                          >
+                            {card.title}
+                          </text>
+                          <rect x={card.x + 22} y={card.y + 62} width={card.w - 44} height="1.5" fill={card.border} />
 
-                    {/* Section 3 */}
-                    <text x="540" y="645" fill="#111827" fontSize="23" fontWeight="bold" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      4. Proses Transaksi & Pengiriman
-                    </text>
-                    <text x="540" y="685" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      • Semua transaksi dan komunikasi dilakukan melalui fitur chat resmi marketplace.
-                    </text>
-                    <text x="540" y="715" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      • Penjual wajib mengirimkan akun sesuai dengan pesanan dan dalam kondisi sesuai deskripsi.
-                    </text>
-                    <text x="540" y="745" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      • Pembeli disarankan segera mengamankan akun setelah menerima data dari penjual
-                    </text>
+                          {card.bullets.map((bullet, bi) => {
+                            const items = bullet.map((lineText) => {
+                              const currentY = lineCursor;
+                              lineCursor += 24;
+                              return (
+                                <text
+                                  key={`${bi}-${currentY}`}
+                                  x={card.x + 22}
+                                  y={currentY + 5}
+                                  fill="#1E293B"
+                                  fontSize="16.5"
+                                  fontWeight="600"
+                                  fontFamily="Inter, sans-serif"
+                                >
+                                  {lineText}
+                                </text>
+                              );
+                            });
+                            lineCursor += 14;
+                            return items;
+                          })}
+                        </g>
+                      );
+                    })}
 
-                    {/* Section 4 */}
-                    <text x="540" y="810" fill="#111827" fontSize="23" fontWeight="bold" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      5. Lain-lain
+                    {/* Bottom Footer CTA Banner */}
+                    <rect x="84" y="852" width="745" height="136" rx="18" fill="#0F172A" />
+                    <text x="112" y="891" fill="#34D399" fontSize="14" fontWeight="bold" fontFamily="Inter, sans-serif">
+                      🛡️ PERLINDUNGAN KONSUMEN &amp; GARANSI DIGITAL
                     </text>
-                    <text x="540" y="850" fill="#1f2937" fontSize="17" fontWeight="500" fontFamily="Inter, sans-serif" textAnchor="middle">
-                      Penjual dan pembeli wajib mematuhi seluruh kebijakan marketplace terkait penjualan produk digital dan akun game.
+                    <text x="112" y="928" fill="#FFFFFF" fontSize="22" fontWeight="bold" fontFamily="Inter, sans-serif">
+                      Butuh Bantuan atau Klaim Garansi?
+                    </text>
+                    <text x="112" y="961" fill="#CBD5E1" fontSize="15.5" fontWeight="500" fontFamily="Inter, sans-serif">
+                      Hubungi CS Shopee Chat &amp; siapkan No. Pesanan + Video Unboxing No-Cut.
                     </text>
 
                     {/* --- ANTI-THEFT: INSIDE POSTER CLIP (Rules Slide) --- */}
                     {antiTheftMode !== "off" && (
                       <>
-                        <text x="62" y="116" fill="rgba(0,0,0,0.3)" fontSize="10" fontFamily="monospace" fontWeight="600" letterSpacing="1px">
+                        <text x="62" y="114" fill="rgba(15,23,42,0.22)" fontSize="10" fontFamily="monospace" fontWeight="600" letterSpacing="1px">
                           {`• ${storeBrandName.toUpperCase()} OFFICIAL LICENSED STORE • AUTHENTIC PRODUCT • DO NOT COPY • `.repeat(3)}
                         </text>
-                        <text x="62" y="1016" fill="rgba(0,0,0,0.3)" fontSize="10" fontFamily="monospace" fontWeight="600" letterSpacing="1px">
+                        <text x="62" y="1016" fill="rgba(15,23,42,0.22)" fontSize="10" fontFamily="monospace" fontWeight="600" letterSpacing="1px">
                           {`• SECURED FOR ${storeBrandName.toUpperCase()} • ANTI-FRAUD VERIFIED • ALL RIGHTS RESERVED • `.repeat(2)}
                         </text>
                       </>
@@ -2175,11 +2323,35 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
                   <>
                     {/* Layer 2: Holographic Store Trust Seal */}
                     <g opacity={Math.min(Math.max(watermarkOpacity / 100, 0.35), 0.95)}>
-                      <rect x="66" y="114" width="216" height="34" rx="8" fill="rgba(10, 15, 29, 0.88)" stroke="url(#holoGrad)" strokeWidth="1.5" />
-                      <text x="78" y="136" fill="#ffffff" fontSize="11" fontWeight="bold" fontFamily="Inter, sans-serif">
-                        {`🛡️ ${storeBrandName.slice(0, 17).toUpperCase()}`}
+                      <rect
+                        x={activeSlide === "rules" ? 748 : 66}
+                        y="114"
+                        width="248"
+                        height="34"
+                        rx="8"
+                        fill="rgba(10, 15, 29, 0.88)"
+                        stroke="url(#holoGrad)"
+                        strokeWidth="1.5"
+                      />
+                      <text
+                        x={activeSlide === "rules" ? 758 : 76}
+                        y="135"
+                        fill="#ffffff"
+                        fontSize="10.5"
+                        fontWeight="bold"
+                        fontFamily="Inter, sans-serif"
+                      >
+                        {`🛡️ ${storeBrandName.slice(0, 22).toUpperCase()}`}
                       </text>
-                      <text x="272" y="135" fill="#10b981" fontSize="9" fontWeight="bold" fontFamily="monospace" textAnchor="end">
+                      <text
+                        x={activeSlide === "rules" ? 988 : 306}
+                        y="135"
+                        fill="#10b981"
+                        fontSize="9"
+                        fontWeight="bold"
+                        fontFamily="monospace"
+                        textAnchor="end"
+                      >
                         VERIFIED
                       </text>
                     </g>

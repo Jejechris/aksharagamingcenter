@@ -50,7 +50,10 @@ export async function fetchSmartCatalog(): Promise<any[]> {
 
   let serverGames: any[] = [];
   try {
-    const res = await fetch("/api/catalog");
+    const res = await fetch("/api/catalog", {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
     const json = await res.json();
     if (json.status === "success" && Array.isArray(json.data)) {
       serverGames = json.data.map(sanitizeGameUrls);

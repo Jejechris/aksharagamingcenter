@@ -3,6 +3,9 @@ import fs from "fs";
 import path from "path";
 import { getDbClaimByCode, updateDbClaimState, getWarrantyBySerialOrOrder } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
 

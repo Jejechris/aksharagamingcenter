@@ -4,6 +4,9 @@ import path from "path";
 import os from "os";
 import { getDbVault, saveDbVaultItem, deleteDbVaultItem, getKV, setKV } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const DATA_FILE = path.resolve(process.cwd(), "data", "inventory_vault.json");
 const OUTPUT_FILE = path.resolve(process.cwd(), "..", "output", "inventory_vault.json");
 const TMP_FILE = path.resolve(os.tmpdir(), "akshara_inventory_vault.json");

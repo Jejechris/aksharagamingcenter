@@ -74,6 +74,7 @@ export default function EnebaTerminalPage() {
   const [customPlatform, setCustomPlatform] = useState("Steam");
   const [isAiScanning, setIsAiScanning] = useState(false);
   const [isDiscoveringTrend, setIsDiscoveringTrend] = useState(false);
+  const [discoverCount, setDiscoverCount] = useState<number>(5);
 
   // Shopee Competitor Intelligence Modal
   const [competitorModalGame, setCompetitorModalGame] = useState<any | null>(null);
@@ -98,7 +99,10 @@ export default function EnebaTerminalPage() {
   const fetchEnebaGames = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/research/eneba-crawler");
+      const res = await fetch("/api/research/eneba-crawler", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
       const json = await res.json();
       if (json.status === "success" && Array.isArray(json.data)) {
         setGames(json.data);
@@ -229,14 +233,21 @@ export default function EnebaTerminalPage() {
       const res = await fetch("/api/research/eneba-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "discover_trend", preview_only: true }),
+        body: JSON.stringify({ action: "discover_trend", count: discoverCount, preview_only: true }),
       });
       const json = await res.json();
-      if (res.ok && json.status === "success" && json.data) {
-        setReviewCandidates([json.data]);
-        setReviewModalTitle(`Review Auto-Discover Trend: ${json.data.title}`);
+      const items: EnebaScannedGame[] = Array.isArray(json.data)
+        ? json.data
+        : json.data
+        ? [json.data]
+        : [];
+      if (res.ok && json.status === "success" && items.length > 0) {
+        setReviewCandidates(items);
+        setReviewModalTitle(`Review Auto-Discover Trend (${items.length} Game Terverifikasi)`);
         setReviewModalOpen(true);
-        showToast(`🎯 Trend ditemukan (${json.data.title}). Cek detail & harga asli lalu simpan jika sesuai!`);
+        showToast(
+          `🎯 Ditemukan ${items.length} game trending live. Silakan sortir, cek harga Eneba, & pilih sebelum disimpan!`
+        );
       } else {
         showToast(json.message || "Gagal menemukan trend.", "error");
       }
@@ -510,7 +521,7 @@ export default function EnebaTerminalPage() {
         )}
 
         {/* Header & Breadcrumb */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 pb-4 border-b border-slate-200">
+        <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-5 pb-4 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-2 mb-2 text-xs text-slate-500 font-medium">
               <Link
@@ -568,7 +579,7 @@ export default function EnebaTerminalPage() {
           </div>
 
           {/* Action Controls */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={handleRefresh}
@@ -600,15 +611,29 @@ export default function EnebaTerminalPage() {
               <span>{aiScannerOpen ? "Tutup Scanner" : "Scan Manual"}</span>
             </button>
             
-            <button
-              type="button"
-              onClick={handleDiscoverTrend}
-              disabled={isDiscoveringTrend || loading}
-              className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer select-none disabled:opacity-50"
-            >
-              <Flame className={`w-3.5 h-3.5 ${isDiscoveringTrend ? "animate-pulse" : ""}`} />
-              <span>{isDiscoveringTrend ? "Mencari Trend..." : "Auto-Discover Trend"}</span>
-            </button>
+            <div className="inline-flex items-center rounded-lg border border-emerald-600/30 bg-emerald-600 shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={handleDiscoverTrend}
+                disabled={isDiscoveringTrend || loading}
+                className="px-3 py-2 text-white hover:bg-emerald-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer select-none disabled:opacity-50"
+                title="Cari beberapa game trending & diskon tinggi sekaligus"
+              >
+                <Flame className={`w-3.5 h-3.5 ${isDiscoveringTrend ? "animate-pulse" : ""}`} />
+                <span>{isDiscoveringTrend ? `Mencari ${discoverCount} Game...` : `Auto-Discover Trend (${discoverCount})`}</span>
+              </button>
+              <select
+                value={discoverCount}
+                onChange={(e) => setDiscoverCount(Number(e.target.value))}
+                disabled={isDiscoveringTrend || loading}
+                aria-label="Jumlah game Auto-Discover Trend"
+                className="bg-emerald-700 text-white text-[11px] font-bold px-2 py-2 border-l border-emerald-500/50 focus:outline-none cursor-pointer"
+              >
+                <option value={3}>3</option>
+                <option value={5}>5</option>
+                <option value={8}>8</option>
+              </select>
+            </div>
           </div>
         </div>
 

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getEnebaProductUrl, getEnebaSearchUrl, buildEnebaFilteredUrl } from "@/lib/eneba";
 import { callGemini } from "@/lib/gemini";
+import { isDbConfigured } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
 import { fetchUsdToIdrRate } from "@/lib/g2gStock";
 import { readAuthoritativeCatalog, addOrUpdateGame, bulkAddOrUpdateGames } from "@/lib/catalog";
@@ -8,7 +12,7 @@ import { evaluateSellerTrust, TrustTier } from "@/lib/sellerTrust";
 import { calculateShopeeEconomics, calculateTargetSellingPrice } from "@/lib/pricing";
 import {
   verifyLiveGameOpportunity,
-  discoverRealTrendingOpportunity,
+  discoverRealTrendingOpportunities,
   fetchLiveEnebaListings,
   getPersistedResearchGames,
   savePersistedResearchGames,
@@ -643,18 +647,26 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({
-      status: "success",
-      source: "ENEBA_DIGITAL_KEYS",
-      persisted_count: (persistedDiscovered || []).length,
-      data: enriched,
-      meta: {
-        total_items: enriched.length,
-        supported_payment: "QRIS, DANA, OVO, ShopeePay, Bank Transfer",
-        risk_level: "0% Hackback (Official Redeem Codes)",
-        timestamp: new Date().toISOString(),
+    return NextResponse.json(
+      {
+        status: "success",
+        source: "ENEBA_DIGITAL_KEYS",
+        db_configured: isDbConfigured(),
+        persisted_count: (persistedDiscovered || []).length,
+        data: enriched,
+        meta: {
+          total_items: enriched.length,
+          supported_payment: "QRIS, DANA, OVO, ShopeePay, Bank Transfer",
+          risk_level: "0% Hackback (Official Redeem Codes)",
+          timestamp: new Date().toISOString(),
+        },
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({ status: "error", message: err.message }, { status: 500 });
   }
@@ -1289,93 +1301,107 @@ Skema JSON:
       }
     }
 
-    // ACTION: DISCOVER TRENDS (Zero-Gimmick: Multi-Source Live Verification + Persisted to Supabase)
+    // ACTION: DISCOVER TRENDS (Multi-Game Batch Zero-Gimmick Live Verification + Preview/Save)
     if (action === "discover_trend") {
       try {
+        const requestedCount = Math.min(8, Math.max(1, Number(body.count) || 5));
         const [currentCatalog, persistedResearch] = await Promise.all([
           readAuthoritativeCatalog().catch(() => []),
           getPersistedResearchGames("eneba").catch(() => []),
         ]);
         const excludeTitles = new Set<string>([
           ...(currentCatalog || []).map((g: any) => String(g.title || "").toLowerCase().trim()),
-          ...(persistedResearch || []).slice(0, 12).map((g: any) => String(g.title || "").toLowerCase().trim()),
+          ...(persistedResearch || []).slice(0, 15).map((g: any) => String(g.title || "").toLowerCase().trim()),
         ]);
 
-        const { verified, tactical_reason, instant_redeem_guide } =
-          await discoverRealTrendingOpportunity(excludeTitles);
-
-        const trust = evaluateSellerTrust({
-          rating: 99.8,
-          orders: 45000,
-          stock: 999,
-          priceIdr: verified.price_eneba_idr,
-          sellingPriceShopeeIdr: verified.recommended_shopee_price_idr,
-          deliverySpeed: "Instant 0-Detik",
-          verified: true,
+        const discoveredList = await discoverRealTrendingOpportunities(excludeTitles, {
+          count: requestedCount,
         });
 
-        const resultItem: EnebaScannedGame = {
-          id: `eneba-trend-${verified.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 18)}-${Date.now().toString().slice(-4)}`,
-          title: verified.title,
-          platform: verified.platform || "Steam",
-          category: "Digital Key / CDKey",
-          source_marketplace: "ENEBA",
-          eneba_direct_url: verified.eneba_direct_url,
-          seller_name: verified.eneba_live_verified
-            ? "Eneba Live Merchants (SSR Verified)"
-            : "Eneba Global Merchants (Live API)",
-          seller_rating_pct: trust.seller_rating,
-          seller_reviews_count: trust.seller_orders,
-          seller_rating: trust.seller_rating,
-          seller_orders: trust.seller_orders,
-          seller_level: trust.seller_level,
-          verified: trust.verified,
-          delivery_time: trust.delivery_time,
-          trust_score: trust.trust_score,
-          trust_tier: trust.trust_tier,
-          supplier_tier: "ultra_safe",
-          key_type: verified.key_type || "Steam Key Global",
-          price_eneba_idr: verified.price_eneba_idr,
-          eneba_base_price_idr: verified.eneba_base_price_idr,
-          eneba_live_verified: verified.eneba_live_verified,
-          recommended_shopee_price_idr: verified.recommended_shopee_price_idr,
-          steam_indo_price_idr: verified.steam_indo_price_idr,
-          qris_fee_idr: verified.qris_fee_idr,
-          shopee_fee_idr: verified.shopee_fee_idr,
-          operational_fee_idr: 0,
-          net_profit_idr: verified.net_profit_idr,
-          net_margin_pct: verified.net_margin_pct,
-          spread_pct: verified.spread_pct,
-          demand_score: 96,
-          competition_level: "Sedang",
-          arbitrage_verdict:
-            verified.net_margin_pct >= 30
-              ? "SUPER_OPPORTUNITY"
-              : verified.net_margin_pct >= 18
-              ? "HIGH_MARGIN"
-              : "STEADY_PROFIT",
-          crawl_timestamp: "Live Trend Verified",
-          tactical_reason,
-          instant_redeem_guide,
-          data_source: verified.data_source,
-          cheapshark_usd: verified.cheapshark_usd || undefined,
-          usd_idr_rate: verified.usd_idr_rate,
-          discount_pct: verified.steam_discount_pct || undefined,
-          steam_appid: verified.steam_app_id,
-          arbitrage_viable: verified.arbitrage_viable,
-          arbitrage_warning: verified.arbitrage_warning,
-          persisted_in_research_db: true,
-          opportunity_tags: [
-            "Trending Verified",
-            ...(verified.steam_discount_pct >= 40 ? [`Diskon Steam ${verified.steam_discount_pct}%`] : []),
-          ],
-        };
+        const nowSeed = Date.now().toString().slice(-4);
+        const resultItems: EnebaScannedGame[] = discoveredList.map(
+          ({ verified, tactical_reason, instant_redeem_guide }, idx) => {
+            const trust = evaluateSellerTrust({
+              rating: 99.8,
+              orders: 45000,
+              stock: 999,
+              priceIdr: verified.price_eneba_idr,
+              sellingPriceShopeeIdr: verified.recommended_shopee_price_idr,
+              deliverySpeed: "Instant 0-Detik",
+              verified: true,
+            });
+
+            return {
+              id: `eneba-trend-${verified.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16)}-${nowSeed}${idx}`,
+              title: verified.title,
+              platform: verified.platform || "Steam",
+              category: "Digital Key / CDKey",
+              source_marketplace: "ENEBA",
+              eneba_direct_url: verified.eneba_direct_url,
+              seller_name: verified.eneba_live_verified
+                ? "Eneba Live Merchants (SSR Verified)"
+                : "Eneba Global Merchants (Live API)",
+              seller_rating_pct: trust.seller_rating,
+              seller_reviews_count: trust.seller_orders,
+              seller_rating: trust.seller_rating,
+              seller_orders: trust.seller_orders,
+              seller_level: trust.seller_level,
+              verified: trust.verified,
+              delivery_time: trust.delivery_time,
+              trust_score: trust.trust_score,
+              trust_tier: trust.trust_tier,
+              supplier_tier: "ultra_safe",
+              key_type: verified.key_type || "Steam Key Global",
+              price_eneba_idr: verified.price_eneba_idr,
+              eneba_base_price_idr: verified.eneba_base_price_idr,
+              eneba_live_verified: verified.eneba_live_verified,
+              recommended_shopee_price_idr: verified.recommended_shopee_price_idr,
+              steam_indo_price_idr: verified.steam_indo_price_idr,
+              qris_fee_idr: verified.qris_fee_idr,
+              shopee_fee_idr: verified.shopee_fee_idr,
+              operational_fee_idr: 0,
+              net_profit_idr: verified.net_profit_idr,
+              net_margin_pct: verified.net_margin_pct,
+              spread_pct: verified.spread_pct,
+              demand_score: 96,
+              competition_level: "Sedang",
+              arbitrage_verdict:
+                verified.net_margin_pct >= 30
+                  ? "SUPER_OPPORTUNITY"
+                  : verified.net_margin_pct >= 18
+                  ? "HIGH_MARGIN"
+                  : "STEADY_PROFIT",
+              crawl_timestamp: "Live Trend Verified",
+              tactical_reason,
+              instant_redeem_guide,
+              data_source: verified.data_source,
+              cheapshark_usd: verified.cheapshark_usd || undefined,
+              usd_idr_rate: verified.usd_idr_rate,
+              discount_pct: verified.steam_discount_pct || undefined,
+              steam_appid: verified.steam_app_id,
+              arbitrage_viable: verified.arbitrage_viable,
+              arbitrage_warning: verified.arbitrage_warning,
+              persisted_in_research_db: true,
+              opportunity_tags: [
+                "Trending Verified",
+                ...(verified.steam_discount_pct >= 40 ? [`Diskon Steam ${verified.steam_discount_pct}%`] : []),
+              ],
+            };
+          }
+        );
 
         if (!previewOnly) {
-          await savePersistedResearchGames("eneba", [resultItem]);
+          await savePersistedResearchGames("eneba", resultItems);
         }
 
-        return NextResponse.json({ status: "success", persisted: !previewOnly, preview_only: previewOnly, data: resultItem });
+        return NextResponse.json({
+          status: "success",
+          persisted: !previewOnly,
+          preview_only: previewOnly,
+          count: resultItems.length,
+          data: resultItems,
+          primary: resultItems[0],
+        });
       } catch (err: any) {
         return NextResponse.json(
           { status: "error", message: err?.message || "Gagal menemukan trend yang tervalidasi live saat ini. Coba lagi." },

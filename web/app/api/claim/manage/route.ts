@@ -4,6 +4,9 @@ import path from "path";
 import { getDbClaims, upsertDbClaim, deleteDbClaim, getKV, setKV } from "@/lib/db";
 import { encryptCredential, decryptCredential } from "@/lib/cryptoVault";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function getClaimsFilePath() {
   return path.join(process.cwd(), "data", "claimed_credentials.json");
 }

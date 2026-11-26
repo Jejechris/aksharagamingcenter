@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getPublicStorefrontCatalog, PublicCatalogProduct } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const PUBLIC_FALLBACK_CATALOG: PublicCatalogProduct[] = [
   {
@@ -58,11 +59,18 @@ export async function GET() {
   try {
     const rows = await getPublicStorefrontCatalog();
     const list = rows && rows.length > 0 ? rows : PUBLIC_FALLBACK_CATALOG;
-    return NextResponse.json({
-      status: "success",
-      count: list.length,
-      data: list,
-    });
+    return NextResponse.json(
+      {
+        status: "success",
+        count: list.length,
+        data: list,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({
       status: "success",

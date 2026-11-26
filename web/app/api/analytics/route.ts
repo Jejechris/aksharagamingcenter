@@ -3,6 +3,9 @@ import fs from "fs";
 import path from "path";
 import { getKV, setKV } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function readLedgerTransactions(): Promise<any[]> {
   const dbData = await getKV("financial_ledger");
   if (dbData) {

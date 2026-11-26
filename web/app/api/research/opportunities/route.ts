@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { callGemini } from "@/lib/gemini";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
 import { getG2GSellerUrl, resolveG2GProductUrl } from "@/lib/g2g";
 import { getDbCatalog } from "@/lib/db";
@@ -391,11 +394,18 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({
-      status: "success",
-      count: enriched.length,
-      data: enriched,
-    });
+    return NextResponse.json(
+      {
+        status: "success",
+        count: enriched.length,
+        data: enriched,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
   }
