@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callGemini } from "@/lib/gemini";
+import { formatCleanShopeeTitle, stripEmojisAndUnsafeSymbols } from "@/lib/shopeeCompliance";
 
 interface DescriptionRequest {
   gameTitle?: string;
@@ -26,158 +27,149 @@ function generateFallbackDescription(params: DescriptionRequest) {
     customNotes = "",
   } = params;
 
-  const cleanTitle = gameTitle.toUpperCase();
+  const cleanTitle = gameTitle.trim();
   const formattedPrice = new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
     maximumFractionDigits: 0,
   }).format(price);
 
-  // Optimized Shopee SEO Title (Max 120 chars, 100% Pure Digital)
-  let seoTitle = `${cleanTitle} [${platform.toUpperCase()}] ORIGINAL FULL ACCESS GARANSI RESMI`;
-  if (seoTitle.length > 120) {
-    seoTitle = seoTitle.substring(0, 117) + "...";
-  }
+  // Clean Shopee Title matching Cover 1:1 (e.g. "Minecraft: Java & Bedrock Edition (PC / Microsoft) - Private")
+  const seoTitle = formatCleanShopeeTitle({
+    title: cleanTitle,
+    platform,
+    category,
+  });
 
   // Generate targeted hashtags
-  const tagWords = cleanTitle.replace(/[^A-Z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2);
+  const tagWords = cleanTitle.replace(/[^a-zA-Z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2);
   const baseTags = [
     `#${tagWords.join("")}`,
-    `#Jual${tagWords[0] || "Game"}Original`,
-    "#GameOriginal",
+    `#Jual${tagWords[0] || "Game"}`,
+    "#GamePC",
     "#AksharaGaming",
-    "#GaransiResmi",
+    "#GaransiDigital",
     `#Game${platform.replace(/[^a-zA-Z0-9]/g, "")}`,
-    "#FullAccess",
-    "#DigitalLicense",
-    "#ShopeeGamingID"
+    "#DigitalLicense"
   ];
-  const seoHashtags = baseTags.slice(0, 8).join(" ");
+  const seoHashtags = baseTags.slice(0, 7).join(" ");
 
   let content = "";
 
   if (style === "ultimate") {
-    content = `AKSHARA GAMING CENTER — OFFICIAL DIGITAL LICENSE
-PRODUK 100% ORIGINAL & LEGAL | PERMANENT OWNERSHIP
-FULL ACCESS | BISA GANTI SEMUA DATA | GARANSI RESMI
+    content = `Akshara Gaming Center - Official Digital License
+${seoTitle}
 
-==================================================
+--------------------------------------------------
 DETAIL PRODUK:
-• Game: ${gameTitle}
-• Platform: ${platform}
-• Tipe Lisensi: ${category}
-• Status: 100% Fresh & Original (Bukan Shared/Bajakan)
-• Wilayah: GLOBAL (Bisa dimainkan di seluruh Indonesia tanpa VPN)
-• Bahasa: Multi-language (Termasuk English)
-==================================================
+- Game: ${gameTitle}
+- Platform: ${platform}
+- Tipe Lisensi: ${category}
+- Kepemilikan: Permanen (Akses Penuh Pribadi untuk 1 Pembeli)
+- Wilayah: Global (Siap dimainkan dari Indonesia tanpa pengaturan khusus)
+- Bahasa: Multi-language (Termasuk English)
+--------------------------------------------------
 
 KEUNGGULAN BELI DI AKSHARA GAMING:
-- FULL ACCESS 100%: Pembeli bebas ganti Email, Password, Nickname, & Pertanyaan Keamanan.
-- ONLINE MULTIPLAYER RESMI: Bebas main online di seluruh server resmi publik & private.
-- PERMANEN MILIK ANDA: Akun/Lisensi aktif selamanya, bukan sewa bulanan.
-- PENGIRIMAN KILAT DIGITAL: Kartu Akses + Sertifikat Garansi Digital QR dikirim langsung via Chat Shopee.
+- Full Access Pribadi: Pembeli dapat mengubah Email, Password, dan Pengaturan Keamanan.
+- Online Multiplayer Resmi: Dapat dimainkan online di seluruh server resmi.
+- Kepemilikan Permanen: Aktif selamanya, bukan sewa berkala.
+- Pengiriman Kilat Digital: Kartu Akses dan Sertifikat Garansi Digital QR dikirim langsung via Chat Shopee.
 ${customNotes ? `CATATAN TAMBAHAN: ${customNotes}\n` : ""}
-==================================================
+--------------------------------------------------
 ${includeActivationSteps ? `3 LANGKAH MUDAH AKTIVASI:
 1. Selesaikan pembayaran di Shopee dan cek chat Shopee Anda.
-2. Tim Akshara akan mengirimkan Kartu Akses + Kode Klaim & panduan setup instan via Chat Shopee.
-3. Login ke launcher resmi ${platform}, ubah data sesuai keinginan, dan game siap dimainkan!
+2. Tim Akshara akan mengirimkan Kartu Akses + Kode Klaim dan panduan setup instan via Chat Shopee.
+3. Login ke launcher resmi ${platform}, amankan data akun, dan game siap dimainkan.
 
-==================================================
-` : ""}${includeUnboxingSop ? `SYARAT & KETENTUAN KLAIM GARANSI (SOP ANTI-FRAUD):
-1. Wajib merekam VIDEO LAYAR (Screen Recording) tanpa jeda (no-cut & unedited) dari sebelum membuka Kartu Akses / Brankas Klaim hingga berhasil login pertama kali ke dalam game.
-2. Segera lakukan pengecekan dan pergantian data setelah detail diterima.
-3. Garansi tidak berlaku jika akun terindikasi menggunakan cheat/third-party mod ilegal/terkena ban aktivitas sendiri.
-4. Tim Support Akshara siap membantu 24/7 jika ada kendala login awal.
+--------------------------------------------------
+` : ""}${includeUnboxingSop ? `SYARAT DAN KETENTUAN KLAIM GARANSI:
+1. Wajib merekam video layar (Screen Recording) tanpa jeda (no-cut) dari sebelum membuka Kartu Akses / Brankas Klaim hingga login pertama kali berhasil.
+2. Segera lakukan pengecekan dan pengamanan data setelah detail diterima.
+3. Garansi tidak berlaku jika akun melanggar ketentuan resmi publisher game.
+4. Tim Support Akshara siap membantu setiap hari jika ada kendala login awal.
 
-==================================================
+--------------------------------------------------
 ` : ""}${includeFaq ? `PERTANYAAN UMUM (FAQ):
-Q: Apakah produk selalu ready stok?
-A: Selalu READY STOK kak! Sistem kami autonomous, silakan langsung di-checkout saja.
+Q: Apakah produk ready stok?
+A: Ready stok, silakan langsung di-checkout.
 
-Q: Apakah butuh VPN untuk login atau main?
-A: Sama sekali TIDAK. 100% region Global dan aman koneksi internet Indonesia (Indihome, Biznet, Telkomsel, dll).
+Q: Apakah bisa langsung dimainkan di Indonesia?
+A: Ya, produk wilayah Global dan berjalan normal menggunakan koneksi internet Indonesia.
 
 Q: Bagaimana cara pengirimannya? Apakah ada paket fisik?
-A: Pesanan diproses 100% DIGITAL kilat via Chat Shopee + Kartu Akses & Sertifikat Garansi Digital ber-QR, tanpa perlu menunggu kurir ekspedisi.
+A: Pesanan diproses 100% digital kilat via Chat Shopee + Kartu Akses dan Sertifikat Garansi Digital QR tanpa paket fisik.
 
-==================================================
-` : ""}Terima kasih telah mempercayakan kebutuhan gaming Anda di Akshara Gaming Center!
-Happy Gaming!
+--------------------------------------------------
+` : ""}Terima kasih telah mempercayakan kebutuhan gaming Anda di Akshara Gaming Center.
 
 ${seoHashtags}`;
   } else if (style === "security") {
-    content = `AKSHARA GAMING CENTER — KEAMANAN LISENSI TERJAMIN 100%
-${cleanTitle} [${platform}]
-AKUN FULL ACCESS DENGAN PROTEKSI GARANSI RESMI
+    content = `Akshara Gaming Center - Keamanan Lisensi Terjamin
+${seoTitle}
 
-==================================================
-KEAMANAN & LEGALITAS PRODUK:
-• 100% Legal & Safe (Bukan hasil carding, phising, atau inject ilegal).
-• Full Access can change email, password, and security info.
-• Bukan Akun Shared / Sharing — 1 Akun hanya untuk 1 Pembeli selamanya.
-• Server Resmi & Original Update otomatis dari developer.
-==================================================
+--------------------------------------------------
+KEAMANAN DAN LEGALITAS PRODUK:
+- 100% Resmi dan Legal dari jalur distribusi terpercaya.
+- Akses Penuh Pribadi: 1 lisensi khusus untuk 1 pembeli saja.
+- Update otomatis langsung dari server resmi publisher.
+--------------------------------------------------
 
-📦 KELENGKAPAN PESANAN:
-1. Akun / Lisensi ${gameTitle} Original.
-2. Panduan Keamanan Akun & Tips Mengamankan Akun dari Hackback.
-3. Sertifikat Garansi Digital ber-QR Serial ID & Panduan Setup Instan.
-4. Layanan Purna Jual CS 24 Jam.
+KELENGKAPAN PESANAN:
+1. Lisensi Resmi ${gameTitle}.
+2. Panduan Pengamanan Akun Lengkap dan Langkah 2FA.
+3. Sertifikat Garansi Digital QR Serial ID dan Panduan Setup Instan.
+4. Layanan Purna Jual CS Responsif.
 
-==================================================
+--------------------------------------------------
 SOP KLAIM GARANSI:
-• Wajib merekam VIDEO LAYAR (Screen Recording) saat membuka brankas kredensial & login pertama tanpa jeda (no-cut).
-• Penggantian akun baru diberikan jika data awal tidak valid saat pertama diterima.
-• Akshara menerapkan Zero-Tolerance untuk seller scam & buyer fraud.
+- Wajib merekam video layar (Screen Recording) saat membuka brankas kredensial dan login pertama tanpa jeda (no-cut).
+- Penggantian unit baru diberikan bila data awal bermasalah saat pertama diterima.
 
 ${seoHashtags}`;
   } else if (style === "flash_sale") {
-    content = `PROMO SPESIAL HARI INI — DISKON SPESIAL AKSHARA GAMING!
-${cleanTitle} — ${formattedPrice}
-DAPATKAN LISENSI RESMI + KARTU GARANSI DIGITAL QR!
+    content = `Penawaran Spesial Akshara Gaming Center
+${seoTitle} - ${formattedPrice}
+Dapatkan Lisensi Resmi dan Kartu Garansi Digital QR.
 
-STOK TERBATAS! Harga promo bisa berubah sewaktu-waktu.
-Langsung checkout sekarang sebelum kehabisan slot promo!
-
-Kenapa harus beli di Akshara Gaming?
-- Harga termurah se-Shopee dengan jaminan original
-- Akun Full Access (Bisa ubah semua data)
-- Pengiriman instan 100% digital tanpa nunggu lama
-- Garansi resmi toko terpercaya bintang 5
+Stok tersedia untuk pengiriman digital cepat via Chat Shopee:
+- Akses Penuh Pribadi (Bisa ubah semua data keamanan)
+- Pengiriman instan 100% digital tanpa menunggu kurir
+- Garansi resmi toko terpercaya
 ${customNotes ? `- ${customNotes}\n` : ""}
 Langkah Order:
-1. Klik Beli Sekarang & lakukan pembayaran.
-2. Cek chat Shopee untuk Kartu Akses Digital & panduan instalasi.
-3. Kredensial lisensi game dapat langsung dibuka instan via portal klaim / QR!
+1. Klik Beli Sekarang dan selesaikan pembayaran.
+2. Cek Chat Shopee untuk menerima Kartu Akses Digital QR.
+3. Scan QR atau masukkan Kode Klaim untuk membuka lisensi Anda.
 
 ${seoHashtags}`;
   } else {
     // Clean & Minimalist
-    content = `AKSHARA GAMING CENTER — ${cleanTitle}
+    content = `Akshara Gaming Center - ${seoTitle}
 
 Spesifikasi Produk:
-• Platform: ${platform}
-• Kategori: ${category}
-• Region: Global (Tanpa VPN)
-• Kepemilikan: Permanen & Full Access
+- Platform: ${platform}
+- Kategori: ${category}
+- Region: Global (Siap dimainkan di Indonesia)
+- Kepemilikan: Permanen (Akses Penuh Pribadi)
 
 Fitur Utama:
-- Original legal developer license
-- Akses penuh ganti email & password
-- Support online multiplayer resmi
-- Pengiriman 100% digital instan + Kartu Garansi Digital QR tanpa nunggu kurir
-${includeUnboxingSop ? `- SOP Garansi: Wajib sertakan video rekaman layar (screen recording) saat buka kredensial tanpa jeda (no cut)\n` : ""}
-Catatan: Silakan tanyakan CS jika membutuhkan bantuan panduan instalasi.
+- Lisensi resmi developer
+- Akses penuh ganti email dan password
+- Mendukung online multiplayer resmi
+- Pengiriman 100% digital instan + Kartu Garansi Digital QR tanpa kurir fisik
+${includeUnboxingSop ? `- SOP Garansi: Wajib sertakan video rekaman layar (screen recording) saat buka kredensial tanpa jeda (no-cut)\n` : ""}Catatan: Silakan hubungi CS via Chat Shopee jika membutuhkan panduan instalasi.
 
 ${seoHashtags}`;
   }
 
+  const sanitizedContent = stripEmojisAndUnsafeSymbols(content);
+
   return {
     seo_title: seoTitle,
-    full_description: content.trim(),
+    full_description: sanitizedContent,
     seo_hashtags: seoHashtags,
-    character_count: content.trim().length,
+    character_count: sanitizedContent.length,
     quick_specs: [
       `Platform: ${platform}`,
       `Lisensi: ${category}`,
@@ -226,10 +218,10 @@ export async function POST(req: Request) {
 Tugasmu adalah membuat deskripsi produk Shopee Indonesia yang SANGAT MENARIK, PROFESIONAL, PERSUASIF, BERSIH, RAMAH ALGORITMA SHOPEE, dan MEMILIKI KONVERSI PENJUALAN TINGGI, LENGKAP DENGAN REKOMENDASI COVER 1080x1080.
 
 Aturan Penting Format Shopee:
-1. Karakteristik pembeli Shopee Indonesia menyukai teks terstruktur rapi dengan pembatas garis (=== atau ---) dan bullet points yang jelas. JANGAN GUNAKAN EMOJI SAMA SEKALI karena bisa ditolak oleh sistem Shopee terbaru. DILARANG KERAS mencantumkan tautan website luar (https://, .com, .vercel.app, bit.ly, wa.me) karena melanggar kebijakan Shopee.
-2. Judul SEO harus di bawah 120 karakter, huruf kapital rapi, mengandung kata kunci utama (Nama Game, Platform, Original, Full Access, Garansi).
+1. Gunakan teks polos alfanumerik standar + tanda baca biasa (---, :, -). DILARANG KERAS memakai emoji, simbol dekoratif unik, kata spam/clickbait ("100% Original", "Termurah", "Best Seller", "Diskon", "Hot Item"), ALL CAPS penuh, maupun kata pemicu filter ("bajakan", "sharing", "hackback", "crack", "carding", "VPN"). DILARANG KERAS mencantumkan tautan website luar (https://, .com, .vercel.app, bit.ly, wa.me).
+2. Judul SEO HARUS simpel & seragam dengan cover produk dalam format Title Case: "${formatCleanShopeeTitle({ title: gameTitle, platform, category })}" (maks 120 karakter, tanpa ALL CAPS atau tanda kurung promosi).
 3. Deskripsi harus memuat:
-   - Header & Keunggulan Produk (100% Legal, Bukan Shared, Full Access bisa ganti email/pass, Region Global tanpa VPN).
+   - Header & Keunggulan Produk (Lisensi Resmi Pribadi 1 Pembeli, Bisa Ubah Data Keamanan, Region Global Indonesia).
    - Detail Spesifikasi (Platform, Bahasa, Fitur Online Multiplayer).
    - Kelengkapan Produk (Lisensi Akun + Kartu Garansi Digital QR & Panduan Aktivasi Digital Instan tanpa paket fisik/kurir).
    ${includeActivationSteps ? "- Langkah Cara Aktivasi 3 Langkah Cepat." : ""}
@@ -270,15 +262,17 @@ Pastikan formatnya sangat rapi, bebas link eksternal terlarang Shopee, dan siap 
       const parsed = JSON.parse(cleanJson);
 
       if (parsed.full_description && parsed.seo_title) {
+        const cleanAiTitle = stripEmojisAndUnsafeSymbols(String(parsed.seo_title)).slice(0, 120);
+        const cleanAiDesc = stripEmojisAndUnsafeSymbols(String(parsed.full_description)).slice(0, 2990);
         return NextResponse.json({
           status: "success",
           source: "gemini-ai",
           data: {
-            seo_title: parsed.seo_title,
-            full_description: parsed.full_description,
-            seo_hashtags: parsed.seo_hashtags || "",
+            seo_title: cleanAiTitle,
+            full_description: cleanAiDesc,
+            seo_hashtags: stripEmojisAndUnsafeSymbols(parsed.seo_hashtags || ""),
             quick_specs: parsed.quick_specs || [],
-            character_count: parsed.full_description.length,
+            character_count: cleanAiDesc.length,
             cover_recommendation: parsed.cover_recommendation || {
               suggested_ratio: "1:1 (1080 x 1080 px)",
               headline_badges: [

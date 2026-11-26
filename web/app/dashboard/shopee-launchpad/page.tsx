@@ -6,6 +6,7 @@ import { fetchSmartCatalog } from "@/lib/catalogClient";
 import ThumbnailStudio from "@/app/dashboard/marketer/components/ThumbnailStudio";
 import GameSelectorCombobox from "@/app/components/GameSelectorCombobox";
 import MassUploadStudio from "./components/MassUploadStudio";
+import { formatCleanShopeeTitle, stripEmojisAndUnsafeSymbols } from "@/lib/shopeeCompliance";
 import {
   SHOPEE_FEE_PRESETS,
   ShopeeFeePresetId,
@@ -105,18 +106,12 @@ export default function ShopeeLaunchpadPage() {
     price: false,
   });
 
-  // Helper: Build Default SEO Title
-  const generateDefaultTitle = useCallback((title: string, plat: string, days: number) => {
-    const cleanT = (title || "GAME TITLE").toUpperCase().trim();
-    const platClean = (plat || "PC").toUpperCase().trim();
-    let str = `${cleanT} [${platClean}] ORIGINAL FULL ACCESS GARANSI RESMI ${days} HARI`;
-    if (str.length > 120) {
-      str = str.slice(0, 117) + "...";
-    }
-    return str;
+  // Helper: Build Clean Shopee Title matching Cover 1:1
+  const generateDefaultTitle = useCallback((title: string, plat: string, _days: number, cat?: string) => {
+    return formatCleanShopeeTitle({ title, platform: plat, category: cat });
   }, []);
 
-  // Helper: Build Default Description
+  // Helper: Build Clean Shopee Description (100% Polos Tanpa Emoji, Tanpa ALL CAPS Spam, Zero-Link)
   const generateDefaultDesc = useCallback((
     title: string,
     plat: string,
@@ -128,66 +123,66 @@ export default function ShopeeLaunchpadPage() {
     vip: boolean,
     bonus: string
   ) => {
-    const cleanT = (title || "GAME TITLE").toUpperCase().trim();
+    const cleanT = (title || "Game Original").trim();
+    const coverTitle = formatCleanShopeeTitle({ title: cleanT, platform: plat, category: cat });
 
-    let desc = `🎮 ${cleanT} — ORIGINAL DIGITAL LICENSE\n`;
+    let desc = `${coverTitle}\n`;
     desc += `Platform: ${plat} | Tipe: ${cat}\n`;
     desc += `Garansi Toko Resmi: ${days} Hari Penuh\n`;
-    desc += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    desc += `--------------------------------------------------\n\n`;
 
-    desc += `⚡ KEUNGGULAN PRODUK AKSHARA GAMING CENTER:\n`;
-    desc += `✓ 100% Lisensi Game Asli & Legal (Bukan bajakan / bukan sharing bebas).\n`;
-    desc += `✓ Full Access Akun Pribadi & Bebas Ganti Data / Email / Password.\n`;
-    desc += `✓ Pengiriman Instan Otomatis langsung melalui sistem Brankas Digital Terenkripsi.\n`;
-    desc += `✓ Proteksi garansi toko ${days} hari ganti baru anti-hackback.\n\n`;
+    desc += `KEUNGGULAN PRODUK AKSHARA GAMING CENTER:\n`;
+    desc += `- 100% Lisensi Game Asli dan Legal.\n`;
+    desc += `- Akses Penuh Pribadi untuk 1 Pembeli (Bukan Akun Bersama).\n`;
+    desc += `- Pengiriman Instan 100% Digital via Chat Shopee.\n`;
+    desc += `- Perlindungan garansi toko resmi selama ${days} hari penuh.\n\n`;
 
     if (guide) {
-      desc += `📥 CARA AKTIVASI & PENGAMBILAN KREDENSIAL (100% DIGITAL QR):\n`;
+      desc += `CARA AKTIVASI DAN PENGAMBILAN KREDENSIAL (100% DIGITAL QR):\n`;
       desc += `1. Selesaikan pembayaran pesanan Anda di Shopee.\n`;
-      desc += `2. Admin akan mengirimkan Kartu Akses & Sertifikat Garansi Digital PNG (berisi QR Code + Kode Klaim + PIN) langsung melalui Chat Shopee.\n`;
+      desc += `2. Admin akan mengirimkan Kartu Akses dan Sertifikat Garansi Digital PNG (berisi QR Code + Kode Klaim + PIN) langsung melalui Chat Shopee.\n`;
       desc += `3. Scan QR Code pada gambar kartu menggunakan kamera HP Anda atau masukkan Kode Klaim & PIN untuk membuka kredensial / CD-Key secara instan.\n`;
-      desc += `4. Login ke launcher resmi (${plat}) & selamat bermain!\n\n`;
+      desc += `4. Login ke launcher resmi (${plat}) dan selamat bermain.\n\n`;
     }
 
     if (unboxing) {
-      desc += `🛡️ SYARAT & KETENTUAN KLAIM GARANSI:\n`;
-      desc += `• Wajib merekam video rekaman layar (screen recording) tanpa jeda (no-cut) mulai dari sebelum membuka brankas kredensial hingga mencoba login pertama kali.\n`;
-      desc += `• Garansi meliputi akun tidak bisa login saat serah terima atau kendala lisensi selama masa garansi ${days} hari.\n`;
-      desc += `• Ulasan bintang 5 dan konfirmasi penerimaan pesanan akan mengaktifkan Sertifikat Garansi Digital secara otomatis.\n\n`;
+      desc += `SYARAT DAN KETENTUAN KLAIM GARANSI:\n`;
+      desc += `- Wajib merekam video rekaman layar (screen recording) tanpa jeda (no-cut) mulai dari sebelum membuka brankas kredensial hingga mencoba login pertama kali.\n`;
+      desc += `- Garansi meliputi akun tidak bisa login saat serah terima atau kendala lisensi selama masa garansi ${days} hari.\n`;
+      desc += `- Ulasan bintang 5 dan konfirmasi penerimaan pesanan akan mengaktifkan Sertifikat Garansi Digital secara otomatis.\n\n`;
     }
 
     if (faq) {
-      desc += `❓ PERTANYAAN UMUM (F.A.Q):\n`;
+      desc += `PERTANYAAN UMUM (F.A.Q):\n`;
       desc += `Q: Apakah ini permanen?\n`;
-      desc += `A: Ya, game menjadi milik Anda permanen dan dapat dimainkan online/offline sesuai fitur game.\n`;
+      desc += `A: Ya, game menjadi milik Anda permanen dan dapat dimainkan online/offline sesuai fitur resmi game.\n`;
       desc += `Q: Apakah ada pengiriman paket atau amplop fisik?\n`;
-      desc += `A: Tidak ada. 100% Pengiriman Digital instan melalui Chat Shopee menggunakan Kartu Akses & Garansi Digital QR resmi.\n\n`;
+      desc += `A: Tidak ada. 100% Pengiriman Digital instan melalui Chat Shopee menggunakan Kartu Akses dan Garansi Digital QR resmi.\n\n`;
     }
 
     if (vip) {
-      desc += `🎁 BONUS MEMBER VIP REPEAT ORDER:\n`;
-      desc += `Pesanan berstatus garansi aktif otomatis tercatat pada ID Sertifikat Garansi Digital Akshara untuk benefit prioritas & promo repeat order.\n\n`;
+      desc += `BONUS MEMBER VIP REPEAT ORDER:\n`;
+      desc += `Pesanan berstatus garansi aktif otomatis tercatat pada ID Sertifikat Garansi Digital Akshara untuk benefit prioritas dan promo repeat order.\n\n`;
     }
 
     if (bonus.trim()) {
-      desc += `📝 CATATAN TAMBAHAN:\n${bonus.trim()}\n\n`;
+      desc += `CATATAN TAMBAHAN:\n${bonus.trim()}\n\n`;
     }
 
     // Hashtags
-    const cleanWords = cleanT.replace(/[^A-Z0-9\s]/g, "").split(/\s+/).filter((w) => w.length > 2);
+    const cleanWords = cleanT.replace(/[^a-zA-Z0-9\s]/g, "").split(/\s+/).filter((w) => w.length > 2);
     const tags = [
       `#${cleanWords.join("")}`,
-      `#Jual${cleanWords[0] || "Game"}Original`,
-      "#GameOriginal",
+      `#Jual${cleanWords[0] || "Game"}`,
+      "#GamePC",
       "#AksharaGaming",
       "#GaransiResmi",
-      `#${plat.replace(/[^a-zA-Z0-9]/g, "")}Gaming`,
-      "#ShopeeGameID",
+      `#${plat.replace(/[^a-zA-Z0-9]/g, "") || "PCGame"}`,
       "#DigitalLicense"
-    ].join(" ");
+    ].slice(0, 7).join(" ");
 
-    desc += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${tags}`;
-    return { desc, tags };
+    desc += `--------------------------------------------------\n${tags}`;
+    return { desc: stripEmojisAndUnsafeSymbols(desc), tags };
   }, []);
 
   // Fetch Catalog on Mount
@@ -207,7 +202,7 @@ export default function ShopeeLaunchpadPage() {
           const cogs = first.metrics?.cogs_g2g_idr || Math.round(first.selling_price_shopee_idr * 0.6);
           setCogsEstimate(cogs);
 
-          const initTitle = generateDefaultTitle(first.title, first.platform, 30);
+          const initTitle = generateDefaultTitle(first.title, first.platform, 30, first.category);
           setSeoTitle(initTitle);
 
           const { desc, tags } = generateDefaultDesc(
@@ -260,7 +255,7 @@ export default function ShopeeLaunchpadPage() {
     setCogsEstimate(newCogs);
 
     // Auto-sync SEO outputs
-    const defTitle = generateDefaultTitle(newTitle, newPlat, warrantyDays);
+    const defTitle = generateDefaultTitle(newTitle, newPlat, warrantyDays, newCat);
     setSeoTitle(defTitle);
 
     const { desc, tags } = generateDefaultDesc(
@@ -300,19 +295,18 @@ export default function ShopeeLaunchpadPage() {
 
   // Re-generate SEO Title
   const handleRebuildTitle = () => {
-    const defTitle = generateDefaultTitle(gameTitle, platform, warrantyDays);
+    const defTitle = generateDefaultTitle(gameTitle, platform, warrantyDays, category);
     setSeoTitle(defTitle);
   };
 
-  // Quick Keyword Chips
+  // Quick Keyword Chips (Shopee-Safe Title Case)
   const KEYWORD_CHIPS = [
-    "ORIGINAL",
-    "FULL ACCESS",
-    `GARANSI ${warrantyDays} HARI`,
-    "INSTANT DELIVERY",
-    "GLOBAL",
-    "ANTI-HACKBACK",
-    "100% LEGAL",
+    "Private",
+    "CD-Key",
+    "Full Access",
+    `Garansi ${warrantyDays} Hari`,
+    "Global",
+    "Digital QR",
     "REGION FREE"
   ];
 

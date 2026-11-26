@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { fetchSmartCatalog } from "@/lib/catalogClient";
+import { formatCleanShopeeTitle } from "@/lib/shopeeCompliance";
 import { 
   Sparkles, Download, RefreshCw, Eye, Check, Copy, 
   Layers, ShieldCheck, Tag, ShoppingBag, Monitor, 
@@ -553,8 +554,13 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
       setPrice(props.externalPrice);
     }
 
-    const accessLabel = rawCat.toLowerCase().includes("key") ? "Key | Full Access" : "Private";
-    setCleanTitle(`${title} (${props.externalPlatform || "Steam"}) - ${accessLabel}`);
+    setCleanTitle(
+      formatCleanShopeeTitle({
+        title,
+        platform: props.externalPlatform || "Steam",
+        category: rawCat,
+      })
+    );
 
     handleFetchOfficialArtwork(title, true);
   }, [props.externalGameTitle, props.externalPlatform, props.externalCategory, props.externalPrice]);

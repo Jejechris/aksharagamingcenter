@@ -5,6 +5,7 @@
  * pill AKSHARA GAMING CENTER VERIFIED, micro-security guilloche border, dog-ear corner peel,
  * dan badge platform di pojok kanan bawah) serta Slide 2 (Aturan & Garansi Resmi Digital).
  */
+import { formatCleanShopeeTitle } from "@/lib/shopeeCompliance";
 
 const PLATFORM_THEME_MAP: Record<
   string,
@@ -287,13 +288,12 @@ export async function renderAndHostBatchCover(params: {
   ctx.fillStyle = frameColor;
   ctx.fillRect(0, 0, 1080, 1080);
 
-  // 2. Top Header Title (x=54, y=64) — Format konsisten: "Judul Game (Platform) - Private / CD-Key"
-  const typeSuffix = /key|cdkey/i.test(params.category || "") ? "CD-Key" : "Private";
-  const platClean = (params.platform || "Steam").trim();
-  const hasPlatInTitle = params.title.toLowerCase().includes(platClean.toLowerCase());
-  const topTitle = hasPlatInTitle
-    ? `${params.title} - ${typeSuffix}`
-    : `${params.title} (${platClean}) - ${typeSuffix}`;
+  // 2. Top Header Title (x=54, y=64) — Format konsisten dengan Judul Shopee Mass Upload: "Judul Game (Platform) - Private / CD-Key"
+  const topTitle = formatCleanShopeeTitle({
+    title: params.title,
+    platform: params.platform,
+    category: params.category,
+  });
 
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";

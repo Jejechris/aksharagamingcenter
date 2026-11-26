@@ -1,4 +1,9 @@
 import ExcelJS from "exceljs";
+import {
+  auditShopeeTextSafety,
+  formatCleanShopeeTitle,
+  stripEmojisAndUnsafeSymbols,
+} from "@/lib/shopeeCompliance";
 
 export interface ShopeeMassProductVariant {
   option_name: string; // e.g. "Standard Global", "Ultimate Edition" (max 20 chars)
@@ -54,12 +59,9 @@ export function inferShopeeCategoryId(title: string, platform: string, category?
   return "101090"; // Gaming & Konsol / Video Game / Game PC
 }
 
-const FORBIDDEN_URL_RE = /(https?:\/\/|wa\.me|bit\.ly|vercel\.app|\.com\b|\.id\b|shopee\.co)/i;
-const PHYSICAL_JUNK_RE = /(amplop fisik|kartu garansi fisik|ekspedisi kurir|video unboxing amplop)/i;
-
 /**
- * Menghasilkan Judul SEO (maks 120 char) & Deskripsi Shopee-Compliant 100% Pure Digital
- * tanpa link eksternal agar lolos validasi & tidak kena sensor marketplace.
+ * Menghasilkan Judul Simpel seragam dengan Cover (misal: "Minecraft: Java & Bedrock Edition (PC / Microsoft) - Private")
+ * & Deskripsi 100% Alfanumerik Polos Tanpa Emoji, Tanpa ALL CAPS Spam, & Bebas Link Eksternal.
  */
 export function buildPureDigitalListingCopy(params: {
   title: string;
@@ -71,59 +73,52 @@ export function buildPureDigitalListingCopy(params: {
   const platform = (params.platform || "PC / Steam").trim();
   const category = (params.category || "Digital License").trim();
   const warrantyDays = Math.max(1, Number(params.warrantyDays) || 30);
-  const isKey = /key|cdkey|redeem/i.test(category);
 
-  let seoTitle = `[100% ORIGINAL] ${title.toUpperCase()} - ${platform.toUpperCase()} ${
-    isKey ? "CDKEY RESMI" : "FULL ACCESS"
-  } GARANSI ${warrantyDays} HARI`;
-  if (seoTitle.length > 120) {
-    seoTitle = seoTitle.slice(0, 117).trim() + "...";
-  }
+  const seoTitle = formatCleanShopeeTitle({ title, platform, category });
 
   const tagWords = title
-    .toUpperCase()
-    .replace(/[^A-Z0-9\s]/g, "")
+    .replace(/[^a-zA-Z0-9\s]/g, "")
     .split(/\s+/)
     .filter((w) => w.length > 2)
     .slice(0, 4);
   const hashtags = [
     ...tagWords.map((w) => `#${w}`),
     "#AksharaGaming",
-    "#GameOriginal",
+    "#GamePC",
     "#GaransiDigital",
     `#${platform.replace(/[^a-zA-Z0-9]/g, "") || "PCGame"}`,
   ]
     .slice(0, 7)
     .join(" ");
 
-  const description = [
-    `AKSHARA GAMING CENTER - OFFICIAL DIGITAL LICENSE`,
-    `PRODUK 100% ORIGINAL & LEGAL | 100% PENGIRIMAN DIGITAL INSTAN`,
-    `==================================================`,
+  const rawDescription = [
+    `Akshara Gaming Center - Official Digital License`,
+    `${seoTitle}`,
+    `--------------------------------------------------`,
     `DETAIL PRODUK:`,
-    `- Game: ${title}`,
+    `- Produk: ${title}`,
     `- Platform: ${platform}`,
     `- Tipe Lisensi: ${category}`,
-    `- Status: 100% Legal & Permanen (Bukan Shared / Bajakan)`,
-    `- Region: GLOBAL (Aman tanpa VPN dari Indonesia)`,
-    `==================================================`,
+    `- Kepemilikan: Permanen (Akses Penuh Pribadi untuk 1 Pembeli)`,
+    `- Region: Global (Siap dimainkan langsung dari Indonesia)`,
+    `--------------------------------------------------`,
     ``,
     `KELENGKAPAN PENGIRIMAN DIGITAL (TANPA PAKET FISIK):`,
-    `1. Akses lisensi / kredensial resmi dikirim langsung via Chat Shopee.`,
-    `2. Kartu Akses & Sertifikat Garansi Digital ber-QR resmi (${warrantyDays} Hari).`,
-    `3. Panduan setup & aktivasi lengkap didampingi CS ramah.`,
+    `1. Data lisensi atau akses resmi dikirim langsung melalui Chat Shopee.`,
+    `2. Kartu Akses dan Sertifikat Garansi Digital ber-QR resmi (${warrantyDays} Hari).`,
+    `3. Panduan aktivasi langkah demi langkah dibantu tim CS setiap hari.`,
     ``,
-    `SYARAT & KETENTUAN GARANSI RESMI:`,
+    `SYARAT DAN KETENTUAN GARANSI RESMI:`,
     `- Wajib merekam layar (Screen Recording) tanpa jeda (no-cut) sebelum membuka Kartu Akses hingga login pertama berhasil.`,
-    `- Dilarang mengubah Region/Negara akun (2-4 minggu) atau data akun tanpa konfirmasi admin.`,
-    `- Klik "Pesanan Diterima" + Ulasan Bintang 5 setelah berhasil login untuk mengaktifkan garansi penuh ${warrantyDays} hari.`,
+    `- Dilarang mengubah negara/region akun (2-4 minggu) atau data keamanan tanpa konfirmasi admin.`,
+    `- Klik "Pesanan Diterima" dan berikan ulasan bintang 5 setelah login berhasil untuk mengaktifkan masa garansi ${warrantyDays} hari.`,
     ``,
     `${hashtags}`,
   ].join("\n");
 
   return {
     seoTitle,
-    description: description.slice(0, 2990),
+    description: stripEmojisAndUnsafeSymbols(rawDescription).slice(0, 2990),
   };
 }
 
@@ -137,28 +132,29 @@ export function validateMassUploadItems(items: ShopeeMassProductInput[]): Shopee
     const sku = (item.sku_parent || item.id).trim();
     const titleKey = (item.seo_title || item.title).trim().toLowerCase();
 
-    if (!item.seo_title || item.seo_title.trim().length < 5 || item.seo_title.trim().length > 255) {
-      issues.push({ sku, title: item.title, severity: "error", message: "Nama produk harus 5–255 karakter." });
+    if ((item.seo_title || "").trim().length > 255) {
+      issues.push({ sku, title: item.title, severity: "error", message: "Nama produk melebihi batas 255 karakter." });
     }
-    if (!item.description || item.description.trim().length < 20 || item.description.trim().length > 3000) {
-      issues.push({ sku, title: item.title, severity: "error", message: "Deskripsi produk harus 20–3000 karakter." });
+    if ((item.description || "").trim().length > 3000) {
+      issues.push({ sku, title: item.title, severity: "error", message: "Deskripsi produk melebihi 3000 karakter." });
     }
-    if (FORBIDDEN_URL_RE.test(item.description || "") || FORBIDDEN_URL_RE.test(item.seo_title || "")) {
+
+    const safetyChecks = auditShopeeTextSafety({
+      seoTitle: item.seo_title || "",
+      description: item.description || "",
+      baseTitle: item.title,
+      platform: item.platform,
+      category: item.category_type,
+    });
+    for (const s of safetyChecks) {
       issues.push({
         sku,
         title: item.title,
-        severity: "error",
-        message: "Terdeteksi URL/domain terlarang di Judul/Deskripsi Shopee — harap hapus tautan eksternal.",
+        severity: s.severity,
+        message: s.message,
       });
     }
-    if (PHYSICAL_JUNK_RE.test(item.description || "")) {
-      issues.push({
-        sku,
-        title: item.title,
-        severity: "warning",
-        message: "Masih ada kata amplop/kurir fisik dalam deskripsi.",
-      });
-    }
+
     if (seenTitles.has(titleKey)) {
       issues.push({
         sku,

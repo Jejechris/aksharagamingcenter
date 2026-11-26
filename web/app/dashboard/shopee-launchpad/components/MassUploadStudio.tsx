@@ -27,6 +27,7 @@ import {
   ShopeeMassProductInput,
   ShopeeValidationIssue,
 } from "@/lib/shopeeMassUpload";
+import { isHighRiskHakiProduct } from "@/lib/shopeeCompliance";
 import {
   ArtworkCandidate,
   renderAndHostBatchCover,
@@ -44,6 +45,7 @@ interface MassUploadRow extends ShopeeMassProductInput {
   artwork_candidates?: ArtworkCandidate[];
   selected_artwork_url?: string;
   frame_color?: string;
+  haki_risk_reason?: string;
 }
 
 export default function MassUploadStudio() {
@@ -111,10 +113,12 @@ export default function MassUploadStudio() {
           massJson.data.map((r: ShopeeMassProductInput) => {
             const cat = catalogMap.get(r.id);
             const cogsNet = Number(cat?.metrics?.cogs_net_idr || 0);
+            const haki = isHighRiskHakiProduct(r.title, r.platform, r.category_type);
             return {
               ...r,
-              selected: true,
+              selected: !haki.highRisk,
               cogs_net_idr: cogsNet,
+              haki_risk_reason: haki.highRisk ? haki.reason : undefined,
             };
           })
         );
@@ -894,8 +898,16 @@ export default function MassUploadStudio() {
                           }
                           className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
                         />
-                        <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                          {row.title} ({row.seo_title.length}/120 char)
+                        <div className="text-[10px] text-slate-400 mt-0.5 font-mono flex flex-wrap items-center gap-1.5">
+                          <span>{row.title} ({row.seo_title.length}/120 char)</span>
+                          {row.haki_risk_reason && (
+                            <span
+                              title={row.haki_risk_reason}
+                              className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 font-semibold"
+                            >
+                              ⚠️ Risiko HAKI (Di-uncheck)
+                            </span>
+                          )}
                         </div>
                       </td>
 
