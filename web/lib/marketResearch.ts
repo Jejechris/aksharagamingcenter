@@ -13,6 +13,8 @@ export interface LiveEnebaListing {
   title: string;
   url: string;
   base_price_idr: number;
+  original_price_idr?: number;
+  discount_pct?: number;
   landed_cost_idr: number;
   platform: string;
   is_key: boolean;
@@ -21,6 +23,79 @@ export interface LiveEnebaListing {
 }
 
 const JUNK_LISTING_RE = /\b(dlc|expansion|upgrade|season pass|starter pack|skin|outfit|coins?|points?|pack|bundle only|ost|soundtrack|artbook|random|mystery|account)\b/i;
+
+export function cleanEnebaListingTitle(rawTitle: string): string {
+  return (rawTitle || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&#x27;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\((?:PC|Steam|Xbox[^)]*|Official website)\)/gi, " ")
+    .replace(/\b(?:Steam|Xbox Live|EA App|Origin|GOG\.com|GOG|Ubisoft Connect|Rockstar Games Launcher|Windows Store|Official website)\s*(?:CD\s*Key|Key|Gift)?\s*(?:GLOBAL|ROW|EUROPE|EU|US|ASIA)?$/i, "")
+    .replace(/\b(?:PC\s*)?(?:Steam|Xbox|EA App|GOG)\s*(?:Key|Gift)\s*(?:GLOBAL|PC)?/gi, " ")
+    .replace(/\bGLOBAL\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseEnebaListingsFromHtml(
+  html: string,
+  fallbackPlatform: string = "Steam"
+): LiveEnebaListing[] {
+  if (!html || /cloudflare|turnstile|just a moment/i.test(html)) return [];
+  const anchors = Array.from(
+    html.matchAll(/<a[^>]*title="([^"]{4,160})"[^>]*href="(\/[a-z0-9-]+)"[^>]*><\/a>/gi)
+  );
+  const listings: LiveEnebaListing[] = [];
+  const seenUrl = new Set<string>();
+
+  for (let i = 0; i < anchors.length; i++) {
+    const start = anchors[i].index ?? 0;
+    const end =
+      i + 1 < anchors.length ? anchors[i + 1].index ?? start + 3500 : Math.min(html.length, start + 3500);
+    const chunk = html.slice(start, end);
+    const rawTitle = anchors[i][1]
+      .replace(/&amp;/g, "&")
+      .replace(/&#x27;/g, "'")
+      .trim();
+    const slug = anchors[i][2].trim();
+    const cleanText = chunk.replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/\s+/g, " ");
+    const rpMatches = Array.from(cleanText.matchAll(/Rp\s*([\d.,]+)/gi))
+      .map((m) => Number(m[1].replace(/[^\d]/g, "")))
+      .filter((n) => Number.isFinite(n) && n > 1000);
+    const basePriceIdr = rpMatches.length > 0 ? Math.min(...rpMatches) : 0;
+    const origPriceIdr = rpMatches.length > 1 ? Math.max(...rpMatches) : basePriceIdr;
+
+    if (basePriceIdr <= 1000) continue;
+    const fullUrl = `https://www.eneba.com${slug}`;
+    if (seenUrl.has(fullUrl)) continue;
+    seenUrl.add(fullUrl);
+
+    const discMatch = cleanText.match(/-(\d{1,2})%/);
+    const badgeDisc = discMatch ? Number(discMatch[1]) : 0;
+    const computedDisc =
+      origPriceIdr > basePriceIdr
+        ? Math.round(((origPriceIdr - basePriceIdr) / origPriceIdr) * 100)
+        : 0;
+    const discountPct = Math.max(badgeDisc, computedDisc);
+
+    const lowTitle = rawTitle.toLowerCase();
+    const landedCostIdr = Math.ceil((basePriceIdr * 1.09) / 1000) * 1000;
+    listings.push({
+      title: rawTitle,
+      url: fullUrl,
+      base_price_idr: basePriceIdr,
+      original_price_idr: origPriceIdr,
+      discount_pct: discountPct,
+      landed_cost_idr: landedCostIdr,
+      platform: inferPlatformFromEnebaTitle(rawTitle, fallbackPlatform),
+      is_key: lowTitle.includes("key"),
+      is_gift: lowTitle.includes("gift"),
+      is_account: lowTitle.includes("account"),
+    });
+  }
+
+  return listings;
+}
 
 function inferPlatformFromEnebaTitle(title: string, fallback: string = "Steam"): string {
   const low = title.toLowerCase();
@@ -62,6 +137,7 @@ export async function fetchLiveEnebaListings(
   ];
   if (options?.allowNonGlobalFallback !== false) {
     urls.push(
+      `https://www.eneba.com/store/all?text=${encodeURIComponent(cleanQuery)}&currency=IDR&regions[]=global&sortBy=PRICE_LOWEST`,
       `https://www.eneba.com/store/all?text=${encodeURIComponent(cleanQuery)}&currency=IDR&sortBy=PRICE_LOWEST`
     );
   }
@@ -80,48 +156,7 @@ export async function fetchLiveEnebaListings(
       });
       if (!res.ok) continue;
       const html = await res.text();
-      if (!html || /cloudflare|turnstile|just a moment/i.test(html)) continue;
-
-      const anchors = Array.from(
-        html.matchAll(/<a[^>]*title="([^"]{4,160})"[^>]*href="(\/[a-z0-9-]+)"[^>]*><\/a>/gi)
-      );
-      const listings: LiveEnebaListing[] = [];
-      const seenUrl = new Set<string>();
-
-      for (let i = 0; i < anchors.length; i++) {
-        const start = anchors[i].index ?? 0;
-        const end =
-          i + 1 < anchors.length ? anchors[i + 1].index ?? start + 3500 : Math.min(html.length, start + 3500);
-        const chunk = html.slice(start, end);
-        const rawTitle = anchors[i][1].trim();
-        const slug = anchors[i][2].trim();
-        const cleanText = chunk.replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/\s+/g, " ");
-        // Ekstrak SEMUA nominal Rp di dalam blok kartu (e.g. "From Rp 1,200,631 -94% Rp 73,251")
-        // Lalu ambil harga terendah (harga diskon aktual, BUKAN harga coret original!)
-        const rpMatches = Array.from(cleanText.matchAll(/Rp\s*([\d.,]+)/gi))
-          .map((m) => Number(m[1].replace(/[^\d]/g, "")))
-          .filter((n) => Number.isFinite(n) && n > 1000);
-        const basePriceIdr = rpMatches.length > 0 ? Math.min(...rpMatches) : 0;
-
-        if (basePriceIdr <= 1000) continue;
-        const fullUrl = `https://www.eneba.com${slug}`;
-        if (seenUrl.has(fullUrl)) continue;
-        seenUrl.add(fullUrl);
-
-        const lowTitle = rawTitle.toLowerCase();
-        // ~9% Eneba buyer service fee checkout QRIS/Pay
-        const landedCostIdr = Math.ceil((basePriceIdr * 1.09) / 1000) * 1000;
-        listings.push({
-          title: rawTitle,
-          url: fullUrl,
-          base_price_idr: basePriceIdr,
-          landed_cost_idr: landedCostIdr,
-          platform: inferPlatformFromEnebaTitle(rawTitle, options?.platform || "Steam"),
-          is_key: lowTitle.includes("key"),
-          is_gift: lowTitle.includes("gift"),
-          is_account: lowTitle.includes("account"),
-        });
-      }
+      const listings = parseEnebaListingsFromHtml(html, options?.platform || "Steam");
 
       if (listings.length > 0) {
         enebaCache.set(cacheKey, { ts: Date.now(), data: listings });
@@ -222,6 +257,7 @@ export async function verifyLiveGameOpportunity(params: {
   query: string;
   preferredPlatform?: string;
   targetMarginPct?: number;
+  preVerifiedEneba?: LiveEnebaListing;
 }): Promise<VerifiedMarketOpportunity | null> {
   const query = (params.query || "").trim();
   const preferredPlatform = (params.preferredPlatform || "Steam").trim();
@@ -230,7 +266,9 @@ export async function verifyLiveGameOpportunity(params: {
   if (!query) return null;
 
   const [enebaListings, realSteam, cheapSharkRaw, usdRate] = await Promise.all([
-    fetchLiveEnebaListings(query, { platform: preferredPlatform }).catch(() => []),
+    params.preVerifiedEneba
+      ? Promise.resolve([params.preVerifiedEneba])
+      : fetchLiveEnebaListings(query, { platform: preferredPlatform }).catch(() => []),
     fetchRealSteamIndonesiaPrice(query).catch(() => null),
     fetch(`https://www.cheapshark.com/api/1.0/games?title=${encodeURIComponent(query)}&limit=6`, {
       headers: {
@@ -245,7 +283,8 @@ export async function verifyLiveGameOpportunity(params: {
     fetchUsdToIdrRate().catch(() => 16850),
   ]);
 
-  const matchedEneba = selectBestEnebaListing(enebaListings, query, preferredPlatform);
+  const matchedEneba =
+    params.preVerifiedEneba || selectBestEnebaListing(enebaListings, query, preferredPlatform);
 
   let cheapestUsd = 0;
   let cheapSharkTitle = "";
@@ -407,105 +446,213 @@ function buildDiscoveredItemMeta(chosen: VerifiedMarketOpportunity): DiscoveredT
  */
 export async function discoverRealTrendingOpportunities(
   excludeTitles: Set<string> = new Set(),
-  options: { count?: number } = {}
+  options: {
+    count?: number;
+    cursor?: number;
+    strategy?: "all" | "big_discount" | "cheap_gems";
+  } = {}
 ): Promise<DiscoveredTrendOpportunity[]> {
   const desiredCount = Math.min(10, Math.max(1, Number(options.count) || 5));
+  const cursor = Math.max(0, Number(options.cursor) || 0);
+  const strategy = options.strategy || "all";
+
+  const enebaHeaders = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
+  };
   const csHeaders = {
     "User-Agent": "AksharaGamingCenter/2.0 (ops@aksharagaming.id)",
     Accept: "application/json",
   };
 
-  const [steamFeatured, cheapDealsRated, cheapDealsSavings, aiTitlesRaw] = await Promise.all([
+  // Rotasikan halaman Eneba Live Store (1..5 Steam Global + Multi-Platform Global) dan CheapShark (page 0..4)
+  const enebaPageA = (cursor % 5) + 1;
+  const enebaPageB = ((cursor + 2) % 5) + 1;
+  const enebaGlobalPage = (cursor % 3) + 1;
+  const csPage = cursor % 5;
+
+  const enebaUrlsToScan = [
+    `https://www.eneba.com/store/all?currency=IDR&drms[]=steam&types[]=game&regions[]=global&page=${enebaPageA}`,
+    `https://www.eneba.com/store/all?currency=IDR&drms[]=steam&types[]=game&regions[]=global&page=${enebaPageB}`,
+    `https://www.eneba.com/store/all?currency=IDR&types[]=game&regions[]=global&sortBy=MOST_POPULAR_WEEK&page=${enebaGlobalPage}`,
+  ];
+
+  const excludedNormalized = new Set<string>();
+  Array.from(excludeTitles).forEach((raw) => {
+    const low = String(raw || "").toLowerCase().trim();
+    if (!low) return;
+    excludedNormalized.add(low);
+    const cleaned = cleanEnebaListingTitle(low).toLowerCase();
+    if (cleaned) excludedNormalized.add(cleaned);
+  });
+
+  const isExcludedTitle = (rawTitle: string): boolean => {
+    const low = rawTitle.toLowerCase().trim();
+    const cleaned = cleanEnebaListingTitle(rawTitle).toLowerCase().trim();
+    if (excludedNormalized.has(low) || (cleaned && excludedNormalized.has(cleaned))) {
+      return true;
+    }
+    return false;
+  };
+
+  const excludedSample = Array.from(excludedNormalized).slice(0, 18).join(", ");
+
+  const [enebaPagesHtml, steamFeatured, cheapDealsRated, cheapDealsSavings, aiTitlesRaw] = await Promise.all([
+    Promise.all(
+      enebaUrlsToScan.map((u) =>
+        fetch(u, { headers: enebaHeaders, signal: AbortSignal.timeout(7000), cache: "no-store" })
+          .then((r) => (r.ok ? r.text() : ""))
+          .catch(() => "")
+      )
+    ),
     fetch("https://store.steampowered.com/api/featuredcategories/?cc=id&l=indonesian", {
       signal: AbortSignal.timeout(6000),
       cache: "no-store",
     })
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null),
-    fetch("https://www.cheapshark.com/api/1.0/deals?pageSize=35&sortBy=DealRating&upperPrice=20&onSale=1", {
-      headers: csHeaders,
-      signal: AbortSignal.timeout(6000),
-      cache: "no-store",
-    })
+    fetch(
+      `https://www.cheapshark.com/api/1.0/deals?pageSize=35&pageNumber=${csPage}&sortBy=DealRating&upperPrice=22&onSale=1`,
+      {
+        headers: csHeaders,
+        signal: AbortSignal.timeout(6000),
+        cache: "no-store",
+      }
+    )
       .then((r) => (r.ok ? r.json() : []))
       .catch(() => []),
-    fetch("https://www.cheapshark.com/api/1.0/deals?pageSize=35&sortBy=Savings&upperPrice=18&onSale=1", {
-      headers: csHeaders,
-      signal: AbortSignal.timeout(6000),
-      cache: "no-store",
-    })
+    fetch(
+      `https://www.cheapshark.com/api/1.0/deals?pageSize=35&pageNumber=${csPage}&sortBy=Savings&upperPrice=20&onSale=1`,
+      {
+        headers: csHeaders,
+        signal: AbortSignal.timeout(6000),
+        cache: "no-store",
+      }
+    )
       .then((r) => (r.ok ? r.json() : []))
       .catch(() => []),
     callGemini(
-      `Berikan 12 judul game PC populer non-indie-obscure yang sering dicari gamer Indonesia dan harga normal Steam-nya mahal (>= Rp 150.000) sementara key global-nya sering diskon besar (misal: Hogwarts Legacy, Resident Evil 4, Cyberpunk 2077, Red Dead Redemption 2, Monster Hunter World, Mortal Kombat 11, Batman Arkham Knight, Middle-earth Shadow of War, Devil May Cry 5, Doom Eternal, Dying Light 2, Tekken 8).
-Hanya kembalikan JSON array string judul game (JANGAN tulis harga):
+      `Berikan 14 judul game PC/Console populer lintas genre (RPG, Horror, Co-op, Racing, Action, Indie hit, Anime/JRPG) yang laris dicari gamer Indonesia dan sering diskon besar di toko CD-Key global.
+JANGAN sebutkan judul-judul ini (sudah pernah discan): ${excludedSample || "Minecraft, Terraria, GTA V"}.
+Hanya kembalikan JSON:
 {"titles": ["..."]}`,
-      "Kembalikan hanya daftar judul game populer dalam JSON.",
-      { jsonMode: true, temperature: 0.85 }
+      "Kembalikan hanya daftar judul game baru dalam JSON.",
+      { jsonMode: true, temperature: 0.95 }
     ).catch(() => ""),
   ]);
 
-  const candidateTitles: string[] = [];
+  interface CandidateSeed {
+    queryTitle: string;
+    platform: string;
+    priorityScore: number;
+    preVerifiedEneba?: LiveEnebaListing;
+  }
+
+  const candidateSeeds: CandidateSeed[] = [];
   const seen = new Set<string>();
 
-  const pushCandidate = (raw?: string) => {
-    const clean = (raw || "").trim();
+  const pushSeed = (seed: CandidateSeed) => {
+    const clean = cleanEnebaListingTitle(seed.queryTitle) || seed.queryTitle.trim();
     const low = clean.toLowerCase();
     if (!clean || clean.length < 3) return;
-    if (/steam machine|steam deck|soundtrack|upgrade|dlc|pack|bundle|skin/i.test(low)) return;
-    if (seen.has(low) || excludeTitles.has(low)) return;
+    if (JUNK_LISTING_RE.test(low)) return;
+    if (seen.has(low) || isExcludedTitle(clean)) return;
     seen.add(low);
-    candidateTitles.push(clean);
+    candidateSeeds.push({ ...seed, queryTitle: clean });
   };
 
-  // 1. CheapShark deals with steamAppID & real savings (most likely cheaper than Steam ID!)
+  // 1. Prioritas UTAMA: Kartu Real Live langsung dari halaman Eneba Global Deals (punya harga & diskon asli!)
+  const directEnebaCards = enebaPagesHtml.flatMap((html) => parseEnebaListingsFromHtml(html, "Steam"));
+  for (const card of directEnebaCards) {
+    if (card.is_account || JUNK_LISTING_RE.test(card.title)) continue;
+    if (card.base_price_idr < 10000) continue;
+    const disc = card.discount_pct || 0;
+    if (strategy === "big_discount" && disc < 45) continue;
+    if (strategy === "cheap_gems" && card.landed_cost_idr > 85000) continue;
+    pushSeed({
+      queryTitle: card.title,
+      platform: card.platform || "Steam",
+      priorityScore: 100 + disc + (card.landed_cost_idr <= 85000 ? 15 : 0),
+      preVerifiedEneba: card,
+    });
+  }
+
+  // 2. CheapShark Multi-Page Global Deals (pageNumber berotasi tiap scan!)
   const allCheap = [
-    ...(Array.isArray(cheapDealsRated) ? cheapDealsRated : []),
     ...(Array.isArray(cheapDealsSavings) ? cheapDealsSavings : []),
+    ...(Array.isArray(cheapDealsRated) ? cheapDealsRated : []),
   ];
   for (const d of allCheap) {
-    if (Number(d.savings || 0) >= 45 && Number(d.salePrice || 0) >= 1.2 && d.steamAppID) {
-      pushCandidate(d.title);
+    const savings = Number(d.savings || 0);
+    const saleUsd = Number(d.salePrice || 0);
+    if (savings >= 45 && saleUsd >= 1.2 && d.steamAppID) {
+      if (strategy === "big_discount" && savings < 55) continue;
+      pushSeed({
+        queryTitle: d.title,
+        platform: "Steam",
+        priorityScore: 70 + savings,
+      });
     }
   }
 
-  // 2. AI trending title ideas (judul saja, harga 100% diverifikasi API!)
+  // 3. Steam Indonesia Top Sellers, Specials, & New Releases
+  const steamItems = [
+    ...(Array.isArray(steamFeatured?.specials?.items) ? steamFeatured.specials.items : []),
+    ...(Array.isArray(steamFeatured?.top_sellers?.items) ? steamFeatured.top_sellers.items : []),
+    ...(Array.isArray(steamFeatured?.new_releases?.items) ? steamFeatured.new_releases.items : []),
+  ].sort((a: any, b: any) => (Number(b.discount_percent) || 0) - (Number(a.discount_percent) || 0));
+
+  for (const it of steamItems) {
+    if ((Number(it.final_price) || 0) >= 4500000) {
+      const disc = Number(it.discount_percent) || 0;
+      if (strategy === "big_discount" && disc < 40) continue;
+      pushSeed({
+        queryTitle: it.name,
+        platform: "Steam",
+        priorityScore: 60 + disc,
+      });
+    }
+  }
+
+  // 4. Saran judul segar dari Gemini (judul dicek ulang live!)
   if (aiTitlesRaw) {
     try {
       const cleaned = aiTitlesRaw.replace(/```json/gi, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(cleaned);
       if (Array.isArray(parsed?.titles)) {
-        for (const t of parsed.titles) pushCandidate(String(t));
+        for (const t of parsed.titles) {
+          pushSeed({
+            queryTitle: String(t),
+            platform: "Steam",
+            priorityScore: 55,
+          });
+        }
       }
     } catch {}
   }
 
-  // 3. Steam Featured Top Sellers & Specials
-  const steamItems = [
-    ...(Array.isArray(steamFeatured?.top_sellers?.items) ? steamFeatured.top_sellers.items : []),
-    ...(Array.isArray(steamFeatured?.specials?.items) ? steamFeatured.specials.items : []),
-  ].sort((a: any, b: any) => (Number(a.discount_percent) || 0) - (Number(b.discount_percent) || 0));
-  for (const it of steamItems) {
-    if ((Number(it.final_price) || 0) >= 6000000) {
-      pushCandidate(it.name);
-    }
-  }
+  // Urutkan & geser sedikit offset agar variasi kandidat selalu tinggi
+  candidateSeeds.sort((a, b) => b.priorityScore - a.priorityScore);
 
-  // Cek bertahap (1 per 1 dengan jeda singkat 160ms agar Eneba SSR tidak throttle)
-  const poolLimit = Math.min(24, Math.max(14, desiredCount * 3));
-  const pool = candidateTitles.slice(0, poolLimit);
+  const poolLimit = Math.min(28, Math.max(16, desiredCount * 3));
+  const pool = candidateSeeds.slice(0, poolLimit);
   const verifiedEnebaViable: VerifiedMarketOpportunity[] = [];
   const verifiedAnyViable: VerifiedMarketOpportunity[] = [];
   const verifiedLastResort: VerifiedMarketOpportunity[] = [];
 
   for (let i = 0; i < pool.length; i++) {
-    const title = pool[i];
+    const seed = pool[i];
     const item = await verifyLiveGameOpportunity({
-      query: title,
-      preferredPlatform: "Steam",
+      query: seed.queryTitle,
+      preferredPlatform: seed.platform,
       targetMarginPct: 18,
+      preVerifiedEneba: seed.preVerifiedEneba,
     }).catch(() => null);
     if (item) {
+      if (isExcludedTitle(item.title)) continue;
+      if (strategy === "cheap_gems" && item.price_eneba_idr > 95000) continue;
       if (item.eneba_live_verified && item.arbitrage_viable && item.net_margin_pct >= 10) {
         verifiedEnebaViable.push(item);
       } else if (item.arbitrage_viable && item.net_margin_pct >= 10) {
@@ -515,14 +662,14 @@ Hanya kembalikan JSON array string judul game (JANGAN tulis harga):
       }
     }
     if (verifiedEnebaViable.length >= desiredCount) break;
-    if (i >= desiredCount * 2 && verifiedEnebaViable.length + verifiedAnyViable.length >= desiredCount) break;
-    if (i < pool.length - 1) {
-      await new Promise((r) => setTimeout(r, 160));
+    if (i >= desiredCount * 2 + 4 && verifiedEnebaViable.length + verifiedAnyViable.length >= desiredCount) break;
+    if (!seed.preVerifiedEneba && i < pool.length - 1) {
+      await new Promise((r) => setTimeout(r, 120));
     }
   }
 
   const byScore = (a: VerifiedMarketOpportunity, b: VerifiedMarketOpportunity) =>
-    b.net_margin_pct - a.net_margin_pct || b.net_profit_idr - a.net_profit_idr;
+    b.net_margin_pct - a.net_margin_pct || b.steam_discount_pct - a.steam_discount_pct || b.net_profit_idr - a.net_profit_idr;
 
   verifiedEnebaViable.sort(byScore);
   verifiedAnyViable.sort(byScore);
@@ -533,7 +680,7 @@ Hanya kembalikan JSON array string judul game (JANGAN tulis harga):
   for (const list of [verifiedEnebaViable, verifiedAnyViable, verifiedLastResort]) {
     for (const item of list) {
       const k = item.title.toLowerCase().trim();
-      if (pickedTitles.has(k)) continue;
+      if (pickedTitles.has(k) || isExcludedTitle(item.title)) continue;
       pickedTitles.add(k);
       merged.push(item);
       if (merged.length >= desiredCount) break;
@@ -542,7 +689,7 @@ Hanya kembalikan JSON array string judul game (JANGAN tulis harga):
   }
 
   if (merged.length === 0) {
-    throw new Error("Tidak ada kandidat trend yang lolos verifikasi harga live Eneba & Steam Indonesia saat ini.");
+    throw new Error("Tidak ada kandidat trend baru yang lolos verifikasi harga live Eneba & Steam Indonesia saat ini. Coba reset riwayat atau ubah strategi.");
   }
 
   return merged.map(buildDiscoveredItemMeta);

@@ -117,6 +117,8 @@ export default function ResearchCenterPage() {
     message: string;
     type: "success" | "error";
   } | null>(null);
+  const [recentDiscoveredTitles, setRecentDiscoveredTitles] = useState<string[]>([]);
+  const [discoverStrategy, setDiscoverStrategy] = useState<"all" | "big_discount" | "cheap_gems">("all");
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setNotification({ message, type });
@@ -214,14 +216,20 @@ export default function ResearchCenterPage() {
     }
   };
 
-  // Auto-Discover Trend (Multi-Game Pre-Save Review Mode)
+  // Auto-Discover Trend (Multi-Game Pre-Save Review Mode + Rotated Eneba Deep Scan)
   const handleDiscoverTrend = async () => {
     setIsDiscoveringTrend(true);
     try {
       const res = await fetch("/api/research/eneba-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "discover_trend", count: discoverCount, preview_only: true }),
+        body: JSON.stringify({
+          action: "discover_trend",
+          count: discoverCount,
+          strategy: discoverStrategy,
+          exclude_titles: recentDiscoveredTitles,
+          preview_only: true,
+        }),
       });
       const json = await res.json();
       const rawItems = Array.isArray(json.data) ? json.data : json.data ? [json.data] : [];
@@ -233,11 +241,14 @@ export default function ResearchCenterPage() {
           g2g_direct_url: it.eneba_direct_url || it.g2g_direct_url,
           g2g_category_slug: "eneba-cdkey",
         }));
+        setRecentDiscoveredTitles((prev) =>
+          Array.from(new Set([...prev, ...mapped.map((x: any) => String(x.title || "").trim())])).slice(-60)
+        );
         setReviewCandidates(mapped);
-        setReviewModalTitle(`Review Auto-Discover Trend (${mapped.length} Game Terverifikasi)`);
+        setReviewModalTitle(`Review Auto-Discover Eneba (${mapped.length} Game Baru Terverifikasi)`);
         setReviewModalOpen(true);
         showToast(
-          `🎯 Ditemukan ${mapped.length} game trending live. Sortir & cek harga asli sebelum simpan ke DB!`
+          `🎯 Ditemukan ${mapped.length} peluang baru dari Eneba Live Pages + Steam/CheapShark. Sortir & cek sebelum simpan!`
         );
       } else {
         showToast(json.message || "Gagal mencari trend game saat ini.", "error");
@@ -667,6 +678,17 @@ export default function ResearchCenterPage() {
                   : `Auto-Discover Trend (${discoverCount})`}
               </span>
             </button>
+            <select
+              value={discoverStrategy}
+              onChange={(e) => setDiscoverStrategy(e.target.value as any)}
+              disabled={isDiscoveringTrend || loading || isScanningBot}
+              aria-label="Fokus Auto-Discover Eneba"
+              className="bg-amber-50 text-amber-900 font-mono text-[11px] font-semibold px-2 py-2 border-l border-amber-200 focus:outline-none cursor-pointer"
+            >
+              <option value="all">Semua Eneba</option>
+              <option value="big_discount">Diskon Besar ≥45%</option>
+              <option value="cheap_gems">Modal &lt;85rb</option>
+            </select>
             <select
               value={discoverCount}
               onChange={(e) => setDiscoverCount(Number(e.target.value))}

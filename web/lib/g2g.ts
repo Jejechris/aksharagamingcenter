@@ -33,6 +33,8 @@ export const G2G_CATEGORY_SLUGS: Record<string, string> = {
   tf2: "tf2-item",
   fc25: "fc-25-accounts",
   "fc 25": "fc-25-accounts",
+  fc26: "fc-26-accounts",
+  "fc 26": "fc-26-accounts",
   zomboid: "project-zomboid-accounts",
   stardew: "stardew-valley-account",
   "dont starve": "don-t-starve-together-accounts",
@@ -129,6 +131,7 @@ export function resolveGameKey(gameTitle?: string): string | null {
   if (lower.includes("wukong") || lower.includes("black myth")) return "wukong";
   if (lower.includes("gta") || lower.includes("grand theft auto")) return "gta";
   if (lower.includes("tf2") || lower.includes("mann co") || lower.includes("team fortress")) return "tf2";
+  if (lower.includes("fc 26") || lower.includes("fc26")) return "fc26";
   if (lower.includes("fc 25") || lower.includes("fc25") || lower.includes("fifa")) return "fc25";
   if (lower.includes("zomboid")) return "zomboid";
   if (lower.includes("stardew")) return "stardew";
@@ -148,6 +151,122 @@ export function resolveGameKey(gameTitle?: string): string | null {
   if (lower.includes("helldivers")) return "helldivers";
   if (lower.includes("forza")) return "forza";
   return null;
+}
+
+export function isGenericG2GCategorySlug(slug?: string | null): boolean {
+  return !slug || slug === "steam-global-account";
+}
+
+/**
+ * Menghasilkan kata kunci pencarian `&q=...` untuk kategori G2G multi-game (seperti steam-global-account).
+ */
+export function getG2GSearchKeywords(gameTitle: string): string[] {
+  const lower = (gameTitle || "").toLowerCase();
+  if (lower.includes("gta") || lower.includes("grand theft auto")) {
+    return ["Grand Theft Auto V", "GTA 5"];
+  }
+  if (lower.includes("fc 26") || lower.includes("fc26")) return ["FC 26"];
+  if (lower.includes("fc 25") || lower.includes("fc25")) return ["FC 25"];
+  if (lower.includes("wukong")) return ["Black Myth: Wukong"];
+
+  const cleaned = gameTitle
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(?:standard|enhanced|deluxe|ultimate|complete|definitive|goty|private|edition)\b/gi, " ")
+    .replace(/[:\-|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned ? [cleaned] : [];
+}
+
+/**
+ * Title Relevance Guard: Memastikan listing offer G2G benar-benar untuk game yang diminta.
+ * Mencegah bug kategori umum (`steam-global-account`) mengembalikan game lain (mis. "Schedule I" untuk "GTA V").
+ */
+export function doesOfferMatchGameTitle(offerTitle: string, targetGameTitle: string): boolean {
+  const offerLow = (offerTitle || "").toLowerCase();
+  const targetLow = (targetGameTitle || "").toLowerCase();
+  if (!offerLow.trim() || !targetLow.trim()) return false;
+
+  if (targetLow.includes("gta") || targetLow.includes("grand theft auto")) {
+    const hasGta = /\bgrand\s+theft\s+auto\b/i.test(offerLow) || /\bgta\b/i.test(offerLow);
+    if (!hasGta) return false;
+    if (targetLow.includes("v") || targetLow.includes("5")) {
+      return /\b(?:v|5|gtav|gta5|enhanced|online|legacy)\b/i.test(offerLow);
+    }
+    return true;
+  }
+
+  if (targetLow.includes("fc 26") || targetLow.includes("fc26")) {
+    return /\bfc\s*26\b|\bfifa\s*26\b/i.test(offerLow);
+  }
+  if (targetLow.includes("fc 25") || targetLow.includes("fc25")) {
+    return /\bfc\s*25\b|\bfifa\s*25\b/i.test(offerLow);
+  }
+  if (targetLow.includes("minecraft")) {
+    return /\bminecraft\b/i.test(offerLow);
+  }
+  if (targetLow.includes("terraria")) {
+    return /\bterraria\b/i.test(offerLow);
+  }
+  if (targetLow.includes("wukong") || targetLow.includes("black myth")) {
+    return /\bwukong\b|\bblack\s+myth\b/i.test(offerLow);
+  }
+  if (targetLow.includes("mann co") || targetLow.includes("tf2") || targetLow.includes("team fortress")) {
+    return /\bmann\s+co\b|\btf\s*2\b|\bteam\s+fortress\b/i.test(offerLow);
+  }
+  if (targetLow.includes("windows 11")) {
+    return /\bwindows\s*11\b|\bwin\s*11\b/i.test(offerLow);
+  }
+
+  // Pencocokan umum berbasis token inti & angka seri
+  const cleanTokens = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(
+        (w) =>
+          w.length >= 2 &&
+          ![
+            "the",
+            "and",
+            "edition",
+            "standard",
+            "enhanced",
+            "deluxe",
+            "ultimate",
+            "complete",
+            "definitive",
+            "pc",
+            "steam",
+            "microsoft",
+            "rockstar",
+            "ea",
+            "app",
+            "private",
+            "account",
+            "instant",
+            "fresh",
+            "new",
+            "global",
+            "key",
+            "cdkey",
+            "os",
+            "license",
+          ].includes(w)
+      );
+
+  const targetTokens = cleanTokens(targetLow);
+  if (targetTokens.length === 0) return true;
+
+  // Pastikan setiap token angka (mis. 2, 4, 25, 26) hadir agar seri game tidak tertukar
+  const numericTokens = targetTokens.filter((t) => /^\d+$/.test(t));
+  for (const numTok of numericTokens) {
+    if (!new RegExp(`\\b${numTok}\\b`).test(offerLow)) return false;
+  }
+
+  const hits = targetTokens.filter((t) => offerLow.includes(t)).length;
+  return hits >= Math.max(1, Math.ceil(targetTokens.length * 0.7));
 }
 
 /**

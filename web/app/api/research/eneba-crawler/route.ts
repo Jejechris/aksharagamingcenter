@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getEnebaProductUrl, getEnebaSearchUrl, buildEnebaFilteredUrl } from "@/lib/eneba";
 import { callGemini } from "@/lib/gemini";
-import { isDbConfigured } from "@/lib/db";
+import { getKV, setKV, isDbConfigured } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -1301,21 +1301,35 @@ Skema JSON:
       }
     }
 
-    // ACTION: DISCOVER TRENDS (Multi-Game Batch Zero-Gimmick Live Verification + Preview/Save)
+    // ACTION: DISCOVER TRENDS (Multi-Game Batch Zero-Gimmick Live Verification + Rotated Deep Eneba Discovery)
     if (action === "discover_trend") {
       try {
         const requestedCount = Math.min(8, Math.max(1, Number(body.count) || 5));
-        const [currentCatalog, persistedResearch] = await Promise.all([
+        const strategy = (body.strategy || "all") as "all" | "big_discount" | "cheap_gems";
+        const clientExcluded = Array.isArray(body.exclude_titles) ? body.exclude_titles : [];
+
+        const [currentCatalog, persistedResearch, storedCursorRaw] = await Promise.all([
           readAuthoritativeCatalog().catch(() => []),
           getPersistedResearchGames("eneba").catch(() => []),
+          isDbConfigured() ? getKV("eneba_discover_cursor").catch(() => 0) : Promise.resolve(0),
         ]);
+
+        const currentCursor = Number(storedCursorRaw) || 0;
+        const nextCursor = (currentCursor + 1) % 24;
+        if (isDbConfigured()) {
+          await setKV("eneba_discover_cursor", nextCursor).catch(() => {});
+        }
+
         const excludeTitles = new Set<string>([
           ...(currentCatalog || []).map((g: any) => String(g.title || "").toLowerCase().trim()),
-          ...(persistedResearch || []).slice(0, 15).map((g: any) => String(g.title || "").toLowerCase().trim()),
+          ...(persistedResearch || []).map((g: any) => String(g.title || "").toLowerCase().trim()),
+          ...clientExcluded.map((t: any) => String(t || "").toLowerCase().trim()),
         ]);
 
         const discoveredList = await discoverRealTrendingOpportunities(excludeTitles, {
           count: requestedCount,
+          cursor: currentCursor,
+          strategy,
         });
 
         const nowSeed = Date.now().toString().slice(-4);
@@ -1398,6 +1412,8 @@ Skema JSON:
           status: "success",
           persisted: !previewOnly,
           preview_only: previewOnly,
+          cursor_used: currentCursor,
+          strategy,
           count: resultItems.length,
           data: resultItems,
           primary: resultItems[0],

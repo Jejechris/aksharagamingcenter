@@ -227,13 +227,22 @@ export default function EnebaTerminalPage() {
     }
   };
 
+  const [recentDiscoveredTitles, setRecentDiscoveredTitles] = useState<string[]>([]);
+  const [discoverStrategy, setDiscoverStrategy] = useState<"all" | "big_discount" | "cheap_gems">("all");
+
   const handleDiscoverTrend = async () => {
     setIsDiscoveringTrend(true);
     try {
       const res = await fetch("/api/research/eneba-crawler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "discover_trend", count: discoverCount, preview_only: true }),
+        body: JSON.stringify({
+          action: "discover_trend",
+          count: discoverCount,
+          strategy: discoverStrategy,
+          exclude_titles: recentDiscoveredTitles,
+          preview_only: true,
+        }),
       });
       const json = await res.json();
       const items: EnebaScannedGame[] = Array.isArray(json.data)
@@ -242,11 +251,14 @@ export default function EnebaTerminalPage() {
         ? [json.data]
         : [];
       if (res.ok && json.status === "success" && items.length > 0) {
+        setRecentDiscoveredTitles((prev) =>
+          Array.from(new Set([...prev, ...items.map((x) => String(x.title || "").trim())])).slice(-60)
+        );
         setReviewCandidates(items);
-        setReviewModalTitle(`Review Auto-Discover Trend (${items.length} Game Terverifikasi)`);
+        setReviewModalTitle(`Review Auto-Discover Eneba (${items.length} Game Baru Terverifikasi)`);
         setReviewModalOpen(true);
         showToast(
-          `🎯 Ditemukan ${items.length} game trending live. Silakan sortir, cek harga Eneba, & pilih sebelum disimpan!`
+          `🎯 Ditemukan ${items.length} game baru dari Eneba Live Pages + Steam/CheapShark. Cek & pilih sebelum disimpan!`
         );
       } else {
         showToast(json.message || "Gagal menemukan trend.", "error");
@@ -622,6 +634,17 @@ export default function EnebaTerminalPage() {
                 <Flame className={`w-3.5 h-3.5 ${isDiscoveringTrend ? "animate-pulse" : ""}`} />
                 <span>{isDiscoveringTrend ? `Mencari ${discoverCount} Game...` : `Auto-Discover Trend (${discoverCount})`}</span>
               </button>
+              <select
+                value={discoverStrategy}
+                onChange={(e) => setDiscoverStrategy(e.target.value as any)}
+                disabled={isDiscoveringTrend || loading}
+                aria-label="Fokus Auto-Discover Eneba"
+                className="bg-emerald-700/80 text-white text-[11px] font-medium px-2 py-2 border-l border-emerald-500/50 focus:outline-none cursor-pointer"
+              >
+                <option value="all">Semua Eneba</option>
+                <option value="big_discount">Diskon ≥45%</option>
+                <option value="cheap_gems">Modal &lt;85rb</option>
+              </select>
               <select
                 value={discoverCount}
                 onChange={(e) => setDiscoverCount(Number(e.target.value))}

@@ -5,7 +5,11 @@ import {
   resolveGameKey,
   getG2GDirectOfferUrl,
   getG2GGameCategoryUrl,
+  isGenericG2GCategorySlug,
+  getG2GSearchKeywords,
+  doesOfferMatchGameTitle,
 } from "@/lib/g2g";
+import { verifyLiveGameOpportunity } from "@/lib/marketResearch";
 import {
   evaluateSellerTrust,
   evaluateSteamAccountFreshness,
@@ -52,7 +56,7 @@ const CLICKBAIT_BLACKLIST = [
   "no email", "no change", "cant change", "can't change", "cannot change",
   "save game", "savegame", "mod ", "mods", "dlc only", "expansion only",
   "cape only", "coin", "coins", "gold", "currency", "boost", "boosting", "coaching",
-  "random", "mystery", "lucky", "empty", "no game", "game pass", "gamepass", "1 month",
+  "random", "mystery", "lucky", "empty", "no game", "1 month",
   "3 months", "14 days", "7 days", "1 day", "temporary", "temp ", "family share",
   "steam family", "activation", "p2", "p3", "secondary", "guest"
 ];
@@ -60,6 +64,13 @@ const CLICKBAIT_BLACKLIST = [
 function hasClickbaitSignals(text: string): boolean {
   for (const b of CLICKBAIT_BLACKLIST) {
     if (text.includes(b)) return true;
+  }
+  // Blokir listing Game Pass sewaan, tetapi izinkan penafian seperti "NOT GAME PASS" / "NO GAMEPASS"
+  if (
+    /\bgame\s*pass\b/i.test(text) &&
+    !/\b(?:not|no|non)\s+(?:a\s+)?game\s*pass\b/i.test(text)
+  ) {
+    return true;
   }
   // Cek pola hackback (0-300 hours played, 10+ hours, old account, archive, other paid games, dsb.)
   const freshness = evaluateSteamAccountFreshness(text);
@@ -89,6 +100,7 @@ function getGamePriceFloor(gameTitle: string, sellingPrice: number, medianPrice:
   if (lower.includes("elden ring")) return 150000;
   if (lower.includes("cyberpunk") || lower.includes("rdr2") || lower.includes("red dead")) return 100000;
   if (lower.includes("fc 25") || lower.includes("fc25")) return 55000;
+  if (lower.includes("fc 26") || lower.includes("fc26")) return 55000;
 
   let baseFloor = 12000;
   if (sellingPrice > 0) {
@@ -100,8 +112,8 @@ function getGamePriceFloor(gameTitle: string, sellingPrice: number, medianPrice:
   return baseFloor;
 }
 
-// Fetch deduplicated pool of up to 80 offers (recommended + lowest_price)
-async function searchG2GOffersForSlug(slug: string): Promise<SearchOfferItem[]> {
+// Fetch deduplicated pool of offers; for generic slugs (e.g. steam-global-account), query with `&q=` keywords!
+async function searchG2GOffersForSlug(slug: string, gameTitle: string = ""): Promise<SearchOfferItem[]> {
   const headers = {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -110,43 +122,49 @@ async function searchG2GOffersForSlug(slug: string): Promise<SearchOfferItem[]> 
     Origin: "https://www.g2g.com",
   };
 
+  const useKeywordQuery = isGenericG2GCategorySlug(slug) && Boolean(gameTitle.trim());
+  const keywords = useKeywordQuery ? getG2GSearchKeywords(gameTitle).slice(0, 2) : [];
+
+  const endpoints: string[] = [];
+  if (keywords.length > 0) {
+    for (const kw of keywords) {
+      const qEnc = encodeURIComponent(kw);
+      endpoints.push(
+        `https://sls.g2g.com/offer/search?seo_term=${slug}&q=${qEnc}&currency=IDR&country=ID&page_size=40`,
+        `https://sls.g2g.com/offer/search?seo_term=${slug}&q=${qEnc}&currency=IDR&country=ID&sort=lowest_price&page_size=40`
+      );
+    }
+  } else {
+    endpoints.push(
+      `https://sls.g2g.com/offer/search?seo_term=${slug}&currency=IDR&country=ID&page_size=40`,
+      `https://sls.g2g.com/offer/search?seo_term=${slug}&currency=IDR&country=ID&sort=lowest_price&page_size=40`
+    );
+  }
+
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 12000);
 
-      const [resRec, resLowest] = await Promise.all([
-        fetch(
-          `https://sls.g2g.com/offer/search?seo_term=${slug}&currency=IDR&country=ID&page_size=40`,
-          { headers, signal: controller.signal, cache: "no-store" }
-        ).catch(() => null),
-        fetch(
-          `https://sls.g2g.com/offer/search?seo_term=${slug}&currency=IDR&country=ID&sort=lowest_price&page_size=40`,
-          { headers, signal: controller.signal, cache: "no-store" }
-        ).catch(() => null),
-      ]);
+      const responses = await Promise.all(
+        endpoints.map((ep) =>
+          fetch(ep, { headers, signal: controller.signal, cache: "no-store" }).catch(() => null)
+        )
+      );
 
       clearTimeout(timeout);
 
       const map = new Map<string, SearchOfferItem>();
 
-      if (resRec && resRec.ok) {
-        const j = await resRec.json();
-        const results = j?.payload?.results;
-        if (Array.isArray(results)) {
-          for (const item of results) {
-            if (item.offer_id) map.set(item.offer_id, item);
-          }
-        }
-      }
-
-      if (resLowest && resLowest.ok) {
-        const j = await resLowest.json();
-        const results = j?.payload?.results;
-        if (Array.isArray(results)) {
-          for (const item of results) {
-            if (item.offer_id && !map.has(item.offer_id)) {
-              map.set(item.offer_id, item);
+      for (const res of responses) {
+        if (res && res.ok) {
+          const j = await res.json().catch(() => null);
+          const results = j?.payload?.results;
+          if (Array.isArray(results)) {
+            for (const item of results) {
+              if (item.offer_id && !map.has(item.offer_id)) {
+                map.set(item.offer_id, item);
+              }
             }
           }
         }
@@ -163,6 +181,78 @@ async function searchG2GOffersForSlug(slug: string): Promise<SearchOfferItem[]> 
     }
   }
   return [];
+}
+
+async function buildEnebaFallbackCandidate(game: any) {
+  const cleanQuery = String(game.title || "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(?:os license|standard edition|private)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const live = await verifyLiveGameOpportunity({
+    query: cleanQuery || game.title,
+    preferredPlatform: game.platform || "Steam",
+    targetMarginPct: 18,
+  }).catch(() => null);
+
+  if (!live || (!live.eneba_live_verified && !live.cheapshark_live_verified)) {
+    return null;
+  }
+
+  const sellingPrice = Number(game.selling_price_shopee_idr || live.recommended_shopee_price_idr || 100000);
+  const priceIdr = live.price_eneba_idr;
+  const qrisFee = Math.round(priceIdr * 0.007);
+  const cogsNet = priceIdr + qrisFee;
+  const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
+  const netProfit = sellingPrice - cogsNet - shopeeFee;
+  const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+
+  const trust = evaluateSellerTrust({
+    rating: 99.8,
+    orders: 25000,
+    stock: 999,
+    priceIdr,
+    sellingPriceShopeeIdr: sellingPrice,
+    deliverySpeed: "Instant 0-Detik",
+    verified: true,
+  });
+
+  const sellerId = `eneba-live-${game.id}`;
+  return {
+    seller_id: sellerId,
+    seller_name: live.eneba_live_verified ? "Eneba Verified Merchant" : "Eneba Global CDKey",
+    offer_title: `${live.title} (${live.key_type})`,
+    quality_score: trust.trust_score,
+    trust_score: trust.trust_score,
+    trust_tier: trust.trust_tier,
+    seller_rating: trust.seller_rating,
+    seller_orders: trust.seller_orders,
+    seller_level: trust.seller_level,
+    verified: true,
+    delivery_time: "Instant 0-Detik (Redeem Code)",
+    tier: "ultra_safe" as const,
+    tier_label: "🛡️ ENEBA CDKEY (0% HACKBACK)",
+    tier_desc: `Kunci aktivasi resmi dari Eneba (~Rp ${priceIdr.toLocaleString("id-ID")}). Bebas hackback.`,
+    stock: 999,
+    price_g2g_idr: priceIdr,
+    price_usd: live.cheapshark_usd || 0,
+    rating_pct: trust.seller_rating,
+    reviews_count: trust.seller_orders,
+    delivery_speed: "Instant 0-Detik (Redeem Code)",
+    is_online: true,
+    is_recommended: true,
+    fresh_status: "verified_fresh" as const,
+    has_zero_hours: true,
+    has_first_email: true,
+    freshness_badges: ["Official CD-Key", "0% Hackback"],
+    profile_url: live.eneba_direct_url,
+    fallback_search_url: live.eneba_direct_url,
+    live_status: "live",
+    qris_fee_idr: qrisFee,
+    cogs_net_idr: cogsNet,
+    net_profit_idr: netProfit,
+    net_margin_pct: netMargin,
+  };
 }
 
 // 4 Lapis Filter, Anti-Hackback Freshness Guard & Composite Trust/Value Scoring Engine (0-100)
@@ -188,9 +278,13 @@ function processBestSellers(
   let filteredClickbaitCount = 0;
   const candidatesLayer1: SearchOfferItem[] = [];
 
-  // Lapis 1: Blacklist Check
+  // Lapis 1: Strict Game Title Relevance Guard + Anti-Clickbait/Hackback Blacklist Check
   for (const o of offers) {
     if (!o.offer_id || !o.username) continue;
+    if (!doesOfferMatchGameTitle(o.title || "", gameTitle)) {
+      filteredClickbaitCount++;
+      continue;
+    }
     const textToCheck = `${o.title || ""} ${o.description || ""}`.toLowerCase();
     if (hasClickbaitSignals(textToCheck)) {
       filteredClickbaitCount++;
@@ -566,10 +660,69 @@ export async function POST(req: NextRequest) {
 
       for (const game of catalog) {
         const gameKey = resolveGameKey(game.title);
-        const slug = gameKey && G2G_CATEGORY_SLUGS[gameKey] ? G2G_CATEGORY_SLUGS[gameKey] : null;
+        const catLow = String(game.category || "").toLowerCase();
+        const isCdKeyOrLicense =
+          !gameKey &&
+          (catLow.includes("key") ||
+            catLow.includes("cdkey") ||
+            catLow.includes("license") ||
+            String(game.source_marketplace || "").toUpperCase() === "ENEBA" ||
+            String(game.title || "").toLowerCase().includes("windows"));
+
+        if (isCdKeyOrLicense) {
+          const enebaCandidate = await buildEnebaFallbackCandidate(game);
+          if (enebaCandidate) {
+            const sellingPrice = game.selling_price_shopee_idr || 100000;
+            const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
+            const totalCost = enebaCandidate.cogs_net_idr + shopeeFee;
+            const netProfit = sellingPrice - totalCost;
+            const netMargin =
+              sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+
+            if (previewOnly) {
+              batchPreviews.push({
+                game_id: game.id,
+                game_title: game.title,
+                platform: game.platform || "PC / Microsoft",
+                selling_price_shopee_idr: sellingPrice,
+                current_selected_seller_id: game.selected_seller_id,
+                recommended_selected_seller_id: enebaCandidate.seller_id,
+                candidates: [enebaCandidate],
+                filtered_out_clickbait_count: 0,
+                filtered_out_non_fresh_count: 0,
+                verified_fresh_count: 1,
+                fresh_fallback_warning: false,
+                clean_candidates_count: 1,
+                total_raw_offers: 1,
+              });
+            } else {
+              game.sellers = [enebaCandidate];
+              game.selected_seller_id = enebaCandidate.seller_id;
+              game.target_margin_pct = netMargin;
+              game.metrics = {
+                selected_seller: { ...enebaCandidate },
+                cogs_g2g_idr: enebaCandidate.price_g2g_idr,
+                qris_fee_idr: enebaCandidate.qris_fee_idr,
+                cogs_net_idr: enebaCandidate.cogs_net_idr,
+                shopee_fee_idr: shopeeFee,
+                packaging_cost_idr: 0,
+                total_cost_idr: totalCost,
+                net_profit_idr: netProfit,
+                net_margin_pct: netMargin,
+                break_even_price_idr: Math.ceil((enebaCandidate.cogs_net_idr + 1000) / (1 - 0.08)),
+              };
+              changedIds.push(game.id);
+            }
+            updatedCount++;
+            logs.push(`🔑 ${game.title}: terhubung ke Eneba Official CD-Key (Rp ${enebaCandidate.price_g2g_idr.toLocaleString("id-ID")}).`);
+          }
+          continue;
+        }
+
+        const slug = gameKey && G2G_CATEGORY_SLUGS[gameKey] ? G2G_CATEGORY_SLUGS[gameKey] : "steam-global-account";
 
         if (slug) {
-          const offers = await searchG2GOffersForSlug(slug);
+          const offers = await searchG2GOffersForSlug(slug, game.title);
           if (offers.length > 0) {
             const processed = processBestSellers(
               offers,
@@ -676,9 +829,79 @@ export async function POST(req: NextRequest) {
     }
 
     const gameKey = resolveGameKey(targetGame.title);
+    const catLow = String(targetGame.category || "").toLowerCase();
+    const isCdKeyOrLicense =
+      !gameKey &&
+      (catLow.includes("key") ||
+        catLow.includes("cdkey") ||
+        catLow.includes("license") ||
+        String(targetGame.source_marketplace || "").toUpperCase() === "ENEBA" ||
+        String(targetGame.title || "").toLowerCase().includes("windows"));
+
+    if (isCdKeyOrLicense) {
+      const enebaCandidate = await buildEnebaFallbackCandidate(targetGame);
+      if (!enebaCandidate) {
+        return NextResponse.json({
+          status: "warning",
+          message: `Listing CD-Key / License resmi untuk "${targetGame.title}" belum ditemukan di Eneba/CheapShark saat ini.`,
+          game: targetGame,
+          allGames: catalog,
+        });
+      }
+
+      const sellingPrice = targetGame.selling_price_shopee_idr || 100000;
+      const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
+      const totalCost = enebaCandidate.cogs_net_idr + shopeeFee;
+      const netProfit = sellingPrice - totalCost;
+      const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+
+      if (previewOnly) {
+        return NextResponse.json({
+          status: "success",
+          preview_only: true,
+          fresh_only: filterFreshOnly,
+          message: `Ditemukan listing resmi Eneba Official CD-Key untuk "${targetGame.title}" (bebas 100% hackback & judul cocok).`,
+          game: targetGame,
+          recommended_selected_seller_id: enebaCandidate.seller_id,
+          sellers: [enebaCandidate],
+          filtered_out_clickbait_count: 0,
+          filtered_out_non_fresh_count: 0,
+          verified_fresh_count: 1,
+          fresh_fallback_warning: false,
+          clean_candidates_count: 1,
+          total_raw_offers: 1,
+        });
+      }
+
+      targetGame.sellers = [enebaCandidate];
+      targetGame.selected_seller_id = enebaCandidate.seller_id;
+      targetGame.target_margin_pct = netMargin;
+      targetGame.metrics = {
+        selected_seller: { ...enebaCandidate },
+        cogs_g2g_idr: enebaCandidate.price_g2g_idr,
+        qris_fee_idr: enebaCandidate.qris_fee_idr,
+        cogs_net_idr: enebaCandidate.cogs_net_idr,
+        shopee_fee_idr: shopeeFee,
+        packaging_cost_idr: 0,
+        total_cost_idr: totalCost,
+        net_profit_idr: netProfit,
+        net_margin_pct: netMargin,
+        break_even_price_idr: Math.ceil((enebaCandidate.cogs_net_idr + 1000) / (1 - 0.08)),
+      };
+      await writeAuthoritativeCatalog(catalog, { changedGameIds: [targetGame.id] });
+      return NextResponse.json({
+        status: "success",
+        preview_only: false,
+        message: `Supplier untuk "${targetGame.title}" diperbarui ke Eneba Official CD-Key.`,
+        game: targetGame,
+        allGames: catalog,
+        sellers: [enebaCandidate],
+      });
+    }
+
     const slug = gameKey && G2G_CATEGORY_SLUGS[gameKey] ? G2G_CATEGORY_SLUGS[gameKey] : "steam-global-account";
 
-    const offers = await searchG2GOffersForSlug(slug);
+    const offers = await searchG2GOffersForSlug(slug, targetGame.title);
     if (offers.length === 0) {
       return NextResponse.json({
         status: "warning",

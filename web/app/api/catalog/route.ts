@@ -463,6 +463,7 @@ export async function PATCH(req: Request) {
     const {
       game_id,
       title,
+      new_title,
       selected_seller_id,
       selling_price_shopee_idr,
       target_margin_pct,
@@ -497,6 +498,9 @@ export async function PATCH(req: Request) {
 
     const game = catalog[itemIndex];
 
+    if (typeof new_title === "string" && new_title.trim().length > 0) {
+      game.title = new_title.trim();
+    }
     if (selected_seller_id !== undefined) {
       game.selected_seller_id = selected_seller_id;
     }

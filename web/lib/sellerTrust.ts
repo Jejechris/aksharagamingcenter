@@ -77,11 +77,24 @@ const HACKBACK_SUBSTRINGS = [
   "100% progress",
   "100%process",
   "other paid games",
+  "other games (free)",
+  "paid/other games",
+  "chance of extra games",
+  "no any game",
+  "not include any games",
+  "does not include any",
+  "without game",
   "community account ban",
   "community ban",
   "vac ban",
   "trade ban",
   "game ban",
+  "red flag",
+  "corrupted",
+  "cannot be accessed",
+  "email address is corrupted",
+  "no email access",
+  "no mail access",
 ];
 
 /**
@@ -108,7 +121,7 @@ export function isSteamAccountProduct(
     return false;
   }
 
-  if (plat.includes("steam") && !plat.includes("rockstar")) {
+  if (plat.includes("steam")) {
     return true;
   }
 
@@ -214,11 +227,13 @@ export function evaluateSteamAccountFreshness(
     };
   }
 
-  // 4. Cek bundel banyak game berbayar/bonus acak ("+10 Other Paid Games", "+ Bonus Games" -> tipikal log cracked)
+  // 4. Cek bundel banyak game berbayar/bonus acak ("+10 Other Paid Games", "+ Bonus Games", "With 20+ Other games", "«22 Games»")
   if (
     /\+\s*(?:[1-9]\d*\s*)?(?:other\s+|bonus\s+|extra\s+|random\s+|more\s+)?(?:paid\s+)?games?\b/i.test(
       lower
-    )
+    ) ||
+    /\b[1-9]\d*\+?\s*(?:other|bonus|extra|random)\s*(?:paid\s*)?games?\b/i.test(lower) ||
+    /(?:«|\[|\()\s*[1-9]\d*\s+games?\b/i.test(lower)
   ) {
     return {
       fresh_status: "risky_played",
