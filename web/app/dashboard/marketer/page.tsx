@@ -53,7 +53,7 @@ export default function MarketerPage() {
   const [platform, setPlatform] = useState("Steam");
   const [buyerName, setBuyerName] = useState("Kak Dimas");
   const [channel, setChannel] = useState<"Shopee" | "WhatsApp">("Shopee");
-  const [deliveryMode, setDeliveryMode] = useState<"digital" | "physical_envelope">("digital");
+  const deliveryMode = "digital" as const;
   const [tone, setTone] = useState("Ramah, Hangat & Profesional");
   const [isFormatting, setIsFormatting] = useState(false);
   const [formattedData, setFormattedData] = useState<{
@@ -397,32 +397,9 @@ export default function MarketerPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600 block">Mode Pengiriman:</label>
-                    <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                      <button
-                        type="button"
-                        onClick={() => setDeliveryMode("digital")}
-                        className={`py-1.5 px-2 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                          deliveryMode === "digital"
-                            ? "bg-white text-slate-900 shadow-sm font-bold"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        Digital Instant
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeliveryMode("physical_envelope")}
-                        className={`py-1.5 px-2 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                          deliveryMode === "physical_envelope"
-                            ? "bg-white text-slate-900 shadow-sm font-bold"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        Sertifikat Fisik/Resi
-                      </button>
-                    </div>
+                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 flex items-center justify-between gap-2">
+                    <span>⚡ <strong>100% Pengiriman Digital</strong> (Tanpa amplop fisik &amp; bebas link URL tersensor Shopee)</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">DIGITAL</span>
                   </div>
 
                   <div className="space-y-1.5">

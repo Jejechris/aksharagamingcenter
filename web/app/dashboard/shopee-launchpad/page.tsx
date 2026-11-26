@@ -5,6 +5,7 @@ import Link from "next/link";
 import { fetchSmartCatalog } from "@/lib/catalogClient";
 import ThumbnailStudio from "@/app/dashboard/marketer/components/ThumbnailStudio";
 import GameSelectorCombobox from "@/app/components/GameSelectorCombobox";
+import MassUploadStudio from "./components/MassUploadStudio";
 import {
   SHOPEE_FEE_PRESETS,
   ShopeeFeePresetId,
@@ -33,7 +34,8 @@ import {
   AlertTriangle,
   RotateCcw,
   Smartphone,
-  Info
+  Info,
+  FileSpreadsheet
 } from "lucide-react";
 
 interface CatalogItem {
@@ -51,8 +53,17 @@ interface CatalogItem {
 }
 
 export default function ShopeeLaunchpadPage() {
+  const [launchpadMode, setLaunchpadMode] = useState<"single" | "mass_upload">("single");
   const [activeStep, setActiveStep] = useState<number>(1);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") === "mass_upload") {
+      setLaunchpadMode("mass_upload");
+    }
+  }, []);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
   const [selectedGameId, setSelectedGameId] = useState<string>("custom");
 
@@ -131,31 +142,31 @@ export default function ShopeeLaunchpadPage() {
     desc += `✓ Proteksi garansi toko ${days} hari ganti baru anti-hackback.\n\n`;
 
     if (guide) {
-      desc += `📥 CARA AKTIVASI & PENGAMBILAN KREDENSIAL:\n`;
+      desc += `📥 CARA AKTIVASI & PENGAMBILAN KREDENSIAL (100% DIGITAL QR):\n`;
       desc += `1. Selesaikan pembayaran pesanan Anda di Shopee.\n`;
-      desc += `2. Cek chat Shopee Anda untuk mendapatkan link Brankas Kredensial Resmi beserta Passcode PIN rahasia.\n`;
-      desc += `3. Buka link brankas, masukkan PIN, dan langsung dapatkan akses email/pass atau serial CD-Key Anda.\n`;
+      desc += `2. Admin akan mengirimkan Kartu Akses & Sertifikat Garansi Digital PNG (berisi QR Code + Kode Klaim + PIN) langsung melalui Chat Shopee.\n`;
+      desc += `3. Scan QR Code pada gambar kartu menggunakan kamera HP Anda atau masukkan Kode Klaim & PIN untuk membuka kredensial / CD-Key secara instan.\n`;
       desc += `4. Login ke launcher resmi (${plat}) & selamat bermain!\n\n`;
     }
 
     if (unboxing) {
       desc += `🛡️ SYARAT & KETENTUAN KLAIM GARANSI:\n`;
-      desc += `• Wajib merekam video unboxing / screen recording tanpa jeda (no-cut) mulai dari sebelum membuka link brankas hingga mencoba login pertama kali.\n`;
+      desc += `• Wajib merekam video rekaman layar (screen recording) tanpa jeda (no-cut) mulai dari sebelum membuka brankas kredensial hingga mencoba login pertama kali.\n`;
       desc += `• Garansi meliputi akun tidak bisa login saat serah terima atau kendala lisensi selama masa garansi ${days} hari.\n`;
-      desc += `• Ulasan bintang 5 dan konfirmasi penerimaan pesanan akan mengaktifkan masa garansi otomatis.\n\n`;
+      desc += `• Ulasan bintang 5 dan konfirmasi penerimaan pesanan akan mengaktifkan Sertifikat Garansi Digital secara otomatis.\n\n`;
     }
 
     if (faq) {
       desc += `❓ PERTANYAAN UMUM (F.A.Q):\n`;
       desc += `Q: Apakah ini permanen?\n`;
       desc += `A: Ya, game menjadi milik Anda permanen dan dapat dimainkan online/offline sesuai fitur game.\n`;
-      desc += `Q: Apakah butuh kirim paket fisik?\n`;
-      desc += `A: Pengiriman digital otomatis instan via chat. Kartu bukti fisik opsional dapat disertakan bila dibutuhkan.\n\n`;
+      desc += `Q: Apakah ada pengiriman paket atau amplop fisik?\n`;
+      desc += `A: Tidak ada. 100% Pengiriman Digital instan melalui Chat Shopee menggunakan Kartu Akses & Garansi Digital QR resmi.\n\n`;
     }
 
     if (vip) {
       desc += `🎁 BONUS MEMBER VIP REPEAT ORDER:\n`;
-      desc += `Dapatkan kartu voucher diskon Rp 15.000 untuk pembelian game selanjutnya di official store direct kami!\n\n`;
+      desc += `Pesanan berstatus garansi aktif otomatis tercatat pada ID Sertifikat Garansi Digital Akshara untuk benefit prioritas & promo repeat order.\n\n`;
     }
 
     if (bonus.trim()) {
@@ -423,31 +434,62 @@ export default function ShopeeLaunchpadPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
-                    Shopee Listing Wizard
+                    Shopee Listing Launchpad
                   </h1>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold">
-                    4-STEP FLOW
+                    {launchpadMode === "single" ? "4-STEP FLOW" : "MASS UPLOAD"}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Eksekusi satu alur cover, judul SEO, SOP deskripsi, hingga penetapan harga.
+                  {launchpadMode === "single"
+                    ? "Eksekusi satu alur cover, judul SEO, SOP zero-link, hingga penetapan harga."
+                    : "Export massal template Excel resmi Shopee Seller Centre + auto-render cover 1080x1080."}
                 </p>
               </div>
             </div>
 
-            {/* Catalog Selector Combobox */}
-            <div className="flex items-center gap-2.5 w-full md:w-auto">
-              <div className="relative flex-1 md:w-[420px]">
-                <GameSelectorCombobox
-                  games={catalog}
-                  selectedGameId={selectedGameId}
-                  selectedGameTitle={gameTitle}
-                  showCustomOption={true}
-                  onSelectCustom={() => handleSelectGame("custom")}
-                  onSelect={(g) => handleSelectGame(g.id)}
-                  placeholder="Pilih game dari katalog atau input manual..."
-                />
+            {/* Mode Switcher + Quick Action */}
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+              <div className="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setLaunchpadMode("single")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    launchpadMode === "single"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Wizard Satuan</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLaunchpadMode("mass_upload")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    launchpadMode === "mass_upload"
+                      ? "bg-orange-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Batch Mass Upload (.xlsx)</span>
+                </button>
               </div>
+
+              {launchpadMode === "single" && (
+                <div className="relative flex-1 md:w-[320px]">
+                  <GameSelectorCombobox
+                    games={catalog}
+                    selectedGameId={selectedGameId}
+                    selectedGameTitle={gameTitle}
+                    showCustomOption={true}
+                    onSelectCustom={() => handleSelectGame("custom")}
+                    onSelect={(g) => handleSelectGame(g.id)}
+                    placeholder="Pilih game dari katalog atau input manual..."
+                  />
+                </div>
+              )}
 
               <a
                 href="https://seller.shopee.co.id/portal/product/new"
@@ -462,61 +504,73 @@ export default function ShopeeLaunchpadPage() {
             </div>
           </div>
 
-          {/* Baris Bawah: 4-Step Interactive Horizontal Stepper */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {STEPS.map((s) => {
-              const Icon = s.icon;
-              const isActive = activeStep === s.id;
-              const isDone = checklist[s.key];
+          {/* Baris Bawah: 4-Step Interactive Horizontal Stepper (Hanya di Wizard Satuan) */}
+          {launchpadMode === "single" && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+              {STEPS.map((s) => {
+                const Icon = s.icon;
+                const isActive = activeStep === s.id;
+                const isDone = checklist[s.key];
 
-              let stepStyle = "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100";
-              if (isActive) {
-                stepStyle = "bg-emerald-600 border-emerald-600 text-white shadow-xs ring-2 ring-emerald-500/20";
-              } else if (isDone) {
-                stepStyle = "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/70";
-              }
+                let stepStyle = "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100";
+                if (isActive) {
+                  stepStyle = "bg-emerald-600 border-emerald-600 text-white shadow-xs ring-2 ring-emerald-500/20";
+                } else if (isDone) {
+                  stepStyle = "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/70";
+                }
 
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setActiveStep(s.id)}
-                  className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${stepStyle}`}
-                >
-                  <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold transition-colors ${
-                      isActive
-                        ? "bg-white/20 text-white"
-                        : isDone
-                        ? "bg-emerald-600 text-white"
-                        : "bg-white border border-slate-300 text-slate-500"
-                    }`}
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setActiveStep(s.id)}
+                    className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer ${stepStyle}`}
                   >
-                    {isDone ? (
-                      <Check className="w-4 h-4 stroke-[2.5]" />
-                    ) : (
-                      <span>{s.id}</span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : isDone ? "text-emerald-700" : "text-slate-400"}`} />
-                      <span className="text-xs font-bold truncate">{s.title}</span>
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold transition-colors ${
+                        isActive
+                          ? "bg-white/20 text-white"
+                          : isDone
+                          ? "bg-emerald-600 text-white"
+                          : "bg-white border border-slate-300 text-slate-500"
+                      }`}
+                    >
+                      {isDone ? (
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                      ) : (
+                        <span>{s.id}</span>
+                      )}
                     </div>
-                    <span className={`text-[10px] block truncate ${isActive ? "text-emerald-100" : "text-slate-400"}`}>
-                      {isDone ? "Sudah Siap ✓" : s.description}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : isDone ? "text-emerald-700" : "text-slate-400"}`} />
+                        <span className="text-xs font-bold truncate">{s.title}</span>
+                      </div>
+                      <span className={`text-[10px] block truncate ${isActive ? "text-emerald-100" : "text-slate-400"}`}>
+                        {isDone ? "Sudah Siap ✓" : s.description}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* 1B. KONTEN BATCH MASS UPLOAD STUDIO (MODE MASS UPLOAD EXCEL)       */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {launchpadMode === "mass_upload" && (
+          <div className="animate-fade-up">
+            <MassUploadStudio />
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
         {/* 2. KONTEN WIZARD (HANYA 1 STEP AKTIF PER LAYAR - PERSISTENT STATE) */}
         {/* ══════════════════════════════════════════════════════════════════ */}
+        <div className={launchpadMode === "single" ? "space-y-5" : "hidden"}>
 
         {/* ── STEP 1: COVER 1080x1080 (CSS block/hidden agar state studio awet) ── */}
         <div className={activeStep === 1 ? "block animate-fade-up" : "hidden"}>
@@ -1232,6 +1286,8 @@ export default function ShopeeLaunchpadPage() {
               </a>
             )}
           </div>
+
+        </div>
 
         </div>
 

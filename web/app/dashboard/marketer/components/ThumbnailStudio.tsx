@@ -221,7 +221,7 @@ const RULES_SLIDE_CARDS: RulesCardConfig[] = [
     titleColor: "#064E3B",
     bullets: [
       ["✓ Garansi aktif 30 Hari sejak tanggal", "   pembelian & ulasan bintang 5."],
-      ["✓ Klaim wajib sertakan video unboxing /", "   screen recording tanpa jeda (no-cut)."],
+      ["✓ Klaim wajib sertakan video rekaman", "   layar (screen rec) tanpa jeda (no-cut)."],
       ["✓ Penggantian unit baru penuh sesuai", "   prosedur SOP resmi toko."],
     ],
   },

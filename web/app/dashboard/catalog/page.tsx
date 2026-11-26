@@ -9,7 +9,7 @@ import {
   Check, Filter, Search, Sliders, ChevronDown, ChevronUp,
   Cpu, Trash2, ArrowUpRight, ShieldAlert, Sparkles, Star,
   Award, QrCode, Zap, Layers, BarChart3, CheckCircle2, Clock, Save,
-  Pencil, FileText, Download, Upload, Database, ShoppingBag
+  Pencil, FileText, Download, Upload, Database, ShoppingBag, FileSpreadsheet
 } from 'lucide-react';
 import { getG2GSellerUrl, getG2GGameCategoryUrl, resolveG2GProductUrl, getG2GSellerProfileUrl, extractG2GOfferId } from '@/lib/g2g';
 import { getEnebaSearchUrl } from '@/lib/eneba';
@@ -966,6 +966,15 @@ export default function CatalogDashboardPage() {
               <Zap className="w-3.5 h-3.5 text-indigo-600" />
               <span>Detektor Link</span>
             </button>
+
+            <Link
+              href="/dashboard/shopee-launchpad?mode=mass_upload"
+              className="px-3 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5"
+              title="Export semua katalog terpilih ke template Mass Upload Excel Shopee (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-orange-600" />
+              <span>Mass Upload Shopee</span>
+            </Link>
 
             <button
               onClick={() => {

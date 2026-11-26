@@ -1,7 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import QRCode from "qrcode";
+import {
+  renderDigitalWarrantyCardPng,
+  generateQrDataUrl,
+  buildVerificationOrClaimUrl,
+} from "@/lib/digitalWarrantyCard";
 import {
   Award,
   Check,
@@ -69,15 +73,7 @@ export default function WarrantyCardStudio({ onToast }: WarrantyCardStudioProps)
   // Generate crisp real scannable QR code
   useEffect(() => {
     let cancelled = false;
-    QRCode.toDataURL(verificationUrl, {
-      width: 320,
-      margin: 1,
-      color: {
-        dark: "#0F172A",
-        light: "#FFFFFF",
-      },
-      errorCorrectionLevel: "M",
-    })
+    generateQrDataUrl(verificationUrl)
       .then((url) => {
         if (!cancelled) setQrDataUrl(url);
       })
@@ -141,301 +137,21 @@ export default function WarrantyCardStudio({ onToast }: WarrantyCardStudioProps)
     notify(`Sertifikat otomatis diisi dari klaim ${found.claim_code}!`);
   };
 
-  // High-resolution A6 (1240 x 1754 px @ ~300 DPI) Canvas PNG Renderer
+  // High-resolution A6 Digital Certificate PNG Renderer (delegated to shared digitalWarrantyCard lib)
   const renderCardSidePng = async (side: "front" | "back"): Promise<string | null> => {
-    const W = 1240;
-    const H = 1754;
-    const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-
-    // 1. Dark Obsidian Metallic Background matching claimakshara.vercel.app
-    const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-    bgGrad.addColorStop(0, "#070B14");
-    bgGrad.addColorStop(0.55, "#0B1120");
-    bgGrad.addColorStop(1, "#090D16");
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, W, H);
-
-    // Ambient Emerald + Amber radial accents
-    const glow1 = ctx.createRadialGradient(W - 140, 180, 20, W - 140, 180, 480);
-    glow1.addColorStop(0, "rgba(16, 185, 129, 0.22)");
-    glow1.addColorStop(1, "rgba(16, 185, 129, 0)");
-    ctx.fillStyle = glow1;
-    ctx.fillRect(0, 0, W, H);
-
-    const glow2 = ctx.createRadialGradient(160, H - 180, 20, 160, H - 180, 440);
-    glow2.addColorStop(0, "rgba(245, 158, 11, 0.14)");
-    glow2.addColorStop(1, "rgba(245, 158, 11, 0)");
-    ctx.fillStyle = glow2;
-    ctx.fillRect(0, 0, W, H);
-
-    // Outer Gold & Emerald Double Frame
-    ctx.strokeStyle = "rgba(245, 158, 11, 0.42)";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.roundRect(38, 38, W - 76, H - 76, 42);
-    ctx.stroke();
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.10)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(56, 56, W - 112, H - 112, 32);
-    ctx.stroke();
-
-    // Top Microtext Security Strip
-    ctx.fillStyle = "rgba(148, 163, 184, 0.45)";
-    ctx.font = "600 15px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(
-      `• AKSHARA GAMING CENTER • OFFICIAL LICENSED STORE • ${serialNumber} •`,
-      W / 2,
-      86
-    );
-
-    // Top Brand Header
-    ctx.fillStyle = "rgba(16, 185, 129, 0.12)";
-    ctx.strokeStyle = "rgba(16, 185, 129, 0.35)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(96, 130, W - 192, 134, 24);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "900 44px 'Inter', sans-serif";
-    ctx.fillText("AKSHARA", 134, 190);
-    ctx.fillStyle = "#34D399";
-    ctx.font = "700 20px 'JetBrains Mono', monospace";
-    ctx.fillText("GAMING CENTER • OFFICIAL VAULT CERTIFICATE", 134, 232);
-
-    // Right Pill on Header
-    ctx.fillStyle = "rgba(245, 158, 11, 0.16)";
-    ctx.strokeStyle = "rgba(245, 158, 11, 0.5)";
-    ctx.beginPath();
-    ctx.roundRect(W - 386, 162, 254, 68, 16);
-    ctx.fill();
-    ctx.stroke();
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#FCD34D";
-    ctx.font = "800 22px 'JetBrains Mono', monospace";
-    ctx.fillText(side === "front" ? `GARANSI ${warrantyDays} HARI` : "SOP & VIP CARD", W - 259, 204);
-
-    if (side === "front") {
-      // Certificate Title
-      ctx.fillStyle = "#F59E0B";
-      ctx.fillRect(96, 326, 110, 8);
-
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#F8FAFC";
-      ctx.font = "800 54px 'Inter', sans-serif";
-      ctx.fillText("Sertifikat Keaslian", 96, 398);
-      ctx.fillStyle = "#94A3B8";
-      ctx.font = "500 25px 'Inter', sans-serif";
-      ctx.fillText("Lisensi game 100% original, legal & terlindungi proteksi penuh toko.", 96, 448);
-
-      // Game Highlight Box
-      ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(96, 502, W - 192, 220, 26);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = "#34D399";
-      ctx.font = "700 20px 'JetBrains Mono', monospace";
-      ctx.fillText(`${platform.toUpperCase()} • ${productType.toUpperCase()}`, 132, 556);
-
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "800 40px 'Inter', sans-serif";
-      const clippedGame = gameTitle.length > 36 ? gameTitle.slice(0, 35) + "…" : gameTitle;
-      ctx.fillText(clippedGame, 132, 622);
-
-      ctx.fillStyle = "#94A3B8";
-      ctx.font = "500 22px 'JetBrains Mono', monospace";
-      ctx.fillText(`Status Verifikasi: AKTIF & TERDAFTAR DI SISTEM`, 132, 678);
-
-      // 4 Telemetry Detail Cards (2x2 Grid)
-      const rows = [
-        { label: "PEMILIK LISENSI", val: buyerName || "-", x: 96, y: 760 },
-        { label: "NOMOR PESANAN", val: orderId || "-", x: 636, y: 760 },
-        { label: "TANGGAL TERBIT", val: issueDate || "-", x: 96, y: 954 },
-        { label: "MASA PERLINDUNGAN", val: `${warrantyDays} HARI PENUH`, x: 636, y: 954 },
-      ];
-      for (const box of rows) {
-        ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.09)";
-        ctx.beginPath();
-        ctx.roundRect(box.x, box.y, 508, 166, 22);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = "#64748B";
-        ctx.font = "700 18px 'JetBrains Mono', monospace";
-        ctx.fillText(box.label, box.x + 28, box.y + 48);
-
-        ctx.fillStyle = box.label === "MASA PERLINDUNGAN" ? "#34D399" : "#F8FAFC";
-        ctx.font = "700 30px 'Inter', sans-serif";
-        const valText = box.val.length > 23 ? box.val.slice(0, 22) + "…" : box.val;
-        ctx.fillText(valText, box.x + 28, box.y + 108);
-      }
-
-      // Bottom Verification Banner with Embedded Scannable QR Code
-      ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-      ctx.strokeStyle = "rgba(16, 185, 129, 0.35)";
-      ctx.beginPath();
-      ctx.roundRect(96, 1290, W - 192, 340, 28);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = "#94A3B8";
-      ctx.font = "700 20px 'JetBrains Mono', monospace";
-      ctx.fillText("SERIAL SERTIFIKAT RESMI (SCAN QR UNTUK CEK ONLINE)", 132, 1348);
-
-      ctx.fillStyle = "#34D399";
-      ctx.font = "800 38px 'JetBrains Mono', monospace";
-      ctx.fillText(serialNumber, 132, 1412);
-
-      ctx.fillStyle = "#CBD5E1";
-      ctx.font = "500 22px 'Inter', sans-serif";
-      ctx.fillText("Portal Validasi Resmi:", 132, 1484);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "700 23px 'JetBrains Mono', monospace";
-      ctx.fillText("claimakshara.vercel.app/#warranty", 132, 1522);
-
-      ctx.fillStyle = "#FCD34D";
-      ctx.font = "600 20px 'Inter', sans-serif";
-      ctx.fillText("✦ Disahkan secara digital oleh Akshara Command Vault", 132, 1582);
-
-      // Draw Real Scannable QR Code
-      if (qrDataUrl) {
-        await new Promise<void>((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            ctx.fillStyle = "#FFFFFF";
-            ctx.beginPath();
-            ctx.roundRect(W - 376, 1336, 248, 248, 20);
-            ctx.fill();
-            ctx.drawImage(img, W - 362, 1350, 220, 220);
-            resolve();
-          };
-          img.onerror = () => resolve();
-          img.src = qrDataUrl;
-        });
-      }
-    } else {
-      // BACK SIDE: SOP KLAIM GARANSI + VIP REPEAT ORDER VOUCHER
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#F8FAFC";
-      ctx.font = "800 44px 'Inter', sans-serif";
-      ctx.fillText("SOP Klaim & Ketentuan Garansi", 96, 360);
-      ctx.fillStyle = "#94A3B8";
-      ctx.font = "500 23px 'Inter', sans-serif";
-      ctx.fillText("Ikuti 3 langkah wajib ini agar klaim garansi diproses kilat:", 96, 406);
-
-      const sopSteps = [
-        {
-          no: "01",
-          title: "Wajib Video Tanpa Jeda (No-Cut)",
-          desc1: "Rekam layar / unboxing amplop tanpa jeda mulai sebelum",
-          desc2: "buka portal kredensial hingga proses login pertama berhasil.",
-          accent: "#34D399",
-        },
-        {
-          no: "02",
-          title: "Jaga Keamanan & Aturan Region",
-          desc1: "Dilarang ubah region akun (2–4 minggu) atau ubah email/",
-          desc2: "password utama tanpa konfirmasi admin. Segera aktifkan 2FA.",
-          accent: "#60A5FA",
-        },
-        {
-          no: "03",
-          title: "Aktivasi Garansi & Support 24/7",
-          desc1: "Klik 'Pesanan Diterima' + Ulasan Bintang 5 di Shopee, lalu",
-          desc2: "hubungi Chat CS resmi jika butuh bantuan setup atau klaim.",
-          accent: "#FBBF24",
-        },
-      ];
-
-      let sy = 456;
-      for (const s of sopSteps) {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.11)";
-        ctx.beginPath();
-        ctx.roundRect(96, sy, W - 192, 220, 24);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = s.accent;
-        ctx.beginPath();
-        ctx.roundRect(130, sy + 30, 62, 48, 12);
-        ctx.fill();
-
-        ctx.fillStyle = "#0F172A";
-        ctx.font = "900 24px 'JetBrains Mono', monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(s.no, 161, sy + 63);
-
-        ctx.textAlign = "left";
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "800 30px 'Inter', sans-serif";
-        ctx.fillText(s.title, 214, sy + 64);
-
-        ctx.fillStyle = "#CBD5E1";
-        ctx.font = "500 23px 'Inter', sans-serif";
-        ctx.fillText(s.desc1, 130, sy + 126);
-        ctx.fillText(s.desc2, 130, sy + 162);
-
-        sy += 248;
-      }
-
-      // Gold VIP Voucher Banner matching Python A6 generator
-      const vGrad = ctx.createLinearGradient(96, 1226, W - 96, 1466);
-      vGrad.addColorStop(0, "#78350F");
-      vGrad.addColorStop(0.5, "#92400E");
-      vGrad.addColorStop(1, "#451A03");
-      ctx.fillStyle = vGrad;
-      ctx.strokeStyle = "rgba(252, 211, 77, 0.65)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.roundRect(96, 1230, W - 192, 236, 26);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = "#FDE68A";
-      ctx.font = "800 20px 'JetBrains Mono', monospace";
-      ctx.fillText("★ VOUCHER EKSKLUSIF MEMBER REPEAT ORDER", 132, 1286);
-
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "900 46px 'JetBrains Mono', monospace";
-      ctx.fillText(vipVoucher, 132, 1356);
-
-      ctx.fillStyle = "#FEF3C7";
-      ctx.font = "500 22px 'Inter', sans-serif";
-      ctx.fillText("Tunjukkan kode ini di Chat CS untuk diskon khusus order berikutnya!", 132, 1418);
-
-      // Footer
-      ctx.fillStyle = "#94A3B8";
-      ctx.font = "600 22px 'JetBrains Mono', monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(`VERIFY ONLINE: claimakshara.vercel.app • SERIAL: ${serialNumber}`, W / 2, 1564);
-    }
-
-    // Bottom Microtext
-    ctx.fillStyle = "rgba(148, 163, 184, 0.45)";
-    ctx.font = "600 15px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(
-      `• ENCRYPTED BY AKSHARA CLAIM VAULT • ${issueDate.toUpperCase()} • DO NOT FORGE •`,
-      W / 2,
-      H - 70
-    );
-
-    return canvas.toDataURL("image/png", 1.0);
+    return renderDigitalWarrantyCardPng({
+      side,
+      buyerName,
+      gameTitle,
+      platform,
+      productType,
+      orderId,
+      serialNumber,
+      issueDate,
+      warrantyDays,
+      vipVoucher,
+      claimBaseUrl: DEFAULT_CLAIM_URL_BASE,
+    });
   };
 
   const handleDownloadPng = async (target: "front" | "back" | "both") => {
@@ -646,7 +362,7 @@ export default function WarrantyCardStudio({ onToast }: WarrantyCardStudioProps)
                         <div className="font-bold text-emerald-300 mb-0.5">
                           01. Wajib Video Tanpa Jeda (No-Cut)
                         </div>
-                        Sertakan rekaman unboxing/screen recording tanpa edit dari sebelum membuka brankas klaim hingga login pertama berhasil.
+                        Sertakan rekaman layar (Screen Recording) tanpa edit/jeda dari sebelum membuka brankas klaim hingga login pertama berhasil.
                       </div>
                       <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.1]">
                         <div className="font-bold text-sky-300 mb-0.5">

@@ -45,8 +45,7 @@ function DescriptionMakerContent() {
   const [coverTheme, setCoverTheme] = useState<"violet" | "emerald" | "amber" | "cyan">("violet");
 
   // Options toggles
-  const [includePhysicalCard, setIncludePhysicalCard] = useState(false);
-  const [includeUnboxingSop, setIncludeUnboxingSop] = useState(false);
+  const [includeUnboxingSop, setIncludeUnboxingSop] = useState(true);
   const [includeFaq, setIncludeFaq] = useState(true);
   const [includeActivationSteps, setIncludeActivationSteps] = useState(true);
   const [customNotes, setCustomNotes] = useState("");
@@ -149,7 +148,6 @@ function DescriptionMakerContent() {
           category,
           price,
           style,
-          includePhysicalCard,
           includeUnboxingSop,
           includeFaq,
           includeActivationSteps,
@@ -180,7 +178,7 @@ function DescriptionMakerContent() {
     } finally {
       setIsGenerating(false);
     }
-  }, [gameTitle, platform, category, price, style, includePhysicalCard, includeUnboxingSop, includeFaq, includeActivationSteps, customNotes]);
+  }, [gameTitle, platform, category, price, style, includeUnboxingSop, includeFaq, includeActivationSteps, customNotes]);
 
   // Auto-generate initial description once gameTitle is set
   useEffect(() => {
@@ -818,21 +816,11 @@ function DescriptionMakerContent() {
                 <label className="flex items-center gap-2.5 cursor-pointer text-slate-700 hover:text-slate-900 transition-colors">
                   <input
                     type="checkbox"
-                    checked={includePhysicalCard}
-                    onChange={(e) => setIncludePhysicalCard(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <span className="font-medium">📦 Sertakan Info Kartu Garansi Fisik A6 (Opsional)</span>
-                </label>
-
-                <label className="flex items-center gap-2.5 cursor-pointer text-slate-700 hover:text-slate-900 transition-colors">
-                  <input
-                    type="checkbox"
                     checked={includeUnboxingSop}
                     onChange={(e) => setIncludeUnboxingSop(e.target.checked)}
                     className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   />
-                  <span className="font-medium">⚠️ Sertakan SOP Video Rekaman Layar / Unboxing (Anti-Fraud)</span>
+                  <span className="font-medium">⚠️ Sertakan SOP Video Rekaman Layar (Anti-Fraud No-Cut)</span>
                 </label>
 
                 <label className="flex items-center gap-2.5 cursor-pointer text-slate-700 hover:text-slate-900 transition-colors">
@@ -1145,13 +1133,11 @@ function DescriptionMakerContent() {
                         🛡️ 100% Original & Legal
                       </span>
                       <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-medium">
-                        ⚡ Pengiriman Instan
+                        ⚡ Pengiriman 100% Digital
                       </span>
-                      {includePhysicalCard && (
-                        <span className="px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 font-medium">
-                          📦 Garansi Fisik A6
-                        </span>
-                      )}
+                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                        🛡️ Sertifikat Garansi Digital QR
+                      </span>
                     </div>
                   </div>
 
@@ -1205,12 +1191,11 @@ function DescriptionMakerContent() {
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1.5">
               <div className="text-slate-900 font-bold flex items-center gap-1.5">
                 <Info className="w-3.5 h-3.5 text-blue-600" />
-                Tips Lolos Regulasi Shopee Produk Digital (Hybrid Mode):
+                Tips Lolos Regulasi Shopee (100% Digital + Zero-Link):
               </div>
               <p className="text-[11px] leading-relaxed">
-                Shopee mewajibkan resi pengiriman fisik nyata untuk menghindari penalti non-shipment atau penutupan toko.
-                Dengan menyertakan opsi <span className="text-slate-900 font-semibold">Pengiriman Amplop Resi Fisik / Kartu Garansi A6</span> atau instant delivery compliant,
-                toko Anda 100% compliant dengan kebijakan Shopee Indonesia dan terproteksi dari klaim buyer nakal!
+                Shopee melarang mencantumkan tautan website eksternal di deskripsi maupun chat. Deskripsi ini bebas URL luar dan mengandalkan
+                <span className="text-slate-900 font-semibold"> Kartu Akses &amp; Sertifikat Garansi Digital ber-QR</span> yang dikirim langsung sebagai gambar via Chat Shopee.
               </p>
             </div>
 

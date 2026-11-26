@@ -7,7 +7,6 @@ interface DescriptionRequest {
   category?: string;
   price?: number;
   style?: "ultimate" | "clean" | "flash_sale" | "security";
-  includePhysicalCard?: boolean;
   includeUnboxingSop?: boolean;
   includeFaq?: boolean;
   includeActivationSteps?: boolean;
@@ -21,7 +20,6 @@ function generateFallbackDescription(params: DescriptionRequest) {
       category = "Account (Full Access)",
       price = 190900,
       style = "ultimate",
-      includePhysicalCard = false,
       includeUnboxingSop = true,
     includeFaq = true,
     includeActivationSteps = true,
@@ -35,11 +33,8 @@ function generateFallbackDescription(params: DescriptionRequest) {
     maximumFractionDigits: 0,
   }).format(price);
 
-  // Optimized Shopee SEO Title (Max 120 chars)
+  // Optimized Shopee SEO Title (Max 120 chars, 100% Pure Digital)
   let seoTitle = `${cleanTitle} [${platform.toUpperCase()}] ORIGINAL FULL ACCESS GARANSI RESMI`;
-  if (includePhysicalCard && seoTitle.length < 100) {
-    seoTitle += " + Kartu Garansi Fisik A6";
-  }
   if (seoTitle.length > 120) {
     seoTitle = seoTitle.substring(0, 117) + "...";
   }
@@ -80,17 +75,17 @@ KEUNGGULAN BELI DI AKSHARA GAMING:
 - FULL ACCESS 100%: Pembeli bebas ganti Email, Password, Nickname, & Pertanyaan Keamanan.
 - ONLINE MULTIPLAYER RESMI: Bebas main online di seluruh server resmi publik & private.
 - PERMANEN MILIK ANDA: Akun/Lisensi aktif selamanya, bukan sewa bulanan.
-- PENGIRIMAN KILAT: Detail akun/lisensi dikirimkan secara cepat & aman via chat setelah order.
-${includePhysicalCard ? "- BONUS SERTIFIKAT GARANSI DIGITAL: Dilengkapi Kartu Garansi Digital Resmi dengan kode QR verifikasi serial terdaftar!\n" : ""}${customNotes ? `CATATAN TAMBAHAN: ${customNotes}\n` : ""}
+- PENGIRIMAN KILAT DIGITAL: Kartu Akses + Sertifikat Garansi Digital QR dikirim langsung via Chat Shopee.
+${customNotes ? `CATATAN TAMBAHAN: ${customNotes}\n` : ""}
 ==================================================
 ${includeActivationSteps ? `3 LANGKAH MUDAH AKTIVASI:
 1. Selesaikan pembayaran di Shopee dan cek chat Shopee Anda.
-2. Tim Akshara akan mengirimkan data lisensi beserta panduan setup instan.
+2. Tim Akshara akan mengirimkan Kartu Akses + Kode Klaim & panduan setup instan via Chat Shopee.
 3. Login ke launcher resmi ${platform}, ubah data sesuai keinginan, dan game siap dimainkan!
 
 ==================================================
 ` : ""}${includeUnboxingSop ? `SYARAT & KETENTUAN KLAIM GARANSI (SOP ANTI-FRAUD):
-1. ${includePhysicalCard ? "Wajib merekam VIDEO UNBOXING amplop Kartu Garansi Fisik A6 dan proses login pertama kali tanpa jeda (no-cut & unedited)." : "Wajib merekam VIDEO LAYAR (Screen Recording) tanpa jeda (no-cut & unedited) dari sebelum menekan tombol Buka Kredensial di Portal Klaim Akshara hingga berhasil login pertama kali ke dalam game."}
+1. Wajib merekam VIDEO LAYAR (Screen Recording) tanpa jeda (no-cut & unedited) dari sebelum membuka Kartu Akses / Brankas Klaim hingga berhasil login pertama kali ke dalam game.
 2. Segera lakukan pengecekan dan pergantian data setelah detail diterima.
 3. Garansi tidak berlaku jika akun terindikasi menggunakan cheat/third-party mod ilegal/terkena ban aktivitas sendiri.
 4. Tim Support Akshara siap membantu 24/7 jika ada kendala login awal.
@@ -103,8 +98,8 @@ A: Selalu READY STOK kak! Sistem kami autonomous, silakan langsung di-checkout s
 Q: Apakah butuh VPN untuk login atau main?
 A: Sama sekali TIDAK. 100% region Global dan aman koneksi internet Indonesia (Indihome, Biznet, Telkomsel, dll).
 
-Q: Apakah dikirim paket fisik ke alamat rumah?
-A: ${includePhysicalCard ? "Ya kak, amplop resmi berisi Kartu Garansi Fisik Akshara A6 dikirim via kurir Shopee agar order Anda resmi, terdaftar, dan aman regulasi." : "Tidak kak, pesanan diproses 100% digital kilat via chat & portal klaim resmi Akshara tanpa perlu menunggu kurir ekspedisi."}
+Q: Bagaimana cara pengirimannya? Apakah ada paket fisik?
+A: Pesanan diproses 100% DIGITAL kilat via Chat Shopee + Kartu Akses & Sertifikat Garansi Digital ber-QR, tanpa perlu menunggu kurir ekspedisi.
 
 ==================================================
 ` : ""}Terima kasih telah mempercayakan kebutuhan gaming Anda di Akshara Gaming Center!
@@ -127,11 +122,12 @@ KEAMANAN & LEGALITAS PRODUK:
 📦 KELENGKAPAN PESANAN:
 1. Akun / Lisensi ${gameTitle} Original.
 2. Panduan Keamanan Akun & Tips Mengamankan Akun dari Hackback.
-${includePhysicalCard ? "3. Amplop Lisensi & Kartu Garansi Fisik Resmi A6 ber-QR Serial ID.\n" : "3. Akses Brankas Kredensial Digital & Panduan Setup Instan.\n"}4. Layanan Purna Jual CS 24 Jam.
+3. Sertifikat Garansi Digital ber-QR Serial ID & Panduan Setup Instan.
+4. Layanan Purna Jual CS 24 Jam.
 
 ==================================================
 SOP KLAIM GARANSI:
-• ${includePhysicalCard ? "Wajib merekam VIDEO UNBOXING amplop Kartu Garansi Fisik A6 dan login pertama tanpa jeda (no-cut)." : "Wajib merekam VIDEO LAYAR (Screen Recording) saat membuka brankas kredensial & login pertama tanpa jeda (no-cut)."}
+• Wajib merekam VIDEO LAYAR (Screen Recording) saat membuka brankas kredensial & login pertama tanpa jeda (no-cut).
 • Penggantian akun baru diberikan jika data awal tidak valid saat pertama diterima.
 • Akshara menerapkan Zero-Tolerance untuk seller scam & buyer fraud.
 
@@ -139,7 +135,7 @@ ${seoHashtags}`;
   } else if (style === "flash_sale") {
     content = `PROMO SPESIAL HARI INI — DISKON SPESIAL AKSHARA GAMING!
 ${cleanTitle} — ${formattedPrice}
-DAPATKAN LISENSI RESMI${includePhysicalCard ? " + BONUS KARTU GARANSI FISIK A6!" : " + GARANSI RESMI TOKO!"}
+DAPATKAN LISENSI RESMI + KARTU GARANSI DIGITAL QR!
 
 STOK TERBATAS! Harga promo bisa berubah sewaktu-waktu.
 Langsung checkout sekarang sebelum kehabisan slot promo!
@@ -147,13 +143,13 @@ Langsung checkout sekarang sebelum kehabisan slot promo!
 Kenapa harus beli di Akshara Gaming?
 - Harga termurah se-Shopee dengan jaminan original
 - Akun Full Access (Bisa ubah semua data)
-- Pengiriman instan tanpa nunggu lama
+- Pengiriman instan 100% digital tanpa nunggu lama
 - Garansi resmi toko terpercaya bintang 5
 ${customNotes ? `- ${customNotes}\n` : ""}
 Langkah Order:
 1. Klik Beli Sekarang & lakukan pembayaran.
-2. Cek chat Shopee untuk panduan instalasi.
-3. ${includePhysicalCard ? "Paket amplop fisik kartu garansi resmi akan meluncur ke alamat Anda!" : "Kredensial lisensi game dapat langsung dibuka instan via portal klaim!"}
+2. Cek chat Shopee untuk Kartu Akses Digital & panduan instalasi.
+3. Kredensial lisensi game dapat langsung dibuka instan via portal klaim / QR!
 
 ${seoHashtags}`;
   } else {
@@ -170,7 +166,8 @@ Fitur Utama:
 - Original legal developer license
 - Akses penuh ganti email & password
 - Support online multiplayer resmi
-${includePhysicalCard ? "- Termasuk pengiriman sertifikat fisik Kartu Garansi Resmi A6\n" : "- Pengiriman instan & aktivasi digital tanpa nunggu kurir\n"}${includeUnboxingSop ? `- SOP Garansi: ${includePhysicalCard ? "Wajib sertakan video unboxing amplop fisik tanpa jeda (no cut)" : "Wajib sertakan video rekaman layar (screen recording) saat buka kredensial tanpa jeda (no cut)"}\n` : ""}
+- Pengiriman 100% digital instan + Kartu Garansi Digital QR tanpa nunggu kurir
+${includeUnboxingSop ? `- SOP Garansi: Wajib sertakan video rekaman layar (screen recording) saat buka kredensial tanpa jeda (no cut)\n` : ""}
 Catatan: Silakan tanyakan CS jika membutuhkan bantuan panduan instalasi.
 
 ${seoHashtags}`;
@@ -187,7 +184,7 @@ ${seoHashtags}`;
       "100% Original & Legal",
       "Full Access (Bisa Ganti Email & Password)",
       "Garansi Resmi & Video SOP",
-      includePhysicalCard ? "Termasuk Kartu Garansi Fisik A6" : "Pengiriman Cepat Digital"
+      "Pengiriman 100% Digital + Garansi QR"
     ],
     cover_recommendation: {
       suggested_ratio: "1:1 (1080 x 1080 px)",
@@ -219,7 +216,6 @@ export async function POST(req: Request) {
       category = "Account (Full Access)",
       price = 190900,
       style = "ultimate",
-      includePhysicalCard = false,
       includeUnboxingSop = true,
       includeFaq = true,
       includeActivationSteps = true,
@@ -230,14 +226,14 @@ export async function POST(req: Request) {
 Tugasmu adalah membuat deskripsi produk Shopee Indonesia yang SANGAT MENARIK, PROFESIONAL, PERSUASIF, BERSIH, RAMAH ALGORITMA SHOPEE, dan MEMILIKI KONVERSI PENJUALAN TINGGI, LENGKAP DENGAN REKOMENDASI COVER 1080x1080.
 
 Aturan Penting Format Shopee:
-1. Karakteristik pembeli Shopee Indonesia menyukai teks terstruktur rapi dengan pembatas garis (=== atau ---) dan bullet points yang jelas. JANGAN GUNAKAN EMOJI SAMA SEKALI karena bisa ditolak oleh sistem Shopee terbaru.
+1. Karakteristik pembeli Shopee Indonesia menyukai teks terstruktur rapi dengan pembatas garis (=== atau ---) dan bullet points yang jelas. JANGAN GUNAKAN EMOJI SAMA SEKALI karena bisa ditolak oleh sistem Shopee terbaru. DILARANG KERAS mencantumkan tautan website luar (https://, .com, .vercel.app, bit.ly, wa.me) karena melanggar kebijakan Shopee.
 2. Judul SEO harus di bawah 120 karakter, huruf kapital rapi, mengandung kata kunci utama (Nama Game, Platform, Original, Full Access, Garansi).
 3. Deskripsi harus memuat:
    - Header & Keunggulan Produk (100% Legal, Bukan Shared, Full Access bisa ganti email/pass, Region Global tanpa VPN).
    - Detail Spesifikasi (Platform, Bahasa, Fitur Online Multiplayer).
-   - Kelengkapan Produk (Lisensi Akun + ${includePhysicalCard ? "Kartu Garansi Fisik Resmi A6" : "Panduan Aktivasi Digital"}).
+   - Kelengkapan Produk (Lisensi Akun + Kartu Garansi Digital QR & Panduan Aktivasi Digital Instan tanpa paket fisik/kurir).
    ${includeActivationSteps ? "- Langkah Cara Aktivasi 3 Langkah Cepat." : ""}
-   ${includeUnboxingSop ? `- SOP Garansi & Wajib Video Tanpa Jeda (${includePhysicalCard ? "Wajib merekam video unboxing amplop fisik A6" : "Wajib merekam video rekaman layar saat buka brankas klaim & login"}).` : ""}
+   ${includeUnboxingSop ? "- SOP Garansi & Wajib Video Tanpa Jeda (Wajib merekam video rekaman layar / screen recording saat buka brankas klaim & login pertama)." : ""}
    ${includeFaq ? "- FAQ Pertanyaan Umum (Ready stok, butuh VPN, online multiplayer)." : ""}
    - Hashtags SEO bertarget di bagian paling bawah.
 4. Kembalikan HANYA JSON valid tanpa markdown backticks (atau markdown json) dengan format:
@@ -260,13 +256,13 @@ Aturan Penting Format Shopee:
 - Kategori Lisensi: ${category}
 - Harga Jual Shopee: Rp ${price.toLocaleString("id-ID")}
 - Gaya Bahasa / Style: ${style} (ultimate = visual lengkap top seller, security = fokus anti-hackback, flash_sale = promo urgency, clean = minimalis to the point)
-- Sertakan Kartu Garansi Fisik A6: ${includePhysicalCard ? "YA" : "TIDAK"}
+- Mode Pengiriman: 100% DIGITAL INSTAN (Kartu Garansi Digital QR, TANPA pengiriman amplop/paket fisik)
 - Sertakan SOP Video Tanpa Jeda: ${includeUnboxingSop ? "YA" : "TIDAK"}
 - Sertakan FAQ: ${includeFaq ? "YA" : "TIDAK"}
 - Sertakan Langkah Aktivasi: ${includeActivationSteps ? "YA" : "TIDAK"}
 ${customNotes ? `- Catatan Khusus Seller: ${customNotes}` : ""}
 
-Pastikan formatnya sangat rapi dan siap langsung di-paste ke Seller Centre Shopee!`;
+Pastikan formatnya sangat rapi, bebas link eksternal terlarang Shopee, dan siap langsung di-paste ke Seller Centre Shopee!`;
 
     try {
       const rawAiText = await callGemini(userPrompt, systemPrompt, { jsonMode: true });

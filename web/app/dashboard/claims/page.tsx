@@ -25,7 +25,9 @@ import {
   ShieldAlert,
   Inbox,
   ArrowRight,
+  QrCode,
 } from "lucide-react";
+import { renderDigitalWarrantyCardPng } from "@/lib/digitalWarrantyCard";
 
 export default function ClaimsAdminDashboardPage() {
   const [claims, setClaims] = useState<any[]>([]);
@@ -170,26 +172,56 @@ export default function ClaimsAdminDashboardPage() {
   };
 
   const handleCopyShopeeChat = (item: any) => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const baseUrl = claimBaseUrl && claimBaseUrl.trim() ? claimBaseUrl.trim() : origin;
-    const cleanBaseUrl = baseUrl.replace(/\/$/, "");
-    const claimUrl = `${cleanBaseUrl}/claim/${item.claim_code}`;
     const pin = item.passcode || "882194";
+    const warrantyCode = item.warranty_code || item.claim_code;
+    // Shopee-Safe Zero-Link Chat: bebas URL eksternal agar tidak diblokir/disensor Shopee!
     const text =
-      `🎮 [AKSHARA GAMING CENTER — PENGIRIMAN LISENSI RESMI]\n` +
+      `🎮 [AKSHARA GAMING CENTER — KARTU AKSES DIGITAL]\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `Halo kak ${item.buyer_username}, pesanan game ${item.product_title} kakak sudah siap!\n\n` +
-      `🔑 KODE KLAIM: ${item.claim_code}\n` +
-      `🔒 PASSCODE PIN RAHASIA: ${pin}\n` +
-      `🔗 LINK BUKA KREDENSIAL: ${claimUrl}\n\n` +
-      `⚠️ PENTING: Sebelum membuka link & memasukkan passcode PIN, siapkan rekaman video layar (screen recording) tanpa jeda (no-cut) untuk mengaktifkan garansi resmi toko selama ${item.warranty_days} hari. Sistem mencatat waktu dan IP saat kredensial dibuka.\n` +
+      `Halo kak ${item.buyer_username}, pesanan game ${item.product_title} sudah siap dibuka 100% digital!\n\n` +
+      `📌 KODE KLAIM: ${item.claim_code}\n` +
+      `🔒 PASSCODE PIN: ${pin}\n` +
+      `📜 SERIAL GARANSI: ${warrantyCode}\n` +
+      `📷 CARA BUKA: Scan QR Code pada gambar Kartu Akses Digital yang kami kirimkan di atas lewat Kamera HP / Google Lens, lalu masukkan Passcode PIN.\n\n` +
+      `⚠️ PENTING (SOP GARANSI ${item.warranty_days || 30} HARI): Rekam layar (Screen Recording) tanpa jeda (no-cut) dari sebelum scan QR / buka brankas hingga berhasil login pertama kali. Sistem mencatat waktu & IP akses demi keamanan bersama.\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `Terima kasih dan selamat bermain! 🚀`;
+      `Selamat bermain kak! Setelah berhasil masuk mohon klik Pesanan Diterima ya 🚀`;
 
     navigator.clipboard.writeText(text);
     setCopiedCode(item.claim_code);
     setTimeout(() => setCopiedCode(null), 2500);
-    showToast("Template chat Shopee disalin ke clipboard!");
+    showToast("Template Shopee-Safe (Zero-Link + QR) disalin!");
+  };
+
+  const handleDownloadClaimCardPng = async (item: any) => {
+    const baseUrl = claimBaseUrl && claimBaseUrl.trim() ? claimBaseUrl.trim() : "https://claimakshara.vercel.app";
+    const dt = item.created_at ? new Date(item.created_at) : new Date();
+    const issueDate = !Number.isNaN(dt.getTime())
+      ? dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+      : "-";
+    const dataUrl = await renderDigitalWarrantyCardPng({
+      side: "front",
+      buyerName: item.buyer_username || "Customer",
+      gameTitle: item.product_title || "Original Game License",
+      platform: item.platform || "PC / Digital",
+      productType: "100% Digital Access Pass",
+      orderId: item.order_id || "-",
+      serialNumber: item.warranty_code || item.claim_code,
+      issueDate,
+      warrantyDays: Number(item.warranty_days) || 30,
+      claimCode: item.claim_code,
+      passcode: item.passcode,
+      claimBaseUrl: baseUrl,
+    });
+    if (!dataUrl) {
+      showToast("Gagal membuat gambar Kartu Akses QR.");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `akshara-akses-qr-${item.claim_code}.png`;
+    a.click();
+    showToast(`✅ Kartu Akses QR ${item.claim_code} siap kirim via Chat Shopee!`);
   };
 
   const filtered = claims.filter((c) => {
@@ -502,9 +534,19 @@ export default function ClaimsAdminDashboardPage() {
 
                           <button
                             type="button"
+                            onClick={() => handleDownloadClaimCardPng(item)}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-medium inline-flex items-center gap-1 transition-colors"
+                            title="Download Kartu Akses & Garansi QR PNG untuk dikirim di Chat Shopee (bebas sensor link)"
+                          >
+                            <QrCode className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Kartu QR</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => handleCopyShopeeChat(item)}
                             className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium inline-flex items-center gap-1 transition-colors"
-                            title="Salin template Shopee Chat"
+                            title="Salin template Shopee Chat (Bebas URL eksternal / Anti-Sensor)"
                           >
                             {copiedCode === item.claim_code ? (
                               <Check className="w-3.5 h-3.5 text-emerald-600" />

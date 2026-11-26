@@ -48,6 +48,11 @@ export function middleware(request: NextRequest) {
       hostname.startsWith("localhost") ||
       hostname.startsWith("127.0.0.1"));
 
+  // Endpoint gambar thumbnail publik untuk ditarik oleh Shopee Mass Upload (read-only)
+  if (pathname.startsWith("/api/public/")) {
+    return NextResponse.next();
+  }
+
   // 4. Lindungi seluruh API internal (termasuk /api/catalog, /api/verify, & /api/claim/* di app internal)
   const protectedApiPrefixes = [
     "/api/catalog",
@@ -56,6 +61,7 @@ export function middleware(request: NextRequest) {
     "/api/inventory",
     "/api/orders",
     "/api/analytics",
+    "/api/shopee",
     "/api/ai/",
     "/api/research/",
   ];

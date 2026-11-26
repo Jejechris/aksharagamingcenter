@@ -8,7 +8,7 @@ interface DeliveryFormatRequest {
   buyer_name?: string;
   channel?: "Shopee" | "WhatsApp" | "Tokopedia" | string;
   tone?: string;
-  delivery_mode?: "digital" | "physical_envelope";
+  delivery_mode?: "digital";
 }
 
 // Fallback regex credential parser if AI call encounters issues
@@ -69,28 +69,19 @@ function buildFallbackTemplate(
   platform: string,
   buyer: string,
   channel: string,
-  deliveryMode: "digital" | "physical_envelope" = "digital",
+  _deliveryMode: string = "digital",
   isKey: boolean = false
 ): string {
   const buyerGreeting = buyer && buyer.toLowerCase() !== "kak" ? `Kak ${buyer.replace(/^Kak\s+/i, "")}` : "Kak";
   const isWhatsApp = channel.toLowerCase().includes("whatsapp") || channel.toLowerCase().includes("wa");
-  const isDigital = deliveryMode === "digital";
 
-  const warrantySectionWa = isDigital
-    ? `🛡️ *PENGINGAT GARANSI RESMI:*
-• Pesanan ini diproses 100% *DIGITAL* (Non-Fisik). Tidak ada paket/kartu garansi fisik yang dikirim melalui kurir ekspedisi.
-• Garansi resmi Akshara Gaming Center otomatis aktif secara digital berdasarkan No. Pesanan & riwayat chat WhatsApp ini.`
-    : `🛡️ *PENGINGAT GARANSI RESMI:*
-• Amplop fisik berisi *Kartu Garansi Resmi A6 Akshara* sedang dikirimkan via ekspedisi.
-• Simpan kartu garansi tersebut ya Kak. Sesuai SOP, klaim garansi memerlukan *video unboxing amplop tanpa jeda (no-cut)*.`;
+  const warrantySectionWa = `🛡️ *PENGINGAT GARANSI DIGITAL RESMI:*
+• Pesanan ini diproses 100% *DIGITAL* (Non-Fisik, tanpa kurir/paket fisik).
+• Garansi resmi Akshara Gaming Center otomatis aktif secara digital berdasarkan No. Pesanan & Sertifikat Garansi Digital QR.`;
 
-  const warrantySectionShopee = isDigital
-    ? `🛡️ PENGINGAT GARANSI RESMI:
-• Pesanan ini diproses 100% DIGITAL (Non-Fisik / Instant Delivery via Shopee Chat). Tidak ada paket fisik yang dikirimkan ke kurir.
-• Garansi resmi toko otomatis aktif secara digital berdasarkan No. Pesanan ini. Simpan bukti chat ini sebagai tiket garansi resmi Kakak.`
-    : `🛡️ PENGINGAT GARANSI RESMI:
-• Amplop fisik berisi Kartu Garansi Resmi A6 Akshara sedang kami kirimkan ke alamat Kakak via ekspedisi Shopee.
-• Simpan amplop & kartu garansi tersebut. Sesuai SOP toko, klaim garansi memerlukan video unboxing tanpa jeda (no-cut & unedited).`;
+  const warrantySectionShopee = `🛡️ PENGINGAT GARANSI DIGITAL RESMI:
+• Pesanan ini diproses 100% DIGITAL (Instant Delivery via Chat Shopee & Kartu Garansi Digital QR). Tidak ada paket fisik yang dikirimkan.
+• Garansi resmi aktif otomatis berdasarkan No. Pesanan & riwayat chat ini. Simpan gambar Kartu Garansi Digital ber-QR yang kami kirimkan di atas.`;
 
   if (isKey) {
     if (isWhatsApp) {
@@ -213,7 +204,7 @@ export async function POST(req: Request) {
     const buyerName = (body.buyer_name || "Kak").trim();
     const channel = (body.channel || "Shopee").trim();
     const tone = (body.tone || "Ramah, Sopan & Profesional").trim();
-    const deliveryMode = (body.delivery_mode === "physical_envelope" ? "physical_envelope" : "digital");
+    const deliveryMode = "digital";
 
     if (!rawInput) {
       return NextResponse.json(
@@ -223,17 +214,12 @@ export async function POST(req: Request) {
     }
 
     const isWhatsApp = channel.toLowerCase().includes("whatsapp") || channel.toLowerCase().includes("wa");
-    const isDigital = deliveryMode === "digital";
 
-    // Delivery Mode Directive
-    const deliveryModeRules = isDigital
-      ? `ATURAN MODE PENGIRIMAN: 100% DIGITAL (NON-FISIK / TANPA AMPLOP FISIK / TANPA KURIR):
-- DILARANG KERAS menyebutkan kata "amplop fisik", "resi pengiriman kurir", atau "ekspedisi sedang mengantar paket"!
-- Jelaskan bahwa pesanan ini diproses secara 100% DIGITAL langsung melalui chat ini.
-- Jelaskan bahwa garansi toko otomatis aktif secara DIGITAL berbasis No. Pesanan dan riwayat chat ini.`
-      : `ATURAN MODE PENGIRIMAN: PAKET AMPLOP FISIK (Kartu Garansi Resmi A6):
-- Sertakan pengingat bahwa amplop fisik resmi berisi Kartu Garansi A6 Akshara sedang dikirimkan via kurir ekspedisi ke alamat pembeli.
-- Ingatkan pembeli untuk merekam video unboxing amplop tanpa jeda/cut jika suatu saat membutuhkan klaim garansi.`;
+    // Delivery Mode Directive (100% Pure Digital)
+    const deliveryModeRules = `ATURAN MODE PENGIRIMAN: 100% DIGITAL (NON-FISIK / TANPA AMPLOP FISIK / TANPA KURIR):
+- DILARANG KERAS menyebutkan kata "amplop fisik", "kartu fisik", "resi kurir", atau "ekspedisi sedang mengantar paket"!
+- Jelaskan bahwa pesanan diproses 100% DIGITAL langsung via Chat & Sertifikat Garansi Digital ber-QR.
+- DILARANG KERAS menulis link URL eksternal (https://, .com, .vercel.app, wa.me) agar tidak disensor sistem Shopee.`;
 
     // Dynamic Channel Directives
     const channelRules = isWhatsApp
@@ -271,7 +257,7 @@ STRUKTUR PESAN WAJIB:
 1. Salam Pembuka yang hangat, sopan, dan apresiasi tulus atas pembelian. Sapa pembeli dengan: "${buyerName}".
 2. Box Kredensial / CDKey yang rapi dan terstruktur.
 3. 3 Langkah Cepat Pengamanan / Aktivasi (Actionable SOP bagi pembeli).
-4. Catatan Garansi Akshara Gaming Center sesuai mode: ${isDigital ? "100% Digital via No. Pesanan & Chat" : "Amplop Fisik Kartu Garansi A6 via Ekspedisi + Video Unboxing"}.
+4. Catatan Garansi Akshara Gaming Center sesuai mode: 100% Digital via No. Pesanan, Chat, & Kartu Garansi Digital QR (tanpa paket fisik/link luar).
 5. Penutup yang hangat sesuai channel ${channel}, mendoakan have fun gaming, dan reminder review bintang 5.
 
 FORMAT OUTPUT HARUS JSON MURNI TANPA MARKDOWN KUTIPAN KODE:
@@ -300,7 +286,7 @@ FORMAT OUTPUT HARUS JSON MURNI TANPA MARKDOWN KUTIPAN KODE:
     };
 
     try {
-      const userPrompt = `Data Akun Mentah:\n${rawInput}\n\nGame: ${gameTitle}\nPlatform: ${platform}\nNama Pembeli: ${buyerName}\nChannel: ${channel}\nMode Pengiriman: ${isDigital ? "Digital Murni (Non-Fisik)" : "Paket Amplop Kartu Garansi Fisik A6"}\nTone: ${tone}`;
+      const userPrompt = `Data Akun Mentah:\n${rawInput}\n\nGame: ${gameTitle}\nPlatform: ${platform}\nNama Pembeli: ${buyerName}\nChannel: ${channel}\nMode Pengiriman: 100% Digital Instan (Kartu Garansi Digital QR, Tanpa Paket Fisik & Bebas Link URL Shopee)\nTone: ${tone}`;
       const aiResponse = await callGemini(userPrompt, systemPrompt, { jsonMode: true });
 
       let cleaned = aiResponse.trim();

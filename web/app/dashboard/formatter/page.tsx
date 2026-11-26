@@ -40,7 +40,7 @@ export default function FormatterPage() {
   const [platform, setPlatform] = useState("Steam");
   const [buyerName, setBuyerName] = useState("Kak Dimas");
   const [channel, setChannel] = useState<"Shopee" | "WhatsApp" | "Tokopedia">("Shopee");
-  const [deliveryMode, setDeliveryMode] = useState<"digital" | "physical_envelope">("digital");
+  const deliveryMode = "digital" as const;
   const [tone, setTone] = useState("Ramah, Hangat & Profesional");
 
   const [isLoading, setIsLoading] = useState(false);
@@ -287,42 +287,17 @@ export default function FormatterPage() {
               </div>
             </div>
 
-            {/* Mode Pengiriman (Label Rapi Sesuai Spesifikasi) */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Mode Pengiriman
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDeliveryMode("digital")}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    deliveryMode === "digital"
-                      ? "bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300"
-                      : "bg-white border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="text-xs font-semibold text-slate-900">Full Digital (Instant)</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Pengiriman langsung via Chat / Portal Klaim
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDeliveryMode("physical_envelope")}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    deliveryMode === "physical_envelope"
-                      ? "bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300"
-                      : "bg-white border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="text-xs font-semibold text-slate-900">Hybrid + Kartu Garansi</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Disertai pengiriman resi / kartu garansi fisik
-                  </div>
-                </button>
+            {/* Mode Pengiriman (100% Pure Digital) */}
+            <div className="p-3 rounded-lg bg-emerald-50/70 border border-emerald-200 flex items-center justify-between gap-2">
+              <div>
+                <div className="text-xs font-semibold text-emerald-950">Mode: 100% Pengiriman Digital Instan</div>
+                <div className="text-[11px] text-emerald-700 mt-0.5">
+                  Dikirim via Chat Shopee + Kartu Garansi Digital QR (Bebas link URL tersensor &amp; tanpa paket fisik)
+                </div>
               </div>
+              <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold shrink-0">
+                PURE DIGITAL
+              </span>
             </div>
 
             {/* Metadata Pesanan */}

@@ -1010,7 +1010,7 @@ function QuantCalculatorContent() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white tabular-nums"
                   />
                   <p className="text-[11px] text-slate-500">
-                    Default Rp 0 untuk game digital/akun. Isi Rp 2.000 jika menggunakan amplop kartu fisik untuk resi.
+                    Default Rp 0 untuk pengiriman 100% digital (non-fisik / tanpa biaya kemasan).
                   </p>
                 </div>
 

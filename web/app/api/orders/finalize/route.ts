@@ -250,13 +250,22 @@ export async function POST(req: NextRequest) {
     const claimBaseUrl = process.env.NEXT_PUBLIC_CLAIM_URL || "https://claimakshara.vercel.app";
     const claimUrl = `${claimBaseUrl.replace(/\/$/, "")}/claim/${claimEntry.claim_code}`;
 
+    // Shopee-Safe Zero-Link Chat: tanpa URL eksternal agar tidak diblokir/disensor filter link Shopee!
     const shopeeChatMessage =
-      `Halo kak ${buyerUsername}! Pesanan *${productTitle}* (${orderId}) sudah siap diakses secara instan.\n\n` +
-      `🔐 *Link Brankas Klaim:* ${claimUrl}\n` +
+      `Halo kak ${buyerUsername}! Pesanan *${productTitle}* (${orderId}) sudah siap diakses 100% secara digital.\n\n` +
       `📌 *Kode Klaim:* ${claimEntry.claim_code}\n` +
       `🔑 *Passcode PIN:* ${claimEntry.passcode}\n` +
-      `🛡️ *Garansi Resmi:* ${warrantyDays} Hari (Wajib video no-cut saat membuka brankas & login pertama).\n\n` +
-      `Terima kasih telah berbelanja di Akshara Gaming Center!`;
+      `📜 *Serial Garansi Digital:* ${claimEntry.warranty_code}\n` +
+      `📷 *Cara Buka:* Scan QR Code pada gambar *Kartu Akses & Garansi Digital* yang kami kirim di atas via Kamera / Google Lens, lalu masukkan Passcode PIN.\n` +
+      `🛡️ *Garansi Resmi:* ${warrantyDays} Hari (Wajib rekam layar no-cut sebelum scan & login pertama).\n\n` +
+      `Setelah sukses masuk, silakan klik Pesanan Diterima ya kak. Selamat bermain!`;
+
+    const directPortalMessage =
+      `Halo kak ${buyerUsername}! Pesanan *${productTitle}* (${orderId}) siap diakses:\n` +
+      `🔐 Link Klaim: ${claimUrl}\n` +
+      `📌 Kode Klaim: ${claimEntry.claim_code}\n` +
+      `🔑 PIN: ${claimEntry.passcode}\n` +
+      `🛡️ Garansi Digital: ${warrantyDays} Hari (No. Seri: ${claimEntry.warranty_code}).`;
 
     return NextResponse.json({
       status: "success",
@@ -270,6 +279,7 @@ export async function POST(req: NextRequest) {
       ledger_entry: ledgerEntry,
       economics: eco,
       shopee_chat_message: shopeeChatMessage,
+      direct_portal_message: directPortalMessage,
     });
   } catch (error: any) {
     console.error("[Order Finalize Error]:", error);
