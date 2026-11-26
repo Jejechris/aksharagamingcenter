@@ -501,7 +501,7 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
     } else if (rawPlat.includes("rockstar") || rawTitle.includes("grand theft auto") || rawTitle.includes("gta") || rawTitle.includes("red dead")) {
       detectedBadge = "rockstar";
       detectedFrame = "#191013"; // Dark Graphite
-    } else if (rawPlat.includes("ea") || rawTitle.includes("fifa") || rawTitle.includes("fc 25") || rawTitle.includes("fc25") || rawTitle.includes("origin")) {
+    } else if (/\b(ea|ea app|electronic arts|origin)\b/i.test(rawPlat) || rawTitle.includes("fifa") || rawTitle.includes("fc 25") || rawTitle.includes("fc25")) {
       detectedBadge = "ea";
       detectedFrame = "#1e3a8a"; // EA FC Blue
     } else if (rawPlat.includes("xbox") || rawPlat.includes("microsoft")) {
@@ -903,7 +903,7 @@ export default function ThumbnailStudio(props: ThumbnailStudioProps = {}) {
       ctx.fillText("Butuh Bantuan atau Klaim Garansi?", 112, 922);
       ctx.fillStyle = "#CBD5E1";
       ctx.font = "500 15.5px 'Inter', sans-serif";
-      ctx.fillText("Hubungi CS Shopee Chat & siapkan No. Pesanan + Video Unboxing No-Cut.", 112, 956);
+      ctx.fillText("Hubungi CS Shopee Chat & siapkan No. Pesanan + Video Rekam Layar No-Cut.", 112, 956);
     }
 
     // --- COMBINED ANTI-THEFT: INNER OVERLAYS (INSIDE POSTER CLIP) ---

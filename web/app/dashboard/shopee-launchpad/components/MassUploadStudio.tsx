@@ -28,14 +28,21 @@ import {
   ShopeeValidationIssue,
 } from "@/lib/shopeeMassUpload";
 import {
+  ArtworkCandidate,
   renderAndHostBatchCover,
   renderAndHostBatchRulesSlide,
+  uploadCustomCoverImage,
 } from "@/lib/batchThumbnailRenderer";
+
+const DEFAULT_VERCEL_ORIGIN = "https://asksharagaming.vercel.app";
 
 interface MassUploadRow extends ShopeeMassProductInput {
   selected: boolean;
   cogs_net_idr: number;
   preview_thumb_data?: string;
+  has_artwork?: boolean;
+  artwork_candidates?: ArtworkCandidate[];
+  selected_artwork_url?: string;
 }
 
 export default function MassUploadStudio() {
@@ -46,7 +53,7 @@ export default function MassUploadStudio() {
   const [warrantyDays, setWarrantyDays] = useState<number>(30);
   const [enableVariantMode, setEnableVariantMode] = useState<boolean>(false);
 
-  const [publicOrigin, setPublicOrigin] = useState<string>("");
+  const [publicOrigin, setPublicOrigin] = useState<string>(DEFAULT_VERCEL_ORIGIN);
   const [customTemplateName, setCustomTemplateName] = useState<string>("");
   const [customTemplateBase64, setCustomTemplateBase64] = useState<string>("");
 
@@ -58,6 +65,10 @@ export default function MassUploadStudio() {
   const [isExporting, setIsExporting] = useState(false);
   const [validationIssues, setValidationIssues] = useState<ShopeeValidationIssue[]>([]);
   const [editingDescRowId, setEditingDescRowId] = useState<string | null>(null);
+  const [previewRowId, setPreviewRowId] = useState<string | null>(null);
+  const [rulesPreviewDataUrl, setRulesPreviewDataUrl] = useState<string>("");
+  const [customArtUrlInput, setCustomArtUrlInput] = useState<string>("");
+  const [isRenderingSingle, setIsRenderingSingle] = useState<boolean>(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
@@ -69,12 +80,12 @@ export default function MassUploadStudio() {
     if (typeof window !== "undefined") {
       const savedOrigin = localStorage.getItem("akshara_public_media_origin");
       const currentOrigin = window.location.origin;
-      setPublicOrigin(
-        savedOrigin ||
-          (!currentOrigin.includes("localhost") && !currentOrigin.includes("127.0.0.1")
-            ? currentOrigin
-            : currentOrigin)
-      );
+      const isLocal = currentOrigin.includes("localhost") || currentOrigin.includes("127.0.0.1");
+      if (savedOrigin && !savedOrigin.includes("localhost") && !savedOrigin.includes("127.0.0.1")) {
+        setPublicOrigin(savedOrigin);
+      } else {
+        setPublicOrigin(isLocal ? DEFAULT_VERCEL_ORIGIN : currentOrigin);
+      }
     }
   }, []);
 
@@ -117,10 +128,27 @@ export default function MassUploadStudio() {
 
   const selectedRows = useMemo(() => rows.filter((r) => r.selected), [rows]);
 
+  const rewriteMediaOrigin = (url: string, newOrigin: string) => {
+    if (!url || !newOrigin) return url;
+    const idx = url.indexOf("/api/public/media/");
+    if (idx === -1) return url;
+    return `${newOrigin.replace(/\/$/, "")}${url.slice(idx)}`;
+  };
+
   const handleApplyOriginChange = (val: string) => {
     setPublicOrigin(val);
+    const trimmed = val.trim().replace(/\/$/, "");
     if (typeof window !== "undefined") {
-      localStorage.setItem("akshara_public_media_origin", val);
+      localStorage.setItem("akshara_public_media_origin", trimmed);
+    }
+    if (trimmed.startsWith("http")) {
+      setRows((prev) =>
+        prev.map((r) => ({
+          ...r,
+          cover_image_url: rewriteMediaOrigin(r.cover_image_url, trimmed),
+          image_1_url: rewriteMediaOrigin(r.image_1_url, trimmed),
+        }))
+      );
     }
   };
 
@@ -161,23 +189,25 @@ export default function MassUploadStudio() {
       showToast("Pilih minimal 1 produk terlebih dahulu.", "error");
       return;
     }
-    const cleanOrigin = (publicOrigin || window.location.origin).trim().replace(/\/$/, "");
+    const cleanOrigin = (publicOrigin || DEFAULT_VERCEL_ORIGIN).trim().replace(/\/$/, "");
     setIsRenderingMedia(true);
     setRenderProgress({ done: 0, total: selectedRows.length + 1 });
 
     try {
       // 1. Render shared Slide 2 (Rules & Terms Digital)
-      const rulesUrl = await renderAndHostBatchRulesSlide({
+      const rulesRes = await renderAndHostBatchRulesSlide({
         publicOrigin: cleanOrigin,
         warrantyDays,
       });
+      setRulesPreviewDataUrl(rulesRes.previewDataUrl);
       setRenderProgress({ done: 1, total: selectedRows.length + 1 });
 
       // 2. Render & Host Cover unik per produk
+      let missedArtworkCount = 0;
       for (let i = 0; i < selectedRows.length; i++) {
         const target = selectedRows[i];
         try {
-          const { publicUrl, previewDataUrl } = await renderAndHostBatchCover({
+          const rendered = await renderAndHostBatchCover({
             id: target.id,
             title: target.title,
             platform: target.platform,
@@ -185,15 +215,20 @@ export default function MassUploadStudio() {
             priceIdr: target.price_idr,
             warrantyDays,
             publicOrigin: cleanOrigin,
+            customArtworkUrl: target.selected_artwork_url,
           });
+          if (!rendered.hasArtwork) missedArtworkCount++;
           setRows((prev) =>
             prev.map((row) =>
               row.id === target.id
                 ? {
                     ...row,
-                    cover_image_url: publicUrl,
-                    image_1_url: rulesUrl,
-                    preview_thumb_data: previewDataUrl,
+                    cover_image_url: rendered.publicUrl,
+                    image_1_url: rulesRes.publicUrl,
+                    preview_thumb_data: rendered.previewDataUrl,
+                    has_artwork: rendered.hasArtwork,
+                    artwork_candidates: rendered.artworkCandidates,
+                    selected_artwork_url: rendered.selectedArtworkUrl,
                   }
                 : row
             )
@@ -204,14 +239,110 @@ export default function MassUploadStudio() {
         setRenderProgress({ done: i + 2, total: selectedRows.length + 1 });
       }
 
-      showToast(
-        `✅ ${selectedRows.length} Cover unik & Slide 2 Aturan Digital berhasil di-render & di-host!`
-      );
+      if (missedArtworkCount > 0) {
+        showToast(
+          `⚠️ ${selectedRows.length} Cover selesai, namun ${missedArtworkCount} game belum ketemu artwork-nya. Klik thumbnail untuk pilih gambar manual.`,
+          "error"
+        );
+      } else {
+        showToast(
+          `✅ ${selectedRows.length} Cover unik & Slide 2 Aturan Digital berhasil di-render! Klik thumbnail untuk preview besar.`
+        );
+      }
     } catch (err: any) {
       showToast(err?.message || "Gagal memproses gambar batch.", "error");
     } finally {
       setIsRenderingMedia(false);
     }
+  };
+
+  const handleRenderSingleCover = async (rowId: string, overrideArtworkUrl?: string) => {
+    const target = rows.find((r) => r.id === rowId);
+    if (!target) return;
+    const cleanOrigin = (publicOrigin || DEFAULT_VERCEL_ORIGIN).trim().replace(/\/$/, "");
+    setIsRenderingSingle(true);
+    try {
+      let currentRulesUrl = target.image_1_url;
+      if (!currentRulesUrl || !rulesPreviewDataUrl) {
+        const rulesRes = await renderAndHostBatchRulesSlide({
+          publicOrigin: cleanOrigin,
+          warrantyDays,
+        });
+        currentRulesUrl = rulesRes.publicUrl;
+        setRulesPreviewDataUrl(rulesRes.previewDataUrl);
+      }
+      const rendered = await renderAndHostBatchCover({
+        id: target.id,
+        title: target.title,
+        platform: target.platform,
+        category: target.category_type,
+        priceIdr: target.price_idr,
+        warrantyDays,
+        publicOrigin: cleanOrigin,
+        customArtworkUrl: overrideArtworkUrl ?? target.selected_artwork_url,
+      });
+      setRows((prev) =>
+        prev.map((row) =>
+          row.id === target.id
+            ? {
+                ...row,
+                cover_image_url: rendered.publicUrl,
+                image_1_url: currentRulesUrl,
+                preview_thumb_data: rendered.previewDataUrl,
+                has_artwork: rendered.hasArtwork,
+                artwork_candidates:
+                  rendered.artworkCandidates.length > 0
+                    ? rendered.artworkCandidates
+                    : row.artwork_candidates,
+                selected_artwork_url: rendered.selectedArtworkUrl,
+              }
+            : row
+        )
+      );
+      showToast(`✅ Cover "${target.title}" berhasil di-render ulang!`);
+    } catch (err: any) {
+      showToast(err?.message || "Gagal render ulang cover.", "error");
+    } finally {
+      setIsRenderingSingle(false);
+    }
+  };
+
+  const handleUploadCustomCover = (rowId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const target = rows.find((r) => r.id === rowId);
+    if (!target) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      if (typeof reader.result !== "string") return;
+      const cleanOrigin = (publicOrigin || DEFAULT_VERCEL_ORIGIN).trim().replace(/\/$/, "");
+      setIsRenderingSingle(true);
+      try {
+        const uploaded = await uploadCustomCoverImage({
+          id: target.id,
+          dataUrl: reader.result,
+          publicOrigin: cleanOrigin,
+        });
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === rowId
+              ? {
+                  ...r,
+                  cover_image_url: uploaded.publicUrl,
+                  preview_thumb_data: uploaded.previewDataUrl,
+                  has_artwork: true,
+                }
+              : r
+          )
+        );
+        showToast(`✅ Cover custom "${target.title}" diunggah & siap di-export!`);
+      } catch (err: any) {
+        showToast(err?.message || "Gagal mengunggah cover custom.", "error");
+      } finally {
+        setIsRenderingSingle(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const buildPayloadItems = (): ShopeeMassProductInput[] => {
@@ -317,6 +448,7 @@ export default function MassUploadStudio() {
   };
 
   const editingRow = rows.find((r) => r.id === editingDescRowId) || null;
+  const previewRow = rows.find((r) => r.id === previewRowId) || null;
   const localOriginWarning =
     publicOrigin.includes("localhost") || publicOrigin.includes("127.0.0.1");
 
@@ -366,20 +498,46 @@ export default function MassUploadStudio() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           {/* Public Origin for Shopee Image Pull */}
           <div className="md:col-span-5 space-y-1">
-            <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5 text-indigo-600" />
-              Domain Publik Host Gambar (URL Vercel Production Anda)
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-indigo-600" />
+                Domain Publik Host Gambar (URL Vercel Production Anda)
+              </label>
+              {publicOrigin.trim().replace(/\/$/, "") !== DEFAULT_VERCEL_ORIGIN && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleApplyOriginChange(DEFAULT_VERCEL_ORIGIN);
+                    showToast(`✅ Domain host diatur ke ${DEFAULT_VERCEL_ORIGIN}`);
+                  }}
+                  className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md cursor-pointer"
+                >
+                  Pakai asksharagaming.vercel.app
+                </button>
+              )}
+            </div>
             <input
               type="text"
               value={publicOrigin}
               onChange={(e) => handleApplyOriginChange(e.target.value)}
-              placeholder="https://nama-project-anda.vercel.app"
+              placeholder={DEFAULT_VERCEL_ORIGIN}
               className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500"
             />
-            {localOriginWarning && (
+            {localOriginWarning ? (
               <p className="text-[10.5px] text-amber-700">
-                ⚠️ Saat dijalankan dari localhost, ganti ke URL Vercel Anda agar gambar bisa ditarik Shopee.
+                ⚠️ Saat dijalankan dari localhost, klik{" "}
+                <button
+                  type="button"
+                  onClick={() => handleApplyOriginChange(DEFAULT_VERCEL_ORIGIN)}
+                  className="underline font-bold cursor-pointer"
+                >
+                  Pakai asksharagaming.vercel.app
+                </button>{" "}
+                agar Shopee bisa mengunduh gambar.
+              </p>
+            ) : (
+              <p className="text-[10px] text-slate-500">
+                Gambar otomatis tersimpan di Supabase DB sehingga langsung aktif di link HTTPS ini.
               </p>
             )}
           </div>
@@ -609,25 +767,46 @@ export default function MassUploadStudio() {
 
                       <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2">
-                          {row.preview_thumb_data ? (
-                            <img
-                              src={row.preview_thumb_data}
-                              alt={row.title}
-                              className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
-                              <ImageIcon className="w-4 h-4" />
-                            </div>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomArtUrlInput(row.selected_artwork_url || "");
+                              setPreviewRowId(row.id);
+                            }}
+                            title="Klik untuk Preview Penuh & Ganti Artwork Cover"
+                            className="relative group w-11 h-11 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0 cursor-pointer hover:border-indigo-400"
+                          >
+                            {row.preview_thumb_data ? (
+                              <img
+                                src={row.preview_thumb_data}
+                                alt={row.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <ImageIcon className="w-4 h-4 text-slate-400" />
+                            )}
+                          </button>
                           <div className="min-w-0 max-w-[140px]">
-                            <span
-                              className={`text-[10px] font-mono font-bold block ${
-                                row.cover_image_url ? "text-emerald-700" : "text-amber-700"
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomArtUrlInput(row.selected_artwork_url || "");
+                                setPreviewRowId(row.id);
+                              }}
+                              className={`text-[10px] font-mono font-bold block text-left hover:underline cursor-pointer ${
+                                row.cover_image_url
+                                  ? row.has_artwork === false
+                                    ? "text-amber-700"
+                                    : "text-emerald-700"
+                                  : "text-amber-700"
                               }`}
                             >
-                              {row.cover_image_url ? "✓ Link Siap" : "Belum Render"}
-                            </span>
+                              {row.cover_image_url
+                                ? row.has_artwork === false
+                                  ? "⚠️ Tanpa Art (Cek)"
+                                  : "✓ Preview & Cek"
+                                : "Preview / Render"}
+                            </button>
                             <span className="text-[10px] text-slate-400 truncate block">
                               {row.cover_image_url || "Klik Render Batch"}
                             </span>
@@ -739,6 +918,200 @@ export default function MassUploadStudio() {
           </table>
         </div>
       </div>
+
+      {/* Full Visual Preview & Artwork Customizer Modal */}
+      {previewRow && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden my-6">
+            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Visual Inspector Cover &amp; Rules Shopee — {previewRow.title}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Cek hasil render 1080×1080 sebelum export .xlsx, ganti artwork, atau upload foto cover custom.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewRowId(null)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+              {/* Preview Cover Slide 1 & Slide 2 */}
+              <div className="md:col-span-7 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-700 block">
+                      Slide 1 — Cover Utama (1080×1080)
+                    </span>
+                    <div className="aspect-square rounded-xl border border-slate-200 bg-slate-100 overflow-hidden flex items-center justify-center">
+                      {previewRow.preview_thumb_data ? (
+                        <img
+                          src={previewRow.preview_thumb_data}
+                          alt={previewRow.title}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="text-center p-4 text-xs text-slate-400 space-y-2">
+                          <ImageIcon className="w-7 h-7 mx-auto text-slate-300" />
+                          <p>Belum dirender. Klik Render Foto Ini di kanan.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-700 block">
+                      Slide 2 — Rules &amp; Garansi Digital
+                    </span>
+                    <div className="aspect-square rounded-xl border border-slate-200 bg-slate-100 overflow-hidden flex items-center justify-center">
+                      {rulesPreviewDataUrl ? (
+                        <img
+                          src={rulesPreviewDataUrl}
+                          alt="Slide 2 Rules Digital"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="text-center p-4 text-xs text-slate-400">
+                          Akan tampil setelah render Slide 2.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {previewRow.cover_image_url && (
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-mono text-slate-600 break-all">
+                    URL Publik Shopee:{" "}
+                    <a
+                      href={previewRow.cover_image_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-700 underline"
+                    >
+                      {previewRow.cover_image_url}
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Artwork Picker & Custom Upload */}
+              <div className="md:col-span-5 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900">
+                      Pilih Artwork Resmi Lainnya
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isRenderingSingle}
+                      onClick={() =>
+                        handleRenderSingleCover(
+                          previewRow.id,
+                          customArtUrlInput.trim() || undefined
+                        )
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isRenderingSingle ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                      <span>Render Ulang Foto Ini</span>
+                    </button>
+                  </div>
+
+                  {Array.isArray(previewRow.artwork_candidates) &&
+                  previewRow.artwork_candidates.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
+                      {previewRow.artwork_candidates.map((cand) => {
+                        const isPicked = previewRow.selected_artwork_url === cand.rawUrl;
+                        return (
+                          <button
+                            key={cand.id}
+                            type="button"
+                            disabled={isRenderingSingle}
+                            onClick={() => {
+                              setCustomArtUrlInput(cand.rawUrl);
+                              handleRenderSingleCover(previewRow.id, cand.rawUrl);
+                            }}
+                            title={cand.label}
+                            className={`rounded-lg overflow-hidden border text-left transition-all cursor-pointer ${
+                              isPicked
+                                ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                                : "border-slate-200 hover:border-indigo-400"
+                            }`}
+                          >
+                            <img
+                              src={cand.proxyUrl}
+                              alt={cand.label}
+                              className="w-full h-14 object-cover bg-slate-100"
+                            />
+                            <span className="block px-1 py-0.5 text-[9px] text-slate-600 truncate">
+                              {cand.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                      Klik <strong>Render Ulang Foto Ini</strong> untuk mengambil kandidat artwork otomatis dari Steam/Microsoft, atau tempel URL gambar di bawah.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    Atau Paste URL Gambar Artwork Custom
+                  </label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={customArtUrlInput}
+                      onChange={(e) => setCustomArtUrlInput(e.target.value)}
+                      placeholder="https://.../cover-game.jpg"
+                      className="flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-800"
+                    />
+                    <button
+                      type="button"
+                      disabled={isRenderingSingle || !customArtUrlInput.trim()}
+                      onClick={() =>
+                        handleRenderSingleCover(previewRow.id, customArtUrlInput.trim())
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[11px] font-semibold disabled:opacity-40 cursor-pointer"
+                    >
+                      Terapkan
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    Atau Upload Cover Jadimu Sendiri (dari Wizard / Canva)
+                  </label>
+                  <label className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl border border-dashed border-emerald-400 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold cursor-pointer">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Cover Custom (PNG / JPG)</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => handleUploadCustomCover(previewRow.id, e)}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Description Modal */}
       {editingRow && (
