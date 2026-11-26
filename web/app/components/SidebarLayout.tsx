@@ -30,6 +30,10 @@ import {
   LogOut,
   Clock,
   Plus,
+  Bell,
+  AlertTriangle,
+  CheckCircle2,
+  ArrowRight,
 } from "lucide-react";
 
 interface NavItem {
@@ -86,6 +90,12 @@ const navSections: NavSection[] = [
         label: "Sentry & Risk Hub",
         href: "/dashboard/stock-sentry",
         icon: <PackageSearch className="w-4 h-4 shrink-0" />,
+      },
+      {
+        label: "Price & Incident Guard",
+        href: "/dashboard/alerts",
+        icon: <Bell className="w-4 h-4 shrink-0" />,
+        badge: "GUARD",
       },
       {
         label: "Kalkulator Profit",
@@ -157,6 +167,7 @@ const routeTitles: Record<string, string> = {
   "/dashboard/claims": "Brankas Klaim",
   "/dashboard/catalog": "Radar Katalog",
   "/dashboard/stock-sentry": "Sentry & Risk Hub",
+  "/dashboard/alerts": "Price & Incident Guard",
   "/dashboard/stock": "Sentry & Risk Hub",
   "/dashboard/quant": "Kalkulator Profit",
   "/dashboard/risk": "Sentry & Risk Hub",
@@ -209,6 +220,11 @@ export default function SidebarLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [alertUnread, setAlertUnread] = useState(0);
+  const [alertCritical, setAlertCritical] = useState(0);
+  const [latestAlerts, setLatestAlerts] = useState<any[]>([]);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     orders: true,
     catalog: true,
@@ -218,6 +234,33 @@ export default function SidebarLayout({
 
   // Strict route scoping: Only render shell on /dashboard/*
   const isDashboardRoute = pathname?.startsWith("/dashboard");
+
+  useEffect(() => {
+    if (!isDashboardRoute) return;
+    let cancelled = false;
+    const loadAlerts = async () => {
+      try {
+        const res = await fetch("/api/alerts", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json?.status === "success") {
+          setAlertUnread(Number(json.unreadCount || 0));
+          setAlertCritical(Number(json.criticalCount || 0));
+          setLatestAlerts(
+            Array.isArray(json.alerts)
+              ? json.alerts.filter((a: any) => !a.resolved).slice(0, 5)
+              : []
+          );
+        }
+      } catch {}
+    };
+    loadAlerts();
+    const timer = setInterval(loadAlerts, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [isDashboardRoute, pathname]);
 
   // Keep active section open when route changes
   useEffect(() => {
@@ -482,8 +525,101 @@ export default function SidebarLayout({
             </div>
           </div>
 
-          {/* Right: WIB Clock + Fast Order CTA */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          {/* Right: Notification Bell + WIB Clock + Fast Order CTA */}
+          <div className="flex items-center gap-2.5 sm:gap-4 relative">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setBellOpen((prev) => !prev)}
+                className={`relative p-2 rounded-lg border transition-colors cursor-pointer ${
+                  alertCritical > 0
+                    ? "bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100"
+                    : alertUnread > 0
+                    ? "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+                    : "bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                }`}
+                title="Notifikasi Price Guard & Insiden"
+                aria-label="Notifikasi Price Guard"
+              >
+                <Bell className="w-4 h-4" />
+                {alertUnread > 0 && (
+                  <span
+                    className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-mono font-bold text-white flex items-center justify-center shadow-xs ${
+                      alertCritical > 0 ? "bg-rose-600" : "bg-amber-500"
+                    }`}
+                  >
+                    {alertUnread > 9 ? "9+" : alertUnread}
+                  </span>
+                )}
+              </button>
+
+              {bellOpen && (
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <span className="text-xs font-bold text-slate-900">
+                      Notifikasi Harga &amp; Sistem ({alertUnread})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBellOpen(false)}
+                      className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                    {latestAlerts.length === 0 ? (
+                      <div className="p-5 text-center text-xs text-slate-500 space-y-1.5">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" />
+                        <p className="font-medium text-slate-700">Semua harga, stok &amp; sistem aman.</p>
+                      </div>
+                    ) : (
+                      latestAlerts.map((al) => (
+                        <Link
+                          key={al.id}
+                          href="/dashboard/alerts"
+                          onClick={() => setBellOpen(false)}
+                          className="block px-4 py-3 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-0.5">
+                            <span
+                              className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                al.severity === "critical"
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                              }`}
+                            >
+                              {al.category}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {new Date(al.created_at).toLocaleTimeString("id-ID", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold text-slate-900 line-clamp-1">{al.title}</p>
+                          <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{al.message}</p>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                    <Link
+                      href="/dashboard/alerts"
+                      onClick={() => setBellOpen(false)}
+                      className="text-xs font-semibold text-emerald-700 hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Buka Price &amp; Incident Guard</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <LiveClock />
 
             <Link
@@ -495,6 +631,34 @@ export default function SidebarLayout({
             </Link>
           </div>
         </header>
+
+        {/* Global Critical Alert Banner */}
+        {alertCritical > 0 && !bannerDismissed && pathname !== "/dashboard/alerts" && (
+          <div className="bg-rose-50 border-b border-rose-200 px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3 text-xs text-rose-900">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span className="truncate font-medium">
+                <strong>{alertCritical} Peringatan Kritis:</strong> Ada lonjakan harga supplier / stok habis / insiden sistem yang memerlukan peninjauan.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link
+                href="/dashboard/alerts"
+                className="px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px]"
+              >
+                Tindak Lanjut &rarr;
+              </Link>
+              <button
+                type="button"
+                onClick={() => setBannerDismissed(true)}
+                className="p-1 text-rose-400 hover:text-rose-700 cursor-pointer"
+                aria-label="Tutup banner"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Content Area */}
         <main className="flex-1 bg-[#F8FAFC]">

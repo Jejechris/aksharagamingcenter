@@ -55,6 +55,7 @@ export function middleware(request: NextRequest) {
 
   // 4. Lindungi seluruh API internal (termasuk /api/catalog, /api/verify, & /api/claim/* di app internal)
   const protectedApiPrefixes = [
+    "/api/alerts",
     "/api/catalog",
     "/api/claim",
     "/api/verify",

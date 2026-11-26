@@ -4,8 +4,9 @@ import { touchSupabaseKeepalive } from "@/lib/db";
 import { fetchG2GLiveOffer, extractG2GOfferId } from "@/lib/g2gStock";
 import { resolveG2GProductUrl, getG2GGameCategoryUrl } from "@/lib/g2g";
 import { verifyCronOrAdminRequest } from "@/lib/auth";
-import { calculateShopeeEconomics } from "@/lib/pricing";
+import { calculateShopeeEconomics, calculateTargetSellingPrice } from "@/lib/pricing";
 import { evaluateSellerTrust, formatOrdersCompact } from "@/lib/sellerTrust";
+import { recordAlert } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
 
@@ -125,18 +126,21 @@ export async function GET(req: NextRequest) {
       const batchResults = await Promise.all(
         batch.map(async (item) => {
           const live = await fetchG2GLiveOffer(item.offerId);
+          const fetchFailed = Boolean(live.error) || live.status === "unknown";
           let health: "CRITICAL" | "WARNING" | "SAFE" = "SAFE";
-          if (live.available_qty === 0 || live.is_sold_out || live.status !== "live") {
-            health = "CRITICAL";
-          } else if (live.available_qty <= 4) {
-            health = "WARNING";
+          if (!fetchFailed) {
+            if (live.available_qty === 0 || live.is_sold_out || live.status !== "live") {
+              health = "CRITICAL";
+            } else if (live.available_qty <= 4) {
+              health = "WARNING";
+            }
           }
 
           // Price Spike Guard & Trust Evaluation via unified helpers
           const livePriceIdr =
-            live.price_idr > 0
+            !fetchFailed && live.price_idr > 0
               ? live.price_idr
-              : live.price_usd > 0
+              : !fetchFailed && live.price_usd > 0
               ? Math.ceil(live.price_usd * 16850 * 1.045)
               : item.recordedPriceIdr;
           const eco = calculateShopeeEconomics({
@@ -158,7 +162,7 @@ export async function GET(req: NextRequest) {
 
           let priceAlert: "MARGIN_DANGER" | "NORMAL" = "NORMAL";
           const isPriceSpike = liveMarginPct < 12.0 || (item.recordedPriceIdr > 0 && livePriceIdr > item.recordedPriceIdr * 1.15);
-          if (isPriceSpike && (live.price_idr > 0 || live.price_usd > 0)) {
+          if (!fetchFailed && isPriceSpike && (live.price_idr > 0 || live.price_usd > 0)) {
             priceAlert = "MARGIN_DANGER";
           }
 
@@ -260,6 +264,72 @@ export async function GET(req: NextRequest) {
               + `⚡ _Katalog Shopee & Web Store telah diperbarui otonom tanpa jeda penjualan._`
             );
             await sendTelegramAlert(failoverMsg);
+            await recordAlert({
+              category: "PRICE_SPIKE",
+              severity: "info",
+              title: `Auto-Failover Supplier: ${game.title}`,
+              message: `Harga ${audited.sellerName} naik ke Rp ${audited.livePriceIdr.toLocaleString("id-ID")}. Otomatis pindah ke ${backupSeller.seller_name} (margin ${bestCandidate.sMargin.toFixed(1)}%).`,
+              game_id: game.id,
+              game_title: game.title,
+              old_cogs_idr: audited.recordedPriceIdr,
+              new_cogs_idr: audited.livePriceIdr,
+              current_selling_price_idr: game.selling_price_shopee_idr,
+              current_margin_pct: bestCandidate.sMargin,
+              source: "cron_sentry",
+            });
+            failoverAlerts.push(game.id);
+          } else {
+            // FIX: Sebelumnya diam saja kalau tidak ada seller cadangan! Sekarang wajib kirim alert, hitung harga baru, & aktifkan Circuit Breaker bila rugi (<5%).
+            const recommendedPrice = calculateTargetSellingPrice({
+              cogsIdr: Math.round(audited.livePriceIdr * 1.007),
+              presetId: "reguler",
+              packagingCostIdr: 0,
+              targetMarginPct: Number(game.target_margin_pct || 18),
+            });
+            const shouldPause = audited.liveMarginPct < 5.0;
+            const currentSellerObj = game.sellers.find((s: any) => s.seller_id === audited.sellerId);
+            if (currentSellerObj && audited.livePriceIdr > 0) {
+              currentSellerObj.price_g2g_idr = audited.livePriceIdr;
+              catalogModified = true;
+            }
+            if (shouldPause) {
+              game.status = "paused";
+              catalogModified = true;
+            }
+
+            const noBackupMsg = (
+              `🚨 *[BAHAYA MARGIN / DISKON SUPPLIER HABIS]*\n`
+              + `━━━━━━━━━━━━━━━━━━━━━━\n`
+              + `🎮 *Game:* \`${game.title}\`\n`
+              + `• Modal Baru: *Rp ${audited.livePriceIdr.toLocaleString("id-ID")}* (Lama: Rp ${audited.recordedPriceIdr.toLocaleString("id-ID")})\n`
+              + `• Harga Jual Kini: *Rp ${Number(game.selling_price_shopee_idr || 0).toLocaleString("id-ID")}* (Margin: *${audited.liveMarginPct.toFixed(1)}%*)\n`
+              + `💡 *Rekomendasi Harga Baru:* *Rp ${recommendedPrice.toLocaleString("id-ID")}*\n`
+              + (shouldPause ? `🛡️ *Circuit Breaker:* Storefront di-PAUSE otomatis agar tidak kebobolan order rugi!\n` : "")
+              + `━━━━━━━━━━━━━━━━━━━━━━\n`
+              + `⚡ _Buka menu Price Guard di Dashboard untuk 1-Klik Update Harga & Export Excel Shopee._`
+            );
+            await sendTelegramAlert(noBackupMsg);
+            await recordAlert({
+              category: shouldPause ? "AUTO_PAUSED" : "DISCOUNT_ENDED",
+              severity: shouldPause ? "critical" : "warning",
+              title: shouldPause
+                ? `Circuit Breaker Aktif: ${game.title}`
+                : `Harga Naik Tanpa Cadangan: ${game.title}`,
+              message: `Modal naik ke Rp ${audited.livePriceIdr.toLocaleString("id-ID")} (margin ${audited.liveMarginPct.toFixed(1)}%). ${
+                shouldPause
+                  ? "Produk dijeda di Storefront. Naikkan harga jual ke rekomendasi & update Shopee."
+                  : "Tidak ada seller cadangan murah; segera sesuaikan harga jual."
+              }`,
+              game_id: game.id,
+              game_title: game.title,
+              old_cogs_idr: audited.recordedPriceIdr,
+              new_cogs_idr: audited.livePriceIdr,
+              current_selling_price_idr: game.selling_price_shopee_idr,
+              recommended_selling_price_idr: recommendedPrice,
+              current_margin_pct: audited.liveMarginPct,
+              auto_paused: shouldPause,
+              source: "cron_sentry",
+            });
             failoverAlerts.push(game.id);
           }
         }
@@ -294,6 +364,19 @@ export async function GET(req: NextRequest) {
         + `⚠️ *TINDAKAN CEPAT:* Segera matikan listing Shopee atau switch ke supplier cadangan di web dashboard!`
       );
       await sendTelegramAlert(alertMsg);
+      if (item.isSelected) {
+        await recordAlert({
+          category: "STOCK_OUT",
+          severity: "critical",
+          title: `Stok Habis (0 Unit): ${item.gameTitle}`,
+          message: `Seller terpilih ${item.sellerName} kehabisan stok. Segera ganti supplier atau nolkan stok Shopee via Mass Update.`,
+          game_id: item.gameId,
+          game_title: item.gameTitle,
+          new_cogs_idr: item.livePriceIdr,
+          current_margin_pct: item.liveMarginPct,
+          source: "cron_sentry",
+        });
+      }
       alertsSent.push(item.offerId);
     }
 
@@ -352,6 +435,13 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("[Cron Sentry Error]:", error);
+    await recordAlert({
+      category: "TECH_INCIDENT",
+      severity: "critical",
+      title: "Cron Market Sentry Gagal Berjalan",
+      message: error?.message || "Terjadi gangguan saat memeriksa harga & stok supplier.",
+      source: "cron_sentry",
+    }).catch(() => {});
     return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
   }
 }

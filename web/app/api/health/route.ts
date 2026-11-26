@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryDb, isDbConfigured, touchSupabaseKeepalive, getKV } from "@/lib/db";
 import { ensureRootEnvLoaded } from "@/lib/envLoader";
+import { recordAlert } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,13 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     const latencyMs = Math.round(performance.now() - startTime);
+    await recordAlert({
+      category: "TECH_INCIDENT",
+      severity: "critical",
+      title: "Database Supabase Offline / Degraded",
+      message: error?.message || "Koneksi database Cloud PostgreSQL gagal/timeout; fallback JSON lokal aktif.",
+      source: "health_check",
+    }).catch(() => {});
     return NextResponse.json(
       {
         status: "DEGRADED",

@@ -125,11 +125,12 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
     clearTimeout(timeout);
 
     if (!res.ok) {
+      const isGone = res.status === 404 || res.status === 410;
       return {
         offer_id: offerId,
         product_url: productUrl,
         seller_name: "Unknown",
-        status: "unknown",
+        status: isGone ? "delisted" : "unknown",
         is_sold_out: true,
         available_qty: 0,
         actual_qty: 0,
@@ -140,7 +141,7 @@ export async function fetchG2GLiveOffer(offerIdOrUrl: string): Promise<G2GLiveOf
         success_orders: 0,
         total_rating: 0,
         synced_at: now,
-        error: `HTTP ${res.status}`,
+        error: isGone ? undefined : `HTTP ${res.status}`,
       };
     }
 
