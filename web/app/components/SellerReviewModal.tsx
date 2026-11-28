@@ -60,6 +60,7 @@ export default function SellerReviewModal({
   const [sortBy, setSortBy] = useState<SellerSortKey>("trust_desc");
   const [safeOnly, setSafeOnly] = useState<boolean>(false);
   const [freshOnly, setFreshOnly] = useState<boolean>(true);
+  const [instantOnly, setInstantOnly] = useState<boolean>(false);
   const [hideLowMargin, setHideLowMargin] = useState<boolean>(false);
 
   // Per-game selections: checked seller IDs + chosen primary seller ID + whether game is included
@@ -88,6 +89,7 @@ export default function SellerReviewModal({
       setSortBy("trust_desc");
       setSafeOnly(false);
       setFreshOnly(true);
+      setInstantOnly(false);
       setHideLowMargin(false);
     }
   }, [open, previews]);
@@ -118,6 +120,14 @@ export default function SellerReviewModal({
           const fs = s.fresh_status || evaluateSteamAccountFreshness(s.offer_title).fresh_status;
           if (fs !== "verified_fresh") return false;
         }
+        if (instantOnly) {
+          const isInst = Boolean(
+            s.is_instant_delivery ||
+              s.delivery_time === "instant" ||
+              String(s.delivery_speed || "").toLowerCase().includes("instant")
+          );
+          if (!isInst) return false;
+        }
         if (hideLowMargin && Number(s.net_margin_pct ?? 0) < 10) {
           return false;
         }
@@ -132,11 +142,14 @@ export default function SellerReviewModal({
         const fA = a.fresh_status === "verified_fresh" ? 1 : 0;
         const fB = b.fresh_status === "verified_fresh" ? 1 : 0;
         if (fB !== fA) return fB - fA;
+        const iA = a.is_instant_delivery || a.delivery_time === "instant" ? 1 : 0;
+        const iB = b.is_instant_delivery || b.delivery_time === "instant" ? 1 : 0;
+        if (iB !== iA) return iB - iA;
         return (b.trust_score || 0) - (a.trust_score || 0) || (a.price_g2g_idr || 0) - (b.price_g2g_idr || 0);
       });
       return { ...p, visibleCandidates: sorted };
     });
-  }, [previews, sortBy, safeOnly, freshOnly, hideLowMargin]);
+  }, [previews, sortBy, safeOnly, freshOnly, instantOnly, hideLowMargin]);
 
   if (!open) return null;
 
@@ -275,6 +288,18 @@ export default function SellerReviewModal({
 
             <button
               type="button"
+              onClick={() => setInstantOnly(!instantOnly)}
+              className={`px-2.5 py-1.5 rounded-lg border font-medium transition-colors cursor-pointer ${
+                instantOnly
+                  ? "bg-amber-500 text-white border-amber-500"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              ⚡ Instant Delivery Saja
+            </button>
+
+            <button
+              type="button"
               onClick={() => setHideLowMargin(!hideLowMargin)}
               className={`px-2.5 py-1.5 rounded-lg border font-medium transition-colors cursor-pointer ${
                 hideLowMargin
@@ -408,6 +433,19 @@ export default function SellerReviewModal({
                                       {hasEmail && (
                                         <span className="text-[10px] px-1.5 py-0.5 rounded border font-semibold bg-sky-50 text-sky-700 border-sky-200">
                                           ✉️ First Email / OGE
+                                        </span>
+                                      )}
+                                      {Boolean(
+                                        s.is_instant_delivery ||
+                                          s.delivery_time === "instant" ||
+                                          String(s.delivery_speed || "").toLowerCase().includes("instant")
+                                      ) ? (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-semibold bg-amber-50 text-amber-800 border-amber-200">
+                                          ⚡ Instant Auto
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium bg-slate-100 text-slate-600 border-slate-200">
+                                          ⏱️ Manual
                                         </span>
                                       )}
                                     </>

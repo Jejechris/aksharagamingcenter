@@ -221,6 +221,7 @@ export default function CatalogDashboardPage() {
   const [findingSellerGameId, setFindingSellerGameId] = useState<string | null>(null);
   const [safeSellerOnly, setSafeSellerOnly] = useState(false);
   const [freshSteamOnly, setFreshSteamOnly] = useState(true);
+  const [instantOnly, setInstantOnly] = useState(false);
   const [sellerReviewOpen, setSellerReviewOpen] = useState(false);
   const [sellerReviewPreviews, setSellerReviewPreviews] = useState<SellerPreviewGameEntry[]>([]);
   const [isApplyingSellerReview, setIsApplyingSellerReview] = useState(false);
@@ -231,7 +232,7 @@ export default function CatalogDashboardPage() {
       const res = await fetch('/api/catalog/auto-find-sellers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'all', safeOnly: safeSellerOnly, freshOnly: freshSteamOnly, preview_only: true }),
+        body: JSON.stringify({ mode: 'all', safeOnly: safeSellerOnly, freshOnly: freshSteamOnly, instantOnly, preview_only: true }),
       });
       const json = await res.json();
       if (res.ok && json.status === 'success') {
@@ -259,7 +260,7 @@ export default function CatalogDashboardPage() {
       const res = await fetch('/api/catalog/auto-find-sellers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_id: gameId, title, mode: 'single', safeOnly: safeSellerOnly, freshOnly: freshSteamOnly, preview_only: true }),
+        body: JSON.stringify({ game_id: gameId, title, mode: 'single', safeOnly: safeSellerOnly, freshOnly: freshSteamOnly, instantOnly, preview_only: true }),
       });
       const json = await res.json();
       if (res.ok && json.status === 'success' && Array.isArray(json.sellers) && json.sellers.length > 0) {
@@ -1153,6 +1154,22 @@ export default function CatalogDashboardPage() {
             />
             <span>🛡️ 0h Fresh Steam (Anti-Hackback)</span>
           </label>
+          <label
+            title="Prioritaskan & saring seller pengiriman Instant Otomatis (Auto-Delivery)"
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border shadow-xs text-xs font-medium cursor-pointer transition-colors shrink-0 ${
+              instantOnly
+                ? "bg-amber-50 border-amber-300 text-amber-900"
+                : "bg-white border-slate-200 text-slate-700 hover:border-amber-300"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={instantOnly}
+              onChange={(e) => setInstantOnly(e.target.checked)}
+              className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+            />
+            <span>⚡ Instant Delivery Saja</span>
+          </label>
         </div>
 
         {/* 3-TIER SOURCING STRATEGY BANNER */}
@@ -1355,6 +1372,15 @@ export default function CatalogDashboardPage() {
                                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getTrustTierBadgeStyle(trustTier)}`}>
                                       {trustTier}
                                     </span>
+                                    {Boolean(
+                                      (selectedSeller as any).is_instant_delivery ||
+                                        selectedSeller.delivery_time === 'instant' ||
+                                        String(selectedSeller.delivery_speed || '').toLowerCase().includes('instant')
+                                    ) && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold bg-amber-50 text-amber-800 border-amber-200">
+                                        ⚡ Instant
+                                      </span>
+                                    )}
                                   </span>
                                 );
                               })()}

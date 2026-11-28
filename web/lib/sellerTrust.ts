@@ -84,11 +84,6 @@ const HACKBACK_SUBSTRINGS = [
   "not include any games",
   "does not include any",
   "without game",
-  "community account ban",
-  "community ban",
-  "vac ban",
-  "trade ban",
-  "game ban",
   "red flag",
   "corrupted",
   "cannot be accessed",
@@ -121,7 +116,10 @@ export function isSteamAccountProduct(
     return false;
   }
 
-  if (plat.includes("steam")) {
+  if (
+    plat.includes("steam") ||
+    (!cat.includes("key") && !cat.includes("cdkey") && !ttl.includes("minecraft") && ttl.includes("forza"))
+  ) {
     return true;
   }
 
@@ -248,11 +246,20 @@ export function evaluateSteamAccountFreshness(
     };
   }
 
-  // 4b. Cek akun dengan status ban (Community ban, VAC ban, bans) tanpa penafian ("no ban"/"zero ban")
+  // 4b. Cek akun dengan status ban aktual (hindari false positive pada "no community ban", "not banned", atau panduan peringatan buyer)
+  const textWithoutSafeWarnings = lower
+    .replace(/\b(?:no|not|never|zero|0|without|free\s+of|free\s+from)\s+(?:any\s+)?(?:community|vac|trade|game|account|hypixel)?\s*ban(?:ned|s)?\b/gi, " ")
+    .replace(/\bunbanned\b/gi, " ")
+    .replace(/\b(?:will\s+track\s+this\s+and\s+)?ban\s+your\s+account\s+if\b[^.!\n]*/gi, " ")
+    .replace(/\bif\s+(?:your\s+account\s+)?(?:receives?|gets?)\s+a\s+(?:steam\s+)?(?:community|vac|account)?\s*ban\b[^.!\n]*/gi, " ")
+    .replace(/\b(?:already\s+)?received\s+a\s+ban\s+on\b[^.!\n]*/gi, " ")
+    .replace(/\bmay\s+issue\s+an?\s+(?:automatic\s+)?ban\b[^.!\n]*/gi, " ")
+    .replace(/\b(?:may\s+)?lead\s+to\s+a\s+(?:steam\s+)?(?:community|vac|account)?\s*ban\b[^.!\n]*/gi, " ")
+    .replace(/\bafter-sales\s+support\s+if[^.!\n]*\bban\b[^.!\n]*/gi, " ")
+    .replace(/\b(?:cause|official)\s+ban\b[^.!\n]*/gi, " ");
   if (
-    /(\bbans?\b)/i.test(lower) &&
-    !/(\bno\s+bans?\b|\bnot\s+banned\b|\bnever\s+banned\b|\bunban|\bzero\s+bans?\b|\b0\s+bans?\b|\bwithout\s+bans?\b)/i.test(
-      lower
+    /\b(?:community\s+(?:account\s+)?ban(?:ned)?|vac\s+ban(?:ned)?|trade\s+ban(?:ned)?|game\s+ban(?:ned)?|account\s+is\s+banned|restricted\s+account|community\s+market\s+disabled|banned)\b/i.test(
+      textWithoutSafeWarnings
     )
   ) {
     return {
@@ -262,9 +269,24 @@ export function evaluateSteamAccountFreshness(
       has_first_email: false,
       has_changeable_data: false,
       is_rejected_hackback_risk: true,
-      risk_reason: "Akun memiliki catatan ban / pembatasan Steam (Community/VAC Ban)",
+      risk_reason: "Akun memiliki catatan ban / pembatasan Steam (Community/VAC/Market Restriction)",
       freshness_bonus: -50,
       badges: ["Risiko Akun Ban"],
+    };
+  }
+
+  // 4c. Tolak akun inactive lama (misal "Inactive 372d") yang rawan pemilik asli login kembali
+  if (/\binactive\s+\d+\s*(?:d|day|days|m|mo|month|months|y|yr|year|years)\b/i.test(lower)) {
+    return {
+      fresh_status: "risky_played",
+      has_zero_hours: false,
+      has_fresh_label: false,
+      has_first_email: false,
+      has_changeable_data: false,
+      is_rejected_hackback_risk: true,
+      risk_reason: "Akun bertipe inactive aged account rawan hackback pemilik asli",
+      freshness_bonus: -50,
+      badges: ["Risiko Akun Inactive"],
     };
   }
 
@@ -285,15 +307,17 @@ export function evaluateSteamAccountFreshness(
     }
   }
 
-  // 6. Sinyal positif akun segar (0 Hours / Fresh / Original Email / Full Data Change)
+  // 6. Sinyal positif akun segar: HANYA 0 Hours / Unplayed yang mendapat status verified_fresh!
   const hasZeroHours =
-    /(?:\b0|steam0)\s*(?:h|hr|hrs|hour|hours)\b|0hour|\b0h\b|\bzero\s*hours?\b/i.test(lower);
+    /(?:\b0|steam0)\s*(?:h|hr|hrs|hour|hours)\b|0hour|\b0h\b|\bzero\s*(?:hours?|playtime)\b|\bnever\s*played\b|\bunplayed\b/i.test(
+      lower
+    );
   const hasFreshLabel =
-    /\bfresh\b|\bbrand\s*new\b|\bnew\s+(?:steam\s+)?account\b|\b0\s*level\s*steam\b|\blevel\s*0\b|\bnever\s*played\b|\bunplayed\b/i.test(
+    /\bfresh\b|\bbrand\s*new\b|\bnew\s+(?:steam\s+)?account\b|\b0\s*level\s*steam\b|\blevel\s*0\b/i.test(
       lower
     );
   const hasFirstEmail =
-    /original\s*(?:e-?mail|mail)|\bfirst\s*(?:e-?mail|mail)|\bfist\s*(?:e-?mail|mail)|\boge\b|\bwith\s*(?:original|first)\s*mail/i.test(
+    /original\s*(?:registered\s*)?(?:e-?mail|mail)|\bfirst\s*(?:e-?mail|mail)|\bfist\s*(?:e-?mail|mail)|\boge\b|\bwith\s*(?:original|first)\s*mail/i.test(
       lower
     );
   const hasChangeableData =
@@ -303,19 +327,19 @@ export function evaluateSteamAccountFreshness(
 
   const badges: string[] = [];
   if (hasZeroHours) badges.push("0 Hours Fresh");
-  else if (hasFreshLabel) badges.push("Fresh Account");
+  else if (hasFreshLabel) badges.push("New Account (Cek Jam Main)");
   if (hasFirstEmail) badges.push("First Email / OGE");
   if (hasChangeableData) badges.push("Full Data Change");
 
   let bonus = 0;
-  if (hasZeroHours) bonus += 8;
-  else if (hasFreshLabel) bonus += 5;
+  if (hasZeroHours) bonus += 10;
+  else if (hasFreshLabel) bonus += 2;
   if (hasFirstEmail) bonus += 5;
   if (hasChangeableData) bonus += 2;
-  bonus = Math.min(15, bonus);
+  bonus = Math.min(17, bonus);
 
-  const freshStatus: FreshnessStatus =
-    hasZeroHours || hasFreshLabel ? "verified_fresh" : "unverified";
+  // Wajib eksplisit 0 Hours / Unplayed agar tidak kecolongan akun hanya berlabel "New account" tanpa 0h
+  const freshStatus: FreshnessStatus = hasZeroHours ? "verified_fresh" : "unverified";
 
   return {
     fresh_status: freshStatus,
@@ -376,10 +400,11 @@ export function evaluateSellerTrust(params: {
   const priceIdr = Math.max(0, Number(params.priceIdr ?? 0) || 0);
   const sellingPrice = Math.max(0, Number(params.sellingPriceShopeeIdr ?? 0) || 0);
   const deliveryStr = (params.deliverySpeed || "Fast Delivery").trim();
-  const isInstant =
+  const isInstantDelivery =
     deliveryStr.toLowerCase().includes("instant") ||
-    deliveryStr.toLowerCase().includes("0-detik") ||
-    params.isOnline === true;
+    deliveryStr.toLowerCase().includes("auto") ||
+    deliveryStr.toLowerCase().includes("0-detik");
+  const isInstant = isInstantDelivery || params.isOnline === true;
 
   // Rumus full-digital terpusat via web/lib/pricing.ts
   const eco = calculateShopeeEconomics({
@@ -405,8 +430,14 @@ export function evaluateSellerTrust(params: {
     isHardRejected = true;
     rejectReason = `Rating seller terlalu rendah (${rawRating}% < 92%)`;
   } else {
-    const lowBaitThreshold = params.priceFloorIdr ? params.priceFloorIdr * 1.1 : 35000;
-    if ((rawRating === 0 || ordersCount < 5) && priceIdr > 0 && priceIdr < lowBaitThreshold) {
+    // Jangan menolak listing 0h Fresh / Full Access sah yang harganya sudah melewati price floor hanya karena offer baru (ord < 5)
+    const floorRef = params.priceFloorIdr ? params.priceFloorIdr : 25000;
+    const isGenuineZeroHoursAboveFloor = Boolean(freshness?.has_zero_hours && priceIdr >= floorRef);
+    const strictBaitThreshold = Math.min(floorRef, 20000);
+    if (ordersCount === 0 && rawRating === 0 && !freshness?.has_zero_hours) {
+      isHardRejected = true;
+      rejectReason = "Seller baru dengan 0 transaksi & tanpa jaminan 0 Hours";
+    } else if (!isGenuineZeroHoursAboveFloor && (rawRating === 0 || ordersCount < 5) && priceIdr > 0 && priceIdr < strictBaitThreshold) {
       isHardRejected = true;
       rejectReason = `Indikasi bait/scam (transaksi ${ordersCount} < 5 pada harga terlalu rendah)`;
     }
@@ -455,8 +486,9 @@ export function evaluateSellerTrust(params: {
   else if (stockQty >= 3) deliveryScore += 3;
   else if (stockQty >= 1) deliveryScore += 1;
 
-  if (isInstant) deliveryScore += 5;
-  else deliveryScore += 2;
+  if (isInstantDelivery) deliveryScore += 6;
+  else if (isInstant) deliveryScore += 3;
+  else deliveryScore += 1;
 
   const freshnessAdj = freshness
     ? freshness.is_rejected_hackback_risk

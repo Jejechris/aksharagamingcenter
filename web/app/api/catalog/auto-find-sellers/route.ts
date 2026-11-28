@@ -50,45 +50,54 @@ interface SearchOfferItem {
   hasZeroHours?: boolean;
   hasFirstEmail?: boolean;
   freshnessBadges?: string[];
+  isInstant?: boolean;
 }
 
-// Lapis 1: Blacklist Clickbait, Shared, Cracked, dan Non-Full-Access
-const CLICKBAIT_BLACKLIST = [
+// Lapis 1: Blacklist Clickbait, Shared, Cracked, dan Non-Full-Access (Title ketat + Description anti-false-positive)
+const TITLE_CLICKBAIT_SUBSTRINGS = [
   "shared", "sharing", "offline", "offline only", "offline mode", "rent", "rental", "sewa",
-  "trial", "demo", "tlauncher", "cracked", "crack", "nfa", "sfa", "non-full", "no mail",
+  "trial", "demo", "tlauncher", "sklauncher", "cape code", "cracked", "crack", "non-full", "no mail",
   "no email", "no change", "cant change", "can't change", "cannot change",
-  "save game", "savegame", "mod ", "mods", "dlc only", "expansion only",
-  "cape only", "coin", "coins", "gold", "currency", "boost", "boosting", "coaching",
+  "save game", "savegame", "dlc only", "expansion only",
+  "cape only", "coins", "gold", "currency", "boost", "boosting", "coaching",
   "random", "mystery", "lucky", "empty", "no game", "1 month",
-  "3 months", "14 days", "7 days", "1 day", "temporary", "temp ", "family share",
-  "steam family", "activation", "p2", "p3", "secondary", "guest"
+  "3 months", "14 days", "7 days", "1 day", "temporary", "family share",
+  "steam family", "activation", "secondary", "guest"
 ];
 
-function hasClickbaitSignals(text: string): boolean {
-  for (const b of CLICKBAIT_BLACKLIST) {
-    if (text.includes(b)) return true;
+const TITLE_WORD_BOUNDARY_BLACKLIST = /\b(?:nfa|sfa|p2|p3|mod|mods|coin|temp)\b/i;
+const DESC_EXPLICIT_DISQUALIFIERS =
+  /\b(?:shared\s+account|sharing\s+account|offline\s+only|offline\s+mode\s+only|offline\s+activation|family\s+share|steam\s+family|rent\s+account|rental\s+account|random\s+game|random\s+hours|random\s+playtime|no\s+(?:e-?mail|mail)\s+access|can(?:'|not)?\s*change\s*(?:e-?mail|mail)|tlauncher|cracked|stealer|bruteforce|combo\s+list)\b|\b(?:nfa|sfa|p2|p3)\b/i;
+
+function hasClickbaitSignals(offerTitle: string, offerDescription: string = ""): boolean {
+  const tLow = (offerTitle || "").toLowerCase();
+  const dLow = (offerDescription || "").toLowerCase();
+  const combined = `${tLow} ${dLow}`;
+
+  for (const b of TITLE_CLICKBAIT_SUBSTRINGS) {
+    if (tLow.includes(b)) return true;
   }
+  if (TITLE_WORD_BOUNDARY_BLACKLIST.test(tLow)) {
+    return true;
+  }
+  if (DESC_EXPLICIT_DISQUALIFIERS.test(dLow)) {
+    return true;
+  }
+
   // Blokir listing Game Pass sewaan, tetapi izinkan penafian seperti "NOT GAME PASS" / "NO GAMEPASS"
   if (
-    /\bgame\s*pass\b/i.test(text) &&
-    !/\b(?:not|no|non)\s+(?:a\s+)?game\s*pass\b/i.test(text)
+    /\bgame\s*pass\b/i.test(combined) &&
+    !/\b(?:not|no|non)\s+(?:a\s+)?game\s*pass\b/i.test(combined)
   ) {
     return true;
   }
-  // Cek pola hackback (0-300 hours played, 10+ hours, old account, archive, other paid games, dsb.)
-  const freshness = evaluateSteamAccountFreshness(text);
+
+  // Cek pola hackback & ban aktual (0-300 hours played, 10+ hours, old account, other paid games, ban aktual, dll.)
+  const freshness = evaluateSteamAccountFreshness(combined);
   if (freshness.is_rejected_hackback_risk) {
     return true;
   }
-  // Ban check: hindari false positive jika listing menulis "no ban" atau "unbanned"
-  if (text.includes("banned") && !text.includes("unbanned") && !text.includes("no banned") && !text.includes("not banned")) {
-    return true;
-  }
-  if (/(\bban\b|\bbans\b|\bhypixel ban\b)/i.test(text)) {
-    if (!/(\bno bans?\b|\bnot ban\b|\bnever ban\b|\bunban|\bzero bans?\b)/i.test(text)) {
-      return true;
-    }
-  }
+
   return false;
 }
 
@@ -96,7 +105,11 @@ function hasClickbaitSignals(text: string): boolean {
 function getGamePriceFloor(gameTitle: string, sellingPrice: number, medianPrice: number = 0): number {
   const lower = gameTitle.toLowerCase();
 
-  // Khusus game dengan harga wajar tinggi (patokan absolut anti-scam)
+  // Khusus game dengan harga wajar tertentu (patokan absolut anti-scam)
+  if (lower.includes("among us")) return 15000;
+  if (lower.includes("terraria")) return 12000;
+  if (lower.includes("stardew")) return 25000;
+  if (lower.includes("left 4 dead")) return 20000;
   if (lower.includes("minecraft")) return 95000;
   if (lower.includes("wukong") || lower.includes("black myth")) return 180000;
   if (lower.includes("gta") || lower.includes("grand theft auto")) return 90000;
@@ -110,7 +123,8 @@ function getGamePriceFloor(gameTitle: string, sellingPrice: number, medianPrice:
     baseFloor = Math.max(baseFloor, Math.round(sellingPrice * 0.3));
   }
   if (medianPrice > 0) {
-    baseFloor = Math.max(baseFloor, Math.round(medianPrice * 0.45));
+    const medFloor = Math.round(medianPrice * 0.4);
+    baseFloor = Math.max(baseFloor, medFloor);
   }
   return baseFloor;
 }
@@ -331,13 +345,15 @@ function processBestSellers(
   safeOnly: boolean = false,
   freshOnly: boolean = true,
   platform: string = "",
-  category: string = ""
+  category: string = "",
+  instantOnly: boolean = false
 ): {
   selectedSellers: any[];
   allCleanSellers: any[];
   filteredClickbaitCount: number;
   filteredNonFreshCount: number;
   verifiedFreshCount: number;
+  verifiedInstantCount: number;
   freshFallbackWarning: boolean;
   cleanCandidatesCount: number;
 } | null {
@@ -346,15 +362,25 @@ function processBestSellers(
   let filteredClickbaitCount = 0;
   const candidatesLayer1: SearchOfferItem[] = [];
 
-  // Lapis 1: Strict Game Title Relevance Guard + Anti-Clickbait/Hackback Blacklist Check
+  // Lapis 1: Strict Game Title Relevance Guard + Platform Launcher Match + Anti-Clickbait/Hackback Blacklist Check
+  const platLow = (platform || "").toLowerCase();
+  const expectsSteamOnly = platLow.includes("steam") && !platLow.includes("epic") && !platLow.includes("microsoft");
   for (const o of offers) {
     if (!o.offer_id || !o.username) continue;
+    const oTitleLow = (o.title || "").toLowerCase();
     if (!doesOfferMatchGameTitle(o.title || "", gameTitle)) {
       filteredClickbaitCount++;
       continue;
     }
-    const textToCheck = `${o.title || ""} ${o.description || ""}`.toLowerCase();
-    if (hasClickbaitSignals(textToCheck)) {
+    if (
+      expectsSteamOnly &&
+      /\b(?:epic\s*games?|xbox\s*game\s*pass|microsoft\s*account|ubisoft\s*account)\b/i.test(oTitleLow) &&
+      !/\bsteam\b/i.test(oTitleLow)
+    ) {
+      filteredClickbaitCount++;
+      continue;
+    }
+    if (hasClickbaitSignals(o.title || "", o.description || "")) {
       filteredClickbaitCount++;
       continue;
     }
@@ -422,14 +448,17 @@ function processBestSellers(
       continue;
     }
 
-    // Bonus listing clarity + Steam Freshness (0 Hours / Original Email / Full Data Change)
+    // Bonus listing clarity + Steam Freshness (0 Hours / Original Email / Full Data Change) + Instant Delivery
     const freshness = evaluateSteamAccountFreshness(`${o.title || ""} ${o.description || ""}`);
     const titleLower = (o.title || "").toLowerCase();
+    const isInstant = o.delivery_speed === "instant";
     let clarityBonus = freshness.freshness_bonus;
+    if (isInstant) clarityBonus += 5;
     if (titleLower.includes("full access") || /\bfa\b/.test(titleLower)) clarityBonus += 4;
     if (
       titleLower.includes("original email") ||
       titleLower.includes("first mail") ||
+      titleLower.includes("fist email") ||
       titleLower.includes("changeable") ||
       titleLower.includes("key") ||
       titleLower.includes("cdkey")
@@ -448,22 +477,27 @@ function processBestSellers(
       hasZeroHours: freshness.has_zero_hours,
       hasFirstEmail: freshness.has_first_email,
       freshnessBadges: freshness.badges,
+      isInstant,
       qualityScore: Math.min(100, trustEval.trust_score + clarityBonus),
     });
   }
 
   if (scoredCandidates.length === 0) return null;
 
-  // Deduplikasi berdasarkan seller: simpan offer dengan Freshness + Trust & Quality Score tertinggi per seller
+  // Deduplikasi berdasarkan seller: prioritaskan 0 Hours Fresh -> Instant Delivery -> Quality Score -> Harga Termurah
   const sellerMap = new Map<string, typeof scoredCandidates[0]>();
   for (const c of scoredCandidates) {
     const exist = sellerMap.get(c.username);
     const cFreshRank = c.freshStatus === "verified_fresh" ? 1 : 0;
     const existFreshRank = exist?.freshStatus === "verified_fresh" ? 1 : 0;
+    const cInstRank = c.isInstant ? 1 : 0;
+    const existInstRank = exist?.isInstant ? 1 : 0;
     if (
       !exist ||
       cFreshRank > existFreshRank ||
+      (cFreshRank === existFreshRank && cInstRank > existInstRank) ||
       (cFreshRank === existFreshRank &&
+        cInstRank === existInstRank &&
         ((c.qualityScore || 0) > (exist.qualityScore || 0) ||
           ((c.qualityScore || 0) === (exist.qualityScore || 0) &&
             (c.priceIdr || 0) < (exist.priceIdr || 0))))
@@ -490,15 +524,29 @@ function processBestSellers(
     }
   }
 
+  const verifiedInstantCandidates = cleanCandidates.filter((c) => c.isInstant);
+  const verifiedInstantCount = verifiedInstantCandidates.length;
+  if (instantOnly && verifiedInstantCandidates.length > 0) {
+    cleanCandidates = verifiedInstantCandidates;
+  }
+
   const cleanCandidatesCount = cleanCandidates.length;
 
-  // 1. Best Value (Termurah yang lolos Hard Reject & Trust Filter)
+  // 1. Best Value: Prioritaskan 0h Fresh + Instant Delivery bila harganya kompetitif (agar fulfillment cepat & bebas hackback)
   const sortedByPrice = [...cleanCandidates].sort((a, b) => (a.priceIdr || 0) - (b.priceIdr || 0));
-  const lowestPriceOffer = sortedByPrice[0];
+  const cheapestAll = sortedByPrice[0];
+  const instantByPrice = sortedByPrice.filter((c) => c.isInstant);
+  const cheapestInstant = instantByPrice[0];
+  const lowestPriceOffer =
+    cheapestInstant && cheapestInstant.priceIdr! <= Math.max(cheapestAll.priceIdr! * 1.45, cheapestAll.priceIdr! + 25000)
+      ? cheapestInstant
+      : cheapestAll;
 
-  // 2. Top Verified (Trust Score & Rating tertinggi + volume transaksi besar)
+  // 2. Top Verified (Trust Score & Instant & Rating tertinggi + volume transaksi besar)
   const remainingForSafe = cleanCandidates.filter((o) => o.username !== lowestPriceOffer.username);
   const sortedBySafe = remainingForSafe.sort((a, b) => {
+    const instDiff = (b.isInstant ? 1 : 0) - (a.isInstant ? 1 : 0);
+    if (instDiff !== 0) return instDiff;
     const tA = a.trustScore || 0;
     const tB = b.trustScore || 0;
     if (tB !== tA) return tB - tA;
@@ -506,13 +554,13 @@ function processBestSellers(
   });
   const ultraSafeOffer = sortedBySafe[0] || lowestPriceOffer;
 
-  // 3. Balanced Alternative (Highest Quality Score)
+  // 3. Balanced Alternative (Prioritaskan termurah / Instant cadangan jika UTAMA Instant)
   const remainingForMid = cleanCandidates.filter(
     (o) => o.username !== lowestPriceOffer.username && o.username !== ultraSafeOffer.username
   );
-  const sortedByScore = remainingForMid.sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0));
+  const sortedByMid = remainingForMid.sort((a, b) => (a.priceIdr || 0) - (b.priceIdr || 0) || (b.qualityScore || 0) - (a.qualityScore || 0));
   const midLevelOffer =
-    sortedByScore[0] || (sortedByPrice.length > 1 ? sortedByPrice[1] : lowestPriceOffer);
+    sortedByMid[0] || (sortedByPrice.length > 1 ? sortedByPrice.find((x) => x.username !== lowestPriceOffer.username) || sortedByPrice[1] : lowestPriceOffer);
 
   const buildSellerItem = (
     offer: typeof scoredCandidates[0],
@@ -535,6 +583,11 @@ function processBestSellers(
       isOnline: offer.is_online,
       sellerLevel: offer.seller_level,
       verified: offer.verified,
+      offerTitle: offer.title,
+      offerDescription: offer.description,
+      platform,
+      category,
+      gameTitle,
     });
 
     const qrisFee = Math.round(priceIdr * 0.007);
@@ -543,10 +596,12 @@ function processBestSellers(
     const netProfit = sellingPrice - cogsNet - shopeeFee;
     const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
 
-    let tierLabel = "⚡ BEST CLEAN VALUE";
-    let tierDesc = "Harga kulakan Full Access termurah yang lolos filter anti-clickbait & reputasi.";
+    let tierLabel = offer.isInstant ? "⚡ 0H + INSTANT BEST VALUE" : "⚡ BEST CLEAN VALUE";
+    let tierDesc = offer.isInstant
+      ? "Pengiriman Instant Otomatis + lolos filter Anti-Hackback & harga kompetitif."
+      : "Harga kulakan Full Access bersih termurah yang lolos filter anti-clickbait.";
     if (tier === "ultra_safe") {
-      tierLabel = "🛡️ TOP VERIFIED";
+      tierLabel = offer.isInstant ? "🛡️ TOP VERIFIED • INSTANT" : "🛡️ TOP VERIFIED";
       tierDesc = `Trust Score ${trust.trust_score}/100 (${trust.trust_tier}) • Rating ${trust.seller_rating}% (${trust.seller_orders.toLocaleString("id-ID")} order).`;
     } else if (tier === "mid_level") {
       tierLabel = "⚖️ BALANCED TIER";
@@ -565,6 +620,7 @@ function processBestSellers(
       seller_level: trust.seller_level,
       verified: trust.verified,
       delivery_time: trust.delivery_time,
+      is_instant_delivery: Boolean(offer.isInstant ?? offer.delivery_speed === "instant"),
       tier,
       tier_label: tierLabel,
       tier_desc: tierDesc,
@@ -603,20 +659,25 @@ function processBestSellers(
     selectedSellers.push(buildSellerItem(midLevelOffer, "mid_level", false));
   }
 
-  // Jika belum sampai 3 seller, ambil kandidat bersih lainnya jika ada
+  // Jika belum sampai 3 seller, ambil kandidat bersih lainnya (prioritaskan Instant -> termurah)
+  const fallbackSorted = [...cleanCandidates].sort(
+    (a, b) => (b.isInstant ? 1 : 0) - (a.isInstant ? 1 : 0) || (a.priceIdr || 0) - (b.priceIdr || 0)
+  );
   let idx = 0;
-  while (selectedSellers.length < 3 && idx < sortedByPrice.length) {
-    const cand = sortedByPrice[idx];
+  while (selectedSellers.length < 3 && idx < fallbackSorted.length) {
+    const cand = fallbackSorted[idx];
     if (!selectedSellers.some((s) => s.seller_name === cand.username)) {
       selectedSellers.push(buildSellerItem(cand, "mid_level", false));
     }
     idx++;
   }
 
-  // Kumpulkan semua kandidat bersih (maks 10 terbaik dari seluruh cleanCandidates) untuk preview/sortir admin sebelum simpan ke DB
+  // Kumpulkan semua kandidat bersih (maks 10 terbaik) untuk preview/sortir admin: 0h Fresh -> Instant -> Quality/Trust -> Harga
   const allRankedCandidates = [...cleanCandidates].sort((a, b) => {
     const fDiff = (b.freshStatus === "verified_fresh" ? 1 : 0) - (a.freshStatus === "verified_fresh" ? 1 : 0);
     if (fDiff !== 0) return fDiff;
+    const iDiff = (b.isInstant ? 1 : 0) - (a.isInstant ? 1 : 0);
+    if (iDiff !== 0) return iDiff;
     const scoreDiff = (b.qualityScore || 0) - (a.qualityScore || 0);
     if (scoreDiff !== 0) return scoreDiff;
     return (a.priceIdr || 0) - (b.priceIdr || 0);
@@ -637,6 +698,7 @@ function processBestSellers(
     filteredClickbaitCount,
     filteredNonFreshCount,
     verifiedFreshCount,
+    verifiedInstantCount,
     freshFallbackWarning,
     cleanCandidatesCount,
   };
@@ -648,6 +710,7 @@ export async function POST(req: NextRequest) {
     const { game_id, title, mode, safeOnly } = body;
     const filterSafeOnly = Boolean(safeOnly);
     const filterFreshOnly = body.freshOnly === undefined ? true : Boolean(body.freshOnly);
+    const filterInstantOnly = Boolean(body.instantOnly);
     const previewOnly = Boolean(body.preview_only);
 
     const catalog = await readAuthoritativeCatalog();
@@ -800,7 +863,8 @@ export async function POST(req: NextRequest) {
               filterSafeOnly,
               filterFreshOnly,
               game.platform || "",
-              game.category || ""
+              game.category || "",
+              filterInstantOnly
             );
 
             if (processed && processed.selectedSellers.length > 0) {
@@ -813,9 +877,14 @@ export async function POST(req: NextRequest) {
               const netProfit = sellingPrice - totalCost;
               const netMargin =
                 sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
-              const selectedStillExists = processed.selectedSellers.some(
+              const selectedStillExists = processed.selectedSellers.find(
                 (s: any) => s.seller_id === game.selected_seller_id
               );
+              const prevSellerPrice = Number(selectedStillExists?.price_g2g_idr || 0);
+              const bestImprovesOffer =
+                !selectedStillExists ||
+                bestCandidate.price_g2g_idr < prevSellerPrice ||
+                (bestCandidate.is_instant_delivery && !selectedStillExists.is_instant_delivery);
 
               if (previewOnly) {
                 batchPreviews.push({
@@ -835,7 +904,7 @@ export async function POST(req: NextRequest) {
                 });
               } else {
                 game.sellers = processed.selectedSellers;
-                if (netMargin >= 5.0 || !selectedStillExists) {
+                if (netMargin >= 5.0 || bestImprovesOffer) {
                   game.selected_seller_id = bestCandidate.seller_id;
                   game.target_margin_pct = netMargin;
                   game.metrics = {
@@ -982,7 +1051,8 @@ export async function POST(req: NextRequest) {
       filterSafeOnly,
       filterFreshOnly,
       targetGame.platform || "",
-      targetGame.category || ""
+      targetGame.category || "",
+      filterInstantOnly
     );
 
     if (!processed || processed.selectedSellers.length === 0) {
@@ -1001,9 +1071,14 @@ export async function POST(req: NextRequest) {
     const totalCost = bestCandidate.cogs_net_idr + shopeeFee;
     const netProfit = sellingPrice - totalCost;
     const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
-    const selectedStillExists = processed.selectedSellers.some(
+    const selectedStillExists = processed.selectedSellers.find(
       (s: any) => s.seller_id === targetGame.selected_seller_id
     );
+    const prevSellerPrice = Number(selectedStillExists?.price_g2g_idr || 0);
+    const bestImprovesOffer =
+      !selectedStillExists ||
+      bestCandidate.price_g2g_idr < prevSellerPrice ||
+      (bestCandidate.is_instant_delivery && !selectedStillExists.is_instant_delivery);
 
     if (previewOnly) {
       return NextResponse.json({
@@ -1025,7 +1100,7 @@ export async function POST(req: NextRequest) {
 
     targetGame.sellers = processed.selectedSellers;
 
-    if (netMargin >= 5.0 || !selectedStillExists) {
+    if (netMargin >= 5.0 || bestImprovesOffer) {
       targetGame.selected_seller_id = bestCandidate.seller_id;
       targetGame.target_margin_pct = netMargin;
       targetGame.metrics = {
