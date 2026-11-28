@@ -20,9 +20,13 @@ export interface LiveEnebaListing {
   is_key: boolean;
   is_gift: boolean;
   is_account: boolean;
+  is_global?: boolean;
 }
 
-const JUNK_LISTING_RE = /\b(dlc|expansion|upgrade|season pass|starter pack|skin|outfit|coins?|points?|pack|bundle only|ost|soundtrack|artbook|random|mystery|account)\b/i;
+const JUNK_LISTING_RE = /\b(dlc|expansion|season pass|starter pack|skin|outfit|coins?|points?|bundle only|ost|soundtrack|artbook|random|mystery|account|shark\s*card|cash\s*card|megalodon|great\s*white|whale\s*shark|tiger\s*shark|bull\s*shark|criminal\s*enterprise|gift\s*card|wallet|voucher|upgrade|deluxe\s*upgrade|subscription|trial|game\s*pass)\b/i;
+const NON_GLOBAL_REGION_RE = /\b(europe|eu\s*key|eu\s*only|turkey|argentina|latam|cis|russia|brazil|united\s*states|asia|row|china|india|indonesia|japan|korea|uk\s*only)\b/i;
+const CONSOLE_ONLY_RE = /\b(ps4|ps5|playstation|psn|nintendo|switch|xbox\s+one|xbox\s+series(?:\s*[xs|]+)?)\b/i;
+const PC_PLATFORM_RE = /\b(pc|windows\s*store|windows\s*10|windows\s*11|steam|rockstar|gog|ea\s*app|origin|epic|ubisoft|official\s*website)\b/i;
 
 export function cleanEnebaListingTitle(rawTitle: string): string {
   return (rawTitle || "")
@@ -45,30 +49,47 @@ function parseEnebaListingsFromHtml(
   const anchors = Array.from(
     html.matchAll(/<a[^>]*title="([^"]{4,160})"[^>]*href="(\/[a-z0-9-]+)"[^>]*><\/a>/gi)
   );
-  const listings: LiveEnebaListing[] = [];
-  const seenUrl = new Set<string>();
+  const byUrl = new Map<string, LiveEnebaListing>();
 
   for (let i = 0; i < anchors.length; i++) {
     const start = anchors[i].index ?? 0;
-    const end =
-      i + 1 < anchors.length ? anchors[i + 1].index ?? start + 3500 : Math.min(html.length, start + 3500);
-    const chunk = html.slice(start, end);
+    const nextAnchorIdx = i + 1 < anchors.length ? anchors[i + 1].index ?? html.length : html.length;
+    const hardCap = Math.min(html.length, nextAnchorIdx, start + 1800);
+    let chunk = html.slice(start, hardCap);
+
+    // Hentikan slice di akhir blok kartu agar tidak bocor ke widget/kartu tetangga
+    const boundaryIdx = [
+      chunk.indexOf("Add to cart"),
+      chunk.indexOf("View offers"),
+      chunk.indexOf("</li>"),
+    ].filter((idx) => idx > 0);
+    if (boundaryIdx.length > 0) {
+      chunk = chunk.slice(0, Math.min(...boundaryIdx) + 15);
+    }
+
     const rawTitle = anchors[i][1]
       .replace(/&amp;/g, "&")
       .replace(/&#x27;/g, "'")
+      .replace(/&quot;/g, '"')
       .trim();
     const slug = anchors[i][2].trim();
-    const cleanText = chunk.replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/\s+/g, " ");
-    const rpMatches = Array.from(cleanText.matchAll(/Rp\s*([\d.,]+)/gi))
+    const cleanText = chunk
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;|&#160;/g, " ")
+      .replace(/\s+/g, " ");
+
+    if (/\b(sold out|out of stock|not available)\b/i.test(cleanText)) continue;
+
+    // Bersihkan badge cashback/hemat agar tidak tertukar dengan harga produk
+    const priceBlockText = cleanText.replace(/(?:save|cashback|hemat)\s*Rp\s*[\d.,]+/gi, " ");
+    const rpMatches = Array.from(priceBlockText.matchAll(/Rp\s*([\d.,]+)/gi))
       .map((m) => Number(m[1].replace(/[^\d]/g, "")))
       .filter((n) => Number.isFinite(n) && n > 1000);
     const basePriceIdr = rpMatches.length > 0 ? Math.min(...rpMatches) : 0;
     const origPriceIdr = rpMatches.length > 1 ? Math.max(...rpMatches) : basePriceIdr;
 
     if (basePriceIdr <= 1000) continue;
-    const fullUrl = `https://www.eneba.com${slug}`;
-    if (seenUrl.has(fullUrl)) continue;
-    seenUrl.add(fullUrl);
+    const fullUrl = `https://www.eneba.com${slug}?currency=IDR`;
 
     const discMatch = cleanText.match(/-(\d{1,2})%/);
     const badgeDisc = discMatch ? Number(discMatch[1]) : 0;
@@ -79,8 +100,9 @@ function parseEnebaListingsFromHtml(
     const discountPct = Math.max(badgeDisc, computedDisc);
 
     const lowTitle = rawTitle.toLowerCase();
-    const landedCostIdr = Math.ceil((basePriceIdr * 1.09) / 1000) * 1000;
-    listings.push({
+    const lowSlug = slug.toLowerCase();
+    const landedCostIdr = Math.ceil((basePriceIdr * 1.08) / 1000) * 1000;
+    const candidate: LiveEnebaListing = {
       title: rawTitle,
       url: fullUrl,
       base_price_idr: basePriceIdr,
@@ -91,133 +113,357 @@ function parseEnebaListingsFromHtml(
       is_key: lowTitle.includes("key"),
       is_gift: lowTitle.includes("gift"),
       is_account: lowTitle.includes("account"),
-    });
+      is_global: /\bglobal\b/i.test(lowTitle) || lowSlug.endsWith("-global"),
+    };
+
+    const existing = byUrl.get(fullUrl);
+    if (!existing || candidate.base_price_idr < existing.base_price_idr) {
+      byUrl.set(fullUrl, candidate);
+    }
   }
 
-  return listings;
+  return Array.from(byUrl.values());
 }
 
 function inferPlatformFromEnebaTitle(title: string, fallback: string = "Steam"): string {
   const low = title.toLowerCase();
   if (low.includes("steam")) return "Steam";
-  if (low.includes("xbox") || low.includes("microsoft")) return "Xbox / Microsoft";
+  if (low.includes("rockstar")) return "Rockstar";
+  if (low.includes("xbox") || low.includes("microsoft") || low.includes("windows store") || low.includes("official website")) {
+    return "Microsoft / Xbox PC";
+  }
   if (low.includes("gog")) return "GOG";
   if (low.includes("ea app") || low.includes("origin")) return "EA App / PC";
   if (low.includes("epic")) return "Epic Games";
   if (low.includes("ubisoft")) return "Ubisoft Connect";
   if (low.includes("nintendo") || low.includes("switch")) return "Nintendo Switch";
-  if (low.includes("rockstar")) return "Rockstar";
   return fallback;
 }
 
 const enebaCache = new Map<string, { ts: number; data: LiveEnebaListing[] }>();
+let lastEnebaFetchTs = 0;
+
+async function throttleEnebaRequest(minGapMs: number = 1150) {
+  const elapsed = Date.now() - lastEnebaFetchTs;
+  if (elapsed < minGapMs) {
+    await new Promise((r) => setTimeout(r, minGapMs - elapsed));
+  }
+  lastEnebaFetchTs = Date.now();
+}
+
+async function fetchEnebaHtmlSingle(url: string): Promise<{ html: string; rateLimited: boolean; status: number }> {
+  const headers = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
+  };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await throttleEnebaRequest(attempt === 0 ? 1150 : 3200);
+    try {
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(8500),
+        cache: "no-store",
+      });
+      const html = await res.text().catch(() => "");
+      const isCf = res.status === 429 || res.status === 403 || /cloudflare|turnstile|just a moment/i.test(html);
+      if (isCf) {
+        if (attempt === 0) continue;
+        return { html: "", rateLimited: true, status: res.status };
+      }
+      if (!res.ok) return { html: "", rateLimited: false, status: res.status };
+      return { html, rateLimited: false, status: res.status };
+    } catch {
+      if (attempt === 1) return { html: "", rateLimited: false, status: 0 };
+    }
+  }
+  return { html: "", rateLimited: false, status: 0 };
+}
+
+export async function fetchEnebaDirectProductJsonLd(
+  productUrl: string
+): Promise<LiveEnebaListing | null> {
+  const cleanUrl = (productUrl || "").trim();
+  if (!cleanUrl || !cleanUrl.includes("eneba.com/") || cleanUrl.includes("/store/")) {
+    return null;
+  }
+  const urlWithIdr = cleanUrl.includes("currency=IDR")
+    ? cleanUrl
+    : `${cleanUrl}${cleanUrl.includes("?") ? "&" : "?"}currency=IDR`;
+
+  const res = await fetchEnebaHtmlSingle(urlWithIdr);
+  if (!res.html) return null;
+
+  const lds = Array.from(
+    res.html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)
+  );
+  for (const m of lds) {
+    try {
+      const parsed = JSON.parse(m[1]);
+      if (parsed?.["@type"] !== "Product" || !parsed?.name) continue;
+      const offersObj = parsed.offers || {};
+      const availability = String(offersObj.availability || "").toLowerCase();
+      if (availability && availability.includes("outofstock")) continue;
+
+      const currency = String(offersObj.priceCurrency || "").toUpperCase();
+      const rawPrice = Number(offersObj.lowPrice ?? offersObj.price ?? 0);
+      if (!Number.isFinite(rawPrice) || rawPrice <= 0) continue;
+      // Hanya pakai langsung bila mata uang IDR agar tidak salah konversi
+      if (currency && currency !== "IDR") continue;
+
+      const basePriceIdr = Math.round(rawPrice);
+      const rawTitle = String(parsed.name).trim();
+      const lowTitle = rawTitle.toLowerCase();
+      const landedCostIdr = Math.ceil((basePriceIdr * 1.08) / 1000) * 1000;
+      return {
+        title: rawTitle,
+        url: urlWithIdr,
+        base_price_idr: basePriceIdr,
+        original_price_idr: basePriceIdr,
+        discount_pct: 0,
+        landed_cost_idr: landedCostIdr,
+        platform: inferPlatformFromEnebaTitle(rawTitle, "PC / Microsoft"),
+        is_key: lowTitle.includes("key"),
+        is_gift: lowTitle.includes("gift"),
+        is_account: lowTitle.includes("account"),
+        is_global: /\bglobal\b/i.test(lowTitle) || cleanUrl.toLowerCase().includes("-global"),
+      };
+    } catch {}
+  }
+  return null;
+}
+
+export async function fetchCleanEnebaOffers(params: {
+  query: string;
+  preferredPlatform?: string;
+  directUrl?: string;
+  steamMaxIdr?: number;
+  includeAllPcDrms?: boolean;
+  limit?: number;
+}): Promise<{
+  offers: LiveEnebaListing[];
+  rawCount: number;
+  rateLimited: boolean;
+}> {
+  const cleanQuery = (params.query || "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(?:os license|standard edition|private|edition)\b/gi, " ")
+    .replace(/[:&\[\]\(\)]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleanQuery) return { offers: [], rawCount: 0, rateLimited: false };
+
+  const cacheKey = `global_v2::${cleanQuery.toLowerCase()}`;
+  const cached = enebaCache.get(cacheKey);
+  let rawListings: LiveEnebaListing[] = [];
+  let rateLimited = false;
+
+  if (cached && Date.now() - cached.ts < 600000 && cached.data.length > 0) {
+    rawListings = cached.data;
+  } else {
+    const isSoftwareQuery = /\b(windows|office|adobe|antivirus|kaspersky|vpn|license)\b/i.test(params.query || cleanQuery);
+    if (isSoftwareQuery && params.directUrl && !params.directUrl.includes("/store/")) {
+      const directItem = await fetchEnebaDirectProductJsonLd(params.directUrl).catch(() => null);
+      if (directItem) {
+        rawListings = [directItem];
+      }
+    }
+
+    if (rawListings.length === 0) {
+      const primaryUrl = isSoftwareQuery
+        ? `https://www.eneba.com/store/all?text=${encodeURIComponent(cleanQuery)}&currency=IDR&regions[]=global&types[]=software&sortBy=PRICE_LOWEST`
+        : `https://www.eneba.com/store/all?text=${encodeURIComponent(cleanQuery)}&currency=IDR&regions[]=global&types[]=game&sortBy=PRICE_LOWEST`;
+
+      const first = await fetchEnebaHtmlSingle(primaryUrl);
+      rateLimited = first.rateLimited;
+      if (first.html) {
+        rawListings = parseEnebaListingsFromHtml(first.html, params.preferredPlatform || "Steam");
+      }
+
+      // Jika HTTP 200 OK tetapi 0 hasil (misal bundle/software tanpa tag types[]=game), coba sekali tanpa types[] namun TETAP GLOBAL!
+      if (!rateLimited && first.status === 200 && rawListings.length === 0) {
+        const broadGlobalUrl = `https://www.eneba.com/store/all?text=${encodeURIComponent(cleanQuery)}&currency=IDR&regions[]=global&sortBy=PRICE_LOWEST`;
+        const second = await fetchEnebaHtmlSingle(broadGlobalUrl);
+        rateLimited = second.rateLimited;
+        if (second.html) {
+          rawListings = parseEnebaListingsFromHtml(second.html, params.preferredPlatform || "Steam");
+        }
+      }
+    }
+
+    if (rawListings.length === 0 && params.directUrl && !params.directUrl.includes("/store/")) {
+      const directItem = await fetchEnebaDirectProductJsonLd(params.directUrl).catch(() => null);
+      if (directItem) {
+        rawListings = [directItem];
+      }
+    }
+
+    if (rawListings.length > 0) {
+      enebaCache.set(cacheKey, { ts: Date.now(), data: rawListings });
+    }
+  }
+
+  const offers = filterCleanEnebaListings(rawListings, params.query, params.preferredPlatform || "Steam", {
+    steamMaxIdr: params.steamMaxIdr,
+    requireGlobal: true,
+    includeAllPcDrms: params.includeAllPcDrms ?? true,
+  });
+
+  return {
+    offers: offers.slice(0, params.limit || 6),
+    rawCount: rawListings.length,
+    rateLimited,
+  };
+}
 
 /**
- * Mengambil harga REAL & LIVE langsung dari SSR HTML eneba.com/store/all (currency=IDR).
- * Menghilangkan angka halusinasi LLM seperti kasus 007 First Light Rp 255rb vs real Rp 873rb+.
+ * Mengambil harga REAL & LIVE langsung dari SSR HTML eneba.com/store/all (currency=IDR, strictly regions[]=global).
  */
 export async function fetchLiveEnebaListings(
   query: string,
   options?: { platform?: string; allowNonGlobalFallback?: boolean }
 ): Promise<LiveEnebaListing[]> {
-  const cleanQuery = query
-    .replace(/[:&\[\]\(\)]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!cleanQuery) return [];
+  const { offers } = await fetchCleanEnebaOffers({
+    query,
+    preferredPlatform: options?.platform,
+    includeAllPcDrms: true,
+    limit: 12,
+  });
+  return offers;
+}
 
-  const cacheKey = `${cleanQuery.toLowerCase()}::${options?.platform || ""}`;
-  const cached = enebaCache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < 300000 && cached.data.length > 0) {
-    return cached.data;
-  }
+export function filterCleanEnebaListings(
+  listings: LiveEnebaListing[],
+  query: string,
+  preferredPlatform: string = "Steam",
+  options?: { steamMaxIdr?: number; requireGlobal?: boolean; includeAllPcDrms?: boolean }
+): LiveEnebaListing[] {
+  if (!listings || listings.length === 0) return [];
 
-  const urls = [
-    `https://www.eneba.com/store/all?text=${encodeURIComponent(cleanQuery)}&currency=IDR&regions[]=global&types[]=game&sortBy=PRICE_LOWEST`,
-  ];
-  if (options?.allowNonGlobalFallback !== false) {
-    urls.push(
-      `https://www.eneba.com/store/all?text=${encodeURIComponent(cleanQuery)}&currency=IDR&regions[]=global&sortBy=PRICE_LOWEST`,
-      `https://www.eneba.com/store/all?text=${encodeURIComponent(cleanQuery)}&currency=IDR&sortBy=PRICE_LOWEST`
-    );
-  }
+  const qLow = (query || "").toLowerCase();
+  const queryTokens = qLow
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !["the", "edition", "standard", "pc", "steam", "rockstar", "games", "os", "license", "premium", "enhanced"].includes(w));
 
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
-        },
-        signal: AbortSignal.timeout(7000),
-        cache: "no-store",
-      });
-      if (!res.ok) continue;
-      const html = await res.text();
-      const listings = parseEnebaListingsFromHtml(html, options?.platform || "Steam");
+  const queryWantsDlcOrAccount = JUNK_LISTING_RE.test(query);
+  const queryWantsConsole = CONSOLE_ONLY_RE.test(qLow) || /playstation|ps4|ps5|nintendo|switch/i.test(preferredPlatform);
+  const platLower = (preferredPlatform || "").toLowerCase();
+  const requireGlobal = options?.requireGlobal !== false;
 
-      if (listings.length > 0) {
-        enebaCache.set(cacheKey, { ts: Date.now(), data: listings });
-        return listings;
+  const baseFiltered = listings.filter((l) => {
+    const tLow = l.title.toLowerCase();
+    const uLow = l.url.toLowerCase();
+
+    // 1. Wajib Global jika diminta ("pilih yang global")
+    if (requireGlobal) {
+      if (NON_GLOBAL_REGION_RE.test(tLow) || NON_GLOBAL_REGION_RE.test(uLow.replace(/-/g, " "))) {
+        return false;
       }
-    } catch {
-      // Try next URL
+      if (!/\bglobal\b/i.test(tLow) && !uLow.includes("-global")) {
+        return false;
+      }
     }
-  }
 
-  return [];
+    // 2. Blokir listing konsol murni (Xbox One/Series, PS4/PS5, Switch) kecuali game konsol / PC Store
+    if (!queryWantsConsole && CONSOLE_ONLY_RE.test(tLow) && !PC_PLATFORM_RE.test(tLow)) {
+      return false;
+    }
+
+    // 3. Blokir junk, shark card, cashback bundle, DLC, akun, dan Green Gift pihak ketiga tak resmi
+    if (!queryWantsDlcOrAccount && JUNK_LISTING_RE.test(tLow)) return false;
+    if (l.is_account && !qLow.includes("account")) return false;
+    if (uLow.includes("/other-") && /green\s*gift/i.test(tLow)) return false;
+
+    // 4. Hindari salah cocok edisi klasik/tahun lama vs remake modern
+    const legacyMatch = tLow.match(/\b(199\d|200\d|201[0-5]|classic|hd edition|biohazard 4)\b/i);
+    if (legacyMatch && !qLow.includes(legacyMatch[1].toLowerCase())) {
+      return false;
+    }
+
+    // 5. Token inti judul + angka seri / angka romawi (cegah GTA Vice City cocok dengan GTA V)
+    if (/\b(?:gta|grand\s+theft\s+auto)\s*(?:v|5)\b/i.test(qLow)) {
+      if (!/\b(?:v|5|gtav|gta5)\b/i.test(tLow)) return false;
+      if (/\b(?:vice\s*city|san\s*andreas|trilogy|liberty\s*city|gta\s*(?:iv|4|iii|3))\b/i.test(tLow)) return false;
+    }
+
+    const numericTokens = queryTokens.filter((t) => /^\d+$/.test(t));
+    for (const nt of numericTokens) {
+      if (!new RegExp(`\\b${nt}\\b`).test(tLow) && !(nt === "5" && /\bv\b/i.test(tLow))) {
+        return false;
+      }
+    }
+    const romanTokens = queryTokens.filter((t) => /^(?:ii|iii|iv|vi|vii|viii|ix|x)$/.test(t));
+    for (const rt of romanTokens) {
+      if (!new RegExp(`\\b${rt}\\b`, "i").test(tLow)) {
+        return false;
+      }
+    }
+    if (queryTokens.length > 0) {
+      const hits = queryTokens.filter((tok) => tLow.includes(tok) || (tok === "v" && /\b5\b/.test(tLow))).length;
+      if (hits < Math.max(1, Math.ceil(queryTokens.length * 0.6))) return false;
+    }
+    return true;
+  });
+
+  if (baseFiltered.length === 0) return [];
+
+  // 6. Anti-Outlier Harga (misal listing placeholder Rp 8.741.390 saat retail Steam < Rp 200rb atau opsi lain jauh lebih masuk akal)
+  const sortedPrices = baseFiltered.map((x) => x.base_price_idr).sort((a, b) => a - b);
+  const minCleanPrice = sortedPrices[0] || 0;
+  const steamMaxIdr = Number(options?.steamMaxIdr || 0);
+  const withoutOutliers = baseFiltered.filter((l) => {
+    if (steamMaxIdr > 0 && steamMaxIdr < 600000 && l.base_price_idr > Math.max(steamMaxIdr * 4.5, 2000000)) {
+      return false;
+    }
+    if (baseFiltered.length >= 2 && minCleanPrice > 0 && minCleanPrice < 500000 && l.base_price_idr > minCleanPrice * 6 && l.base_price_idr > 1500000) {
+      return false;
+    }
+    return true;
+  });
+
+  const pool = withoutOutliers.length > 0 ? withoutOutliers : baseFiltered;
+
+  return pool
+    .map((l) => {
+      let score = 0;
+      const tLow = l.title.toLowerCase();
+      const lPlat = l.platform.toLowerCase();
+      const isValidPcDrm = /steam|rockstar|gog|ea app|origin|epic|microsoft|xbox|ubisoft/.test(lPlat);
+
+      if (l.is_key) score += 25;
+      else if (l.is_gift) score += 12;
+
+      if (tLow.includes("global")) score += 15;
+      if (isValidPcDrm) score += 15;
+
+      // Bonus kecocokan platform jika bukan mode DRM bebas, tetap izinkan semua PC DRM
+      if (!options?.includeAllPcDrms) {
+        if (platLower.includes("steam") && lPlat === "steam") score += 25;
+        else if (platLower.includes("rockstar") && lPlat.includes("rockstar")) score += 25;
+        else if ((platLower.includes("microsoft") || platLower.includes("xbox")) && lPlat.includes("microsoft")) score += 25;
+      }
+
+      if (!tLow.includes("deluxe") && !tLow.includes("ultimate")) score += 8;
+      return { l, score };
+    })
+    .sort((a, b) => a.l.base_price_idr - b.l.base_price_idr || b.score - a.score)
+    .map((x) => x.l);
 }
 
 function selectBestEnebaListing(
   listings: LiveEnebaListing[],
   query: string,
-  preferredPlatform: string = "Steam"
+  preferredPlatform: string = "Steam",
+  steamMaxIdr: number = 0
 ): LiveEnebaListing | null {
-  if (!listings || listings.length === 0) return null;
-
-  const queryTokens = query
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length >= 2 && !["the", "edition", "standard", "pc", "steam"].includes(w));
-
-  const queryWantsDlcOrAccount = JUNK_LISTING_RE.test(query);
-  const platLower = preferredPlatform.toLowerCase();
-
-  const scored = listings
-    .filter((l) => {
-      const tLow = l.title.toLowerCase();
-      if (!queryWantsDlcOrAccount && JUNK_LISTING_RE.test(tLow)) return false;
-      if (l.is_account && !query.toLowerCase().includes("account")) return false;
-      // Hindari salah cocok edisi klasik/tahun lama vs remake modern (contoh: Resident Evil 4 2023 vs 2005 HD Edition)
-      const qLow = query.toLowerCase();
-      const legacyMatch = tLow.match(/\b(199\d|200\d|201[0-5]|classic|hd edition|biohazard 4)\b/i);
-      if (legacyMatch && !qLow.includes(legacyMatch[1].toLowerCase())) {
-        return false;
-      }
-      // Require core tokens of game title to appear so random games don't match
-      if (queryTokens.length > 0) {
-        const hits = queryTokens.filter((tok) => tLow.includes(tok)).length;
-        if (hits < Math.max(1, Math.ceil(queryTokens.length * 0.6))) return false;
-      }
-      return true;
-    })
-    .map((l) => {
-      let score = 0;
-      const lPlat = l.platform.toLowerCase();
-      if (platLower.includes("steam") && lPlat === "steam") score += 40;
-      else if (platLower.includes("xbox") && lPlat.includes("xbox")) score += 40;
-      else if (lPlat === "steam") score += 20;
-      if (l.is_key) score += 25;
-      if (l.title.toLowerCase().includes("global")) score += 15;
-      if (!l.title.toLowerCase().includes("deluxe") && !l.title.toLowerCase().includes("ultimate")) score += 5;
-      return { l, score };
-    })
-    .sort((a, b) => b.score - a.score || a.l.base_price_idr - b.l.base_price_idr);
-
-  return scored[0]?.l || null;
+  const clean = filterCleanEnebaListings(listings, query, preferredPlatform, {
+    steamMaxIdr,
+    requireGlobal: true,
+    includeAllPcDrms: true,
+  });
+  return clean[0] || null;
 }
 
 export interface VerifiedMarketOpportunity {
@@ -283,8 +529,12 @@ export async function verifyLiveGameOpportunity(params: {
     fetchUsdToIdrRate().catch(() => 16850),
   ]);
 
+  const steamCurrentIdr = realSteam?.price_idr || 0;
+  const steamOrigIdr = realSteam?.original_price_idr || steamCurrentIdr;
+  const steamDiscountPct = realSteam?.discount_percent || 0;
+
   const matchedEneba =
-    params.preVerifiedEneba || selectBestEnebaListing(enebaListings, query, preferredPlatform);
+    params.preVerifiedEneba || selectBestEnebaListing(enebaListings, query, preferredPlatform, steamOrigIdr || steamCurrentIdr);
 
   let cheapestUsd = 0;
   let cheapSharkTitle = "";
@@ -310,9 +560,6 @@ export async function verifyLiveGameOpportunity(params: {
 
   const resolvedTitle = realSteam?.official_title || cheapSharkTitle || query;
   const resolvedPlatform = matchedEneba?.platform || preferredPlatform || "Steam";
-  const steamCurrentIdr = realSteam?.price_idr || 0;
-  const steamOrigIdr = realSteam?.original_price_idr || steamCurrentIdr;
-  const steamDiscountPct = realSteam?.discount_percent || 0;
 
   // Prioritas harga modal:
   // 1) Harga Eneba SSR live (+~9% fee checkout)

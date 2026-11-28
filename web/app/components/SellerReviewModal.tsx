@@ -216,10 +216,10 @@ export default function SellerReviewModal({
               </span>
             </div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-              Review, Sortir &amp; Cek Offer G2G Sebelum Simpan ke Database
+              Review, Sortir &amp; Cek Offer G2G / Eneba Sebelum Simpan ke Database
             </h2>
             <p className="text-xs text-slate-500">
-              Centang seller yang ingin disimpan, pilih Seller Utama (radio), dan cek link G2G asli sebelum menimpa data katalog.
+              Centang seller/offer yang ingin disimpan, pilih Utama (radio), dan cek link G2G / Eneba asli sebelum menimpa data katalog.
             </p>
           </div>
           <button
@@ -425,21 +425,28 @@ export default function SellerReviewModal({
                               <div className="text-[11px] text-slate-600 truncate">
                                 {s.offer_title || s.tier_desc}
                               </div>
-                              <a
-                                href={s.profile_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] text-blue-700 hover:text-blue-900 font-semibold underline"
-                              >
-                                <span>Cek Listing Offer G2G</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
+                                <a
+                                  href={s.profile_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] text-blue-700 hover:text-blue-900 font-semibold underline"
+                                >
+                                  <span>
+                                    {String(s.profile_url || "").includes("eneba.com") ||
+                                    String(s.seller_name || "").toLowerCase().includes("eneba")
+                                      ? "Cek Listing Eneba (Global)"
+                                      : "Cek Listing Offer G2G"}
+                                  </span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center gap-4 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 font-mono text-xs shrink-0">
-                            <div>
-                              <span className="text-[10px] text-slate-500 block font-sans">Modal G2G</span>
+                            <div className="flex items-center gap-4 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 font-mono text-xs shrink-0">
+                              <div>
+                                <span className="text-[10px] text-slate-500 block font-sans">
+                                  {String(s.profile_url || "").includes("eneba.com") ? "Modal Eneba" : "Modal G2G"}
+                                </span>
                               <span className="font-bold text-slate-900 tabular-nums">{formatRp(s.price_g2g_idr)}</span>
                             </div>
                             <div className="text-right border-l border-slate-200 pl-3">

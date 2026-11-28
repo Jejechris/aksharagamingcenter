@@ -5,6 +5,8 @@ import os from "os";
 import { getDbCatalog } from "@/lib/db";
 import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
 import { VERIFIED_ENEBA_CATALOG, getEnebaSearchUrl } from "@/lib/eneba";
+import { fetchCleanEnebaOffers, fetchEnebaDirectProductJsonLd, cleanEnebaListingTitle } from "@/lib/marketResearch";
+import { calculateTargetSellingPrice } from "@/lib/pricing";
 import { fetchUsdToIdrRate } from "@/lib/g2gStock";
 import {
   getG2GGameCategoryUrl,
@@ -86,7 +88,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. Cek apakah ini link Eneba
+    // 1. Cek apakah ini link Eneba (Fetch LIVE harga Global + DRM apa saja)
     if (inputUrl.includes("eneba.com")) {
       const urlClean = inputUrl.replace("eneba.com/id/store", "eneba.com/store");
       const urlObj = new URL(urlClean.startsWith("http") ? urlClean : `https://${urlClean}`);
@@ -106,31 +108,57 @@ export async function POST(req: Request) {
       }
 
       const enebaItem = matchedKey ? VERIFIED_ENEBA_CATALOG[matchedKey] : null;
-      const detectedTitle = enebaItem?.title || queryText || "Eneba Digital Game";
-      const cleanTitle = cleanGameTitle(detectedTitle);
-      const estPrice = enebaItem?.estimatedPriceIdr || 65000;
-      const recommendedShopee = Math.round((estPrice * 1.35) / 1000) * 1000;
+      const directLive = !urlObj.pathname.includes("/store/")
+        ? await fetchEnebaDirectProductJsonLd(urlObj.toString()).catch(() => null)
+        : null;
+
+      const slugReadable = pathSlug
+        .replace(/^(?:steam|rockstar-social-club|gog|xbox|windows-store|origin|epic|other)-/, "")
+        .replace(/-(?:steam|rockstar|gog|xbox|windows|key|global|pc|gift|edition).*/i, "")
+        .replace(/-/g, " ")
+        .trim();
+
+      const searchTerm = directLive?.title
+        ? cleanEnebaListingTitle(directLive.title)
+        : queryText || enebaItem?.title || slugReadable || "Eneba Digital Game";
+
+      const searchLive = !directLive
+        ? await fetchCleanEnebaOffers({ query: searchTerm, includeAllPcDrms: true, limit: 3 }).catch(() => null)
+        : null;
+
+      const chosenLive = directLive || searchLive?.offers?.[0] || null;
+      const detectedTitle = chosenLive?.title || enebaItem?.title || searchTerm;
+      const cleanTitle = cleanGameTitle(cleanEnebaListingTitle(detectedTitle) || searchTerm);
+      const estPrice = chosenLive?.landed_cost_idr || enebaItem?.estimatedPriceIdr || 65000;
+      const recommendedShopee = calculateTargetSellingPrice({
+        cogsIdr: estPrice,
+        presetId: "reguler",
+        packagingCostIdr: 0,
+        targetMarginPct: 20,
+      });
+
+      const resolvedUrl = chosenLive?.url || urlObj.toString();
 
       return NextResponse.json({
         status: "success",
         marketplace: "ENEBA",
         data: {
-          offer_id: `eneba-${matchedKey || "custom"}`,
+          offer_id: `eneba-${matchedKey || "live"}`,
           raw_title: detectedTitle,
           clean_title: cleanTitle,
-          platform: enebaItem?.platform || "Steam / PC",
-          category: enebaItem?.keyType || "Digital Key / CDKey (Global)",
-          seller_name: "Eneba Verified Merchant",
-          real_stock: 50,
+          platform: chosenLive?.platform || enebaItem?.platform || "Steam / PC",
+          category: "Digital Key / CDKey",
+          seller_name: `Eneba Global • ${chosenLive?.platform || enebaItem?.platform || "CD-Key"}`,
+          real_stock: 999,
           price_usd: Math.round((estPrice / USD_TO_IDR_RATE) * 100) / 100,
           price_idr: estPrice,
           recommended_shopee_price_idr: recommendedShopee,
           is_online: true,
           status: "live",
-          rating_pct: 99.9,
-          success_orders: 50000,
-          delivery_speed: "Instant Key Delivery",
-          profile_url: getEnebaSearchUrl(cleanTitle),
+          rating_pct: 99.8,
+          success_orders: 35000,
+          delivery_speed: "Instant 0-Detik (Redeem Code)",
+          profile_url: resolvedUrl,
           fallback_search_url: getEnebaSearchUrl(cleanTitle),
           is_eneba: true,
         },

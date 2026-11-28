@@ -8,6 +8,7 @@ import {
   bulkAddOrUpdateGames,
   deleteGameFromCatalog,
   getCatalogStorageMeta,
+  sortCatalogDeterministically,
 } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
@@ -405,7 +406,7 @@ export async function POST(req: Request) {
           status: "success",
           message: `Game "${existing.title}" updated successfully`,
           data: calculateItemMetrics(existing),
-          allGames: catalog.map(calculateItemMetrics),
+          allGames: sortCatalogDeterministically(catalog).map(calculateItemMetrics),
         });
       } else {
         // INSERT NEW GAME
@@ -446,7 +447,7 @@ export async function POST(req: Request) {
           status: "success",
           message: `Game "${newItem.title}" added to portfolio`,
           data: calculateItemMetrics(newItem),
-          allGames: catalog.map(calculateItemMetrics),
+          allGames: sortCatalogDeterministically(catalog).map(calculateItemMetrics),
         });
       }
     }

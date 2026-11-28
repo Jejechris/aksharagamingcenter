@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readAuthoritativeCatalog, writeAuthoritativeCatalog } from "@/lib/catalog";
+import { readAuthoritativeCatalog, writeAuthoritativeCatalog, sortCatalogDeterministically } from "@/lib/catalog";
 import {
   G2G_CATEGORY_SLUGS,
   resolveGameKey,
@@ -9,7 +9,10 @@ import {
   getG2GSearchKeywords,
   doesOfferMatchGameTitle,
 } from "@/lib/g2g";
-import { verifyLiveGameOpportunity } from "@/lib/marketResearch";
+import {
+  fetchCleanEnebaOffers,
+} from "@/lib/marketResearch";
+import { fetchRealSteamIndonesiaPrice } from "@/lib/steamPrice";
 import {
   evaluateSellerTrust,
   evaluateSteamAccountFreshness,
@@ -183,76 +186,141 @@ async function searchG2GOffersForSlug(slug: string, gameTitle: string = ""): Pro
   return [];
 }
 
-async function buildEnebaFallbackCandidate(game: any) {
+function isEnebaCatalogGame(game: any): boolean {
+  const idLow = String(game?.id || "").toLowerCase();
+  const catLow = String(game?.category || "").toLowerCase();
+  const srcUp = String(game?.source_marketplace || "").toUpperCase();
+  const sellers = Array.isArray(game?.sellers) ? game.sellers : [];
+  const allSellersAreEneba =
+    sellers.length > 0 &&
+    sellers.every(
+      (s: any) =>
+        String(s?.profile_url || "").includes("eneba.com") ||
+        String(s?.seller_name || "").toLowerCase().includes("eneba")
+    );
+  return (
+    idLow.startsWith("eneba-") ||
+    srcUp === "ENEBA" ||
+    catLow.includes("cdkey") ||
+    catLow.includes("os license") ||
+    (catLow.includes("digital key") && !catLow.includes("account")) ||
+    allSellersAreEneba
+  );
+}
+
+async function buildEnebaLiveCandidates(game: any): Promise<{
+  candidates: any[];
+  rawCount: number;
+  rateLimited: boolean;
+}> {
   const cleanQuery = String(game.title || "")
     .replace(/\([^)]*\)/g, " ")
-    .replace(/\b(?:os license|standard edition|private)\b/gi, " ")
+    .replace(/\b(?:os license|standard edition|premium edition|premium|private|edition)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const live = await verifyLiveGameOpportunity({
-    query: cleanQuery || game.title,
-    preferredPlatform: game.platform || "Steam",
-    targetMarginPct: 18,
-  }).catch(() => null);
 
-  if (!live || (!live.eneba_live_verified && !live.cheapshark_live_verified)) {
-    return null;
+  const existingDirectUrl = (game.sellers || [])
+    .map((s: any) => String(s?.profile_url || ""))
+    .find((u: string) => u.includes("eneba.com/") && !u.includes("/store/"));
+
+  const [steamRef, enebaRes] = await Promise.all([
+    fetchRealSteamIndonesiaPrice(cleanQuery || game.title).catch(() => null),
+    fetchCleanEnebaOffers({
+      query: cleanQuery || game.title,
+      preferredPlatform: game.platform || "Steam",
+      directUrl: existingDirectUrl,
+      includeAllPcDrms: true,
+      limit: 5,
+    }),
+  ]);
+
+  let finalOffers = enebaRes.offers;
+  if (finalOffers.length > 0 && steamRef?.original_price_idr) {
+    const filtered = finalOffers.filter(
+      (o) =>
+        !(steamRef.original_price_idr! < 600000 && o.base_price_idr > Math.max(steamRef.original_price_idr! * 4.5, 2000000))
+    );
+    if (filtered.length > 0) finalOffers = filtered;
   }
 
-  const sellingPrice = Number(game.selling_price_shopee_idr || live.recommended_shopee_price_idr || 100000);
-  const priceIdr = live.price_eneba_idr;
-  const qrisFee = Math.round(priceIdr * 0.007);
-  const cogsNet = priceIdr + qrisFee;
-  const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
-  const netProfit = sellingPrice - cogsNet - shopeeFee;
-  const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+  if (finalOffers.length === 0) {
+    return { candidates: [], rawCount: enebaRes.rawCount, rateLimited: enebaRes.rateLimited };
+  }
 
-  const trust = evaluateSellerTrust({
-    rating: 99.8,
-    orders: 25000,
-    stock: 999,
-    priceIdr,
-    sellingPriceShopeeIdr: sellingPrice,
-    deliverySpeed: "Instant 0-Detik",
-    verified: true,
+  const sellingPrice = Number(game.selling_price_shopee_idr || 100000);
+  const candidates = finalOffers.map((offer, idx) => {
+    const priceIdr = offer.landed_cost_idr;
+    const qrisFee = Math.round(priceIdr * 0.007);
+    const cogsNet = priceIdr + qrisFee;
+    const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
+    const netProfit = sellingPrice - cogsNet - shopeeFee;
+    const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
+
+    const trust = evaluateSellerTrust({
+      rating: 99.8,
+      orders: 35000,
+      stock: 999,
+      priceIdr,
+      sellingPriceShopeeIdr: sellingPrice,
+      deliverySpeed: "Instant 0-Detik",
+      verified: true,
+    });
+
+    const rawSlug = (offer.url.split("eneba.com/")[1] || `offer-${idx}`).split("?")[0];
+    let hash = 2166136261;
+    for (let c = 0; c < rawSlug.length; c++) {
+      hash ^= rawSlug.charCodeAt(c);
+      hash = Math.imul(hash, 16777619);
+    }
+    const shortHash = (hash >>> 0).toString(36);
+    const slugPart = rawSlug
+      .replace(/^(?:steam|rockstar-social-club|gog|xbox|windows-store|origin|epic|other)-/, "")
+      .replace(/[^a-z0-9-]/gi, "")
+      .slice(0, 20);
+
+    const tier = idx === 0 ? "lowest_price" : idx === 1 ? "ultra_safe" : "mid_level";
+    const keyLabel = offer.is_gift ? "Gift Global" : "CD-Key Global";
+
+    return {
+      seller_id: `eneba-${slugPart}-${shortHash}`,
+      seller_name: `Eneba Global • ${offer.platform}`,
+      offer_title: offer.title,
+      quality_score: Math.max(trust.trust_score, 88 - idx * 3),
+      trust_score: trust.trust_score,
+      trust_tier: trust.trust_tier,
+      seller_rating: trust.seller_rating,
+      seller_orders: trust.seller_orders,
+      seller_level: trust.seller_level,
+      verified: true,
+      delivery_time: `Instant 0-Detik (${offer.platform} ${keyLabel})`,
+      tier,
+      tier_label: idx === 0 ? "🛡️ ENEBA GLOBAL TERMURAH" : "🛡️ ENEBA CDKEY (0% HACKBACK)",
+      tier_desc: `Harga Eneba Live Rp ${offer.base_price_idr.toLocaleString("id-ID")} (estimasi +fee checkout ~Rp ${priceIdr.toLocaleString("id-ID")}). Region GLOBAL • 0% Hackback.`,
+      stock: 999,
+      price_g2g_idr: priceIdr,
+      price_eneba_base_idr: offer.base_price_idr,
+      price_usd: 0,
+      rating_pct: trust.seller_rating,
+      reviews_count: trust.seller_orders,
+      delivery_speed: `Instant 0-Detik (${keyLabel})`,
+      is_online: true,
+      is_recommended: idx === 0,
+      fresh_status: "verified_fresh" as const,
+      has_zero_hours: true,
+      has_first_email: true,
+      freshness_badges: ["Region: GLOBAL", `${offer.platform}`, "Official CD-Key", "0% Hackback"],
+      profile_url: offer.url,
+      fallback_search_url: `https://www.eneba.com/store/all?text=${encodeURIComponent(cleanQuery)}&currency=IDR&regions[]=global&sortBy=PRICE_LOWEST`,
+      live_status: "live",
+      source_marketplace: "ENEBA",
+      qris_fee_idr: qrisFee,
+      cogs_net_idr: cogsNet,
+      net_profit_idr: netProfit,
+      net_margin_pct: netMargin,
+    };
   });
 
-  const sellerId = `eneba-live-${game.id}`;
-  return {
-    seller_id: sellerId,
-    seller_name: live.eneba_live_verified ? "Eneba Verified Merchant" : "Eneba Global CDKey",
-    offer_title: `${live.title} (${live.key_type})`,
-    quality_score: trust.trust_score,
-    trust_score: trust.trust_score,
-    trust_tier: trust.trust_tier,
-    seller_rating: trust.seller_rating,
-    seller_orders: trust.seller_orders,
-    seller_level: trust.seller_level,
-    verified: true,
-    delivery_time: "Instant 0-Detik (Redeem Code)",
-    tier: "ultra_safe" as const,
-    tier_label: "🛡️ ENEBA CDKEY (0% HACKBACK)",
-    tier_desc: `Kunci aktivasi resmi dari Eneba (~Rp ${priceIdr.toLocaleString("id-ID")}). Bebas hackback.`,
-    stock: 999,
-    price_g2g_idr: priceIdr,
-    price_usd: live.cheapshark_usd || 0,
-    rating_pct: trust.seller_rating,
-    reviews_count: trust.seller_orders,
-    delivery_speed: "Instant 0-Detik (Redeem Code)",
-    is_online: true,
-    is_recommended: true,
-    fresh_status: "verified_fresh" as const,
-    has_zero_hours: true,
-    has_first_email: true,
-    freshness_badges: ["Official CD-Key", "0% Hackback"],
-    profile_url: live.eneba_direct_url,
-    fallback_search_url: live.eneba_direct_url,
-    live_status: "live",
-    qris_fee_idr: qrisFee,
-    cogs_net_idr: cogsNet,
-    net_profit_idr: netProfit,
-    net_margin_pct: netMargin,
-  };
+  return { candidates, rawCount: enebaRes.rawCount, rateLimited: enebaRes.rateLimited };
 }
 
 // 4 Lapis Filter, Anti-Hackback Freshness Guard & Composite Trust/Value Scoring Engine (0-100)
@@ -645,7 +713,7 @@ export async function POST(req: NextRequest) {
         status: "success",
         message: `${changedIds.length} game berhasil diperbarui dengan seller pilihan Anda & tersimpan di database!`,
         updated_count: changedIds.length,
-        allGames: catalog,
+        allGames: sortCatalogDeterministically(catalog),
       });
     }
 
@@ -659,22 +727,13 @@ export async function POST(req: NextRequest) {
       const batchPreviews: any[] = [];
 
       for (const game of catalog) {
-        const gameKey = resolveGameKey(game.title);
-        const catLow = String(game.category || "").toLowerCase();
-        const isCdKeyOrLicense =
-          !gameKey &&
-          (catLow.includes("key") ||
-            catLow.includes("cdkey") ||
-            catLow.includes("license") ||
-            String(game.source_marketplace || "").toUpperCase() === "ENEBA" ||
-            String(game.title || "").toLowerCase().includes("windows"));
-
-        if (isCdKeyOrLicense) {
-          const enebaCandidate = await buildEnebaFallbackCandidate(game);
-          if (enebaCandidate) {
+        if (isEnebaCatalogGame(game)) {
+          const enebaRes = await buildEnebaLiveCandidates(game);
+          if (enebaRes.candidates.length > 0) {
+            const bestEneba = enebaRes.candidates[0];
             const sellingPrice = game.selling_price_shopee_idr || 100000;
             const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
-            const totalCost = enebaCandidate.cogs_net_idr + shopeeFee;
+            const totalCost = bestEneba.cogs_net_idr + shopeeFee;
             const netProfit = sellingPrice - totalCost;
             const netMargin =
               sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
@@ -683,42 +742,52 @@ export async function POST(req: NextRequest) {
               batchPreviews.push({
                 game_id: game.id,
                 game_title: game.title,
-                platform: game.platform || "PC / Microsoft",
+                platform: game.platform || bestEneba.offer_title || "Steam",
                 selling_price_shopee_idr: sellingPrice,
                 current_selected_seller_id: game.selected_seller_id,
-                recommended_selected_seller_id: enebaCandidate.seller_id,
-                candidates: [enebaCandidate],
-                filtered_out_clickbait_count: 0,
+                recommended_selected_seller_id: bestEneba.seller_id,
+                candidates: enebaRes.candidates,
+                filtered_out_clickbait_count: Math.max(0, enebaRes.rawCount - enebaRes.candidates.length),
                 filtered_out_non_fresh_count: 0,
-                verified_fresh_count: 1,
+                verified_fresh_count: enebaRes.candidates.length,
                 fresh_fallback_warning: false,
-                clean_candidates_count: 1,
-                total_raw_offers: 1,
+                clean_candidates_count: enebaRes.candidates.length,
+                total_raw_offers: Math.max(enebaRes.rawCount, enebaRes.candidates.length),
               });
             } else {
-              game.sellers = [enebaCandidate];
-              game.selected_seller_id = enebaCandidate.seller_id;
+              game.source_marketplace = "ENEBA";
+              game.sellers = enebaRes.candidates;
+              game.selected_seller_id = bestEneba.seller_id;
               game.target_margin_pct = netMargin;
               game.metrics = {
-                selected_seller: { ...enebaCandidate },
-                cogs_g2g_idr: enebaCandidate.price_g2g_idr,
-                qris_fee_idr: enebaCandidate.qris_fee_idr,
-                cogs_net_idr: enebaCandidate.cogs_net_idr,
+                selected_seller: { ...bestEneba },
+                cogs_g2g_idr: bestEneba.price_g2g_idr,
+                qris_fee_idr: bestEneba.qris_fee_idr,
+                cogs_net_idr: bestEneba.cogs_net_idr,
                 shopee_fee_idr: shopeeFee,
                 packaging_cost_idr: 0,
                 total_cost_idr: totalCost,
                 net_profit_idr: netProfit,
                 net_margin_pct: netMargin,
-                break_even_price_idr: Math.ceil((enebaCandidate.cogs_net_idr + 1000) / (1 - 0.08)),
+                break_even_price_idr: Math.ceil((bestEneba.cogs_net_idr + 1000) / (1 - 0.08)),
               };
               changedIds.push(game.id);
             }
             updatedCount++;
-            logs.push(`🔑 ${game.title}: terhubung ke Eneba Official CD-Key (Rp ${enebaCandidate.price_g2g_idr.toLocaleString("id-ID")}).`);
+            logs.push(
+              `🔑 ${game.title}: ${enebaRes.candidates.length} offer Eneba GLOBAL live ditemukan (termurah Rp ${bestEneba.price_g2g_idr.toLocaleString("id-ID")}).`
+            );
+          } else {
+            logs.push(
+              enebaRes.rateLimited
+                ? `⏳ ${game.title}: Eneba sementara membatasi request (rate-limit 429). Offer Eneba lama dipertahankan.`
+                : `⚠️ ${game.title}: Belum ditemukan offer Global PC yang cocok di Eneba saat ini.`
+            );
           }
           continue;
         }
 
+        const gameKey = resolveGameKey(game.title);
         const slug = gameKey && G2G_CATEGORY_SLUGS[gameKey] ? G2G_CATEGORY_SLUGS[gameKey] : "steam-global-account";
 
         if (slug) {
@@ -809,7 +878,7 @@ export async function POST(req: NextRequest) {
         filtered_out_clickbait_count: totalFilteredClickbait,
         filtered_out_non_fresh_count: totalFilteredNonFresh,
         batch_previews: previewOnly ? batchPreviews : undefined,
-        allGames: catalog,
+        allGames: sortCatalogDeterministically(catalog),
         logs,
       });
     }
@@ -828,30 +897,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const gameKey = resolveGameKey(targetGame.title);
-    const catLow = String(targetGame.category || "").toLowerCase();
-    const isCdKeyOrLicense =
-      !gameKey &&
-      (catLow.includes("key") ||
-        catLow.includes("cdkey") ||
-        catLow.includes("license") ||
-        String(targetGame.source_marketplace || "").toUpperCase() === "ENEBA" ||
-        String(targetGame.title || "").toLowerCase().includes("windows"));
-
-    if (isCdKeyOrLicense) {
-      const enebaCandidate = await buildEnebaFallbackCandidate(targetGame);
-      if (!enebaCandidate) {
+    if (isEnebaCatalogGame(targetGame)) {
+      const enebaRes = await buildEnebaLiveCandidates(targetGame);
+      if (enebaRes.candidates.length === 0) {
         return NextResponse.json({
           status: "warning",
-          message: `Listing CD-Key / License resmi untuk "${targetGame.title}" belum ditemukan di Eneba/CheapShark saat ini.`,
+          message: enebaRes.rateLimited
+            ? `Eneba sementara membatasi pencarian (rate-limit 429) untuk "${targetGame.title}". Tunggu beberapa detik lalu coba lagi — data Eneba Anda tetap dipertahankan.`
+            : `Listing CD-Key / License Region GLOBAL yang sesuai untuk "${targetGame.title}" belum ditemukan di Eneba saat ini.`,
           game: targetGame,
-          allGames: catalog,
+          allGames: sortCatalogDeterministically(catalog),
         });
       }
 
+      const bestEneba = enebaRes.candidates[0];
       const sellingPrice = targetGame.selling_price_shopee_idr || 100000;
       const shopeeFee = Math.round(sellingPrice * 0.08) + 1000;
-      const totalCost = enebaCandidate.cogs_net_idr + shopeeFee;
+      const totalCost = bestEneba.cogs_net_idr + shopeeFee;
       const netProfit = sellingPrice - totalCost;
       const netMargin = sellingPrice > 0 ? Math.round((netProfit / sellingPrice) * 1000) / 10 : 0;
 
@@ -860,45 +922,47 @@ export async function POST(req: NextRequest) {
           status: "success",
           preview_only: true,
           fresh_only: filterFreshOnly,
-          message: `Ditemukan listing resmi Eneba Official CD-Key untuk "${targetGame.title}" (bebas 100% hackback & judul cocok).`,
+          message: `Ditemukan ${enebaRes.candidates.length} offer resmi Eneba GLOBAL untuk "${targetGame.title}" (Steam/Rockstar/GOG/Microsoft • 0% hackback).`,
           game: targetGame,
-          recommended_selected_seller_id: enebaCandidate.seller_id,
-          sellers: [enebaCandidate],
-          filtered_out_clickbait_count: 0,
+          recommended_selected_seller_id: bestEneba.seller_id,
+          sellers: enebaRes.candidates,
+          filtered_out_clickbait_count: Math.max(0, enebaRes.rawCount - enebaRes.candidates.length),
           filtered_out_non_fresh_count: 0,
-          verified_fresh_count: 1,
+          verified_fresh_count: enebaRes.candidates.length,
           fresh_fallback_warning: false,
-          clean_candidates_count: 1,
-          total_raw_offers: 1,
+          clean_candidates_count: enebaRes.candidates.length,
+          total_raw_offers: Math.max(enebaRes.rawCount, enebaRes.candidates.length),
         });
       }
 
-      targetGame.sellers = [enebaCandidate];
-      targetGame.selected_seller_id = enebaCandidate.seller_id;
+      targetGame.source_marketplace = "ENEBA";
+      targetGame.sellers = enebaRes.candidates;
+      targetGame.selected_seller_id = bestEneba.seller_id;
       targetGame.target_margin_pct = netMargin;
       targetGame.metrics = {
-        selected_seller: { ...enebaCandidate },
-        cogs_g2g_idr: enebaCandidate.price_g2g_idr,
-        qris_fee_idr: enebaCandidate.qris_fee_idr,
-        cogs_net_idr: enebaCandidate.cogs_net_idr,
+        selected_seller: { ...bestEneba },
+        cogs_g2g_idr: bestEneba.price_g2g_idr,
+        qris_fee_idr: bestEneba.qris_fee_idr,
+        cogs_net_idr: bestEneba.cogs_net_idr,
         shopee_fee_idr: shopeeFee,
         packaging_cost_idr: 0,
         total_cost_idr: totalCost,
         net_profit_idr: netProfit,
         net_margin_pct: netMargin,
-        break_even_price_idr: Math.ceil((enebaCandidate.cogs_net_idr + 1000) / (1 - 0.08)),
+        break_even_price_idr: Math.ceil((bestEneba.cogs_net_idr + 1000) / (1 - 0.08)),
       };
       await writeAuthoritativeCatalog(catalog, { changedGameIds: [targetGame.id] });
       return NextResponse.json({
         status: "success",
         preview_only: false,
-        message: `Supplier untuk "${targetGame.title}" diperbarui ke Eneba Official CD-Key.`,
+        message: `Supplier untuk "${targetGame.title}" diperbarui ke ${enebaRes.candidates.length} offer Eneba GLOBAL live.`,
         game: targetGame,
-        allGames: catalog,
-        sellers: [enebaCandidate],
+        allGames: sortCatalogDeterministically(catalog),
+        sellers: enebaRes.candidates,
       });
     }
 
+    const gameKey = resolveGameKey(targetGame.title);
     const slug = gameKey && G2G_CATEGORY_SLUGS[gameKey] ? G2G_CATEGORY_SLUGS[gameKey] : "steam-global-account";
 
     const offers = await searchG2GOffersForSlug(slug, targetGame.title);
@@ -985,7 +1049,7 @@ export async function POST(req: NextRequest) {
       preview_only: false,
       message: `Ditemukan ${processed.selectedSellers.length} seller Full Access bersih (${processed.filteredClickbaitCount} listing clickbait/shared diblokir otomatis).`,
       game: targetGame,
-      allGames: catalog,
+      allGames: sortCatalogDeterministically(catalog),
       sellers: processed.selectedSellers,
       filtered_out_clickbait_count: processed.filteredClickbaitCount,
       clean_candidates_count: processed.cleanCandidatesCount,

@@ -22,6 +22,16 @@ export const PACKAGING_COST_IDR = 0; // Pure digital mode = Rp 0; Physical Envel
 let inMemoryCatalogCache: any[] | null = null;
 let lastCacheTimestamp: number = 0;
 
+export function sortCatalogDeterministically<T extends { title?: string; id?: string }>(items: T[]): T[] {
+  return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
+    const titleCmp = String(a?.title || "").localeCompare(String(b?.title || ""), "en", {
+      sensitivity: "base",
+    });
+    if (titleCmp !== 0) return titleCmp;
+    return String(a?.id || "").localeCompare(String(b?.id || ""));
+  });
+}
+
 export interface Seller {
   seller_id: string;
   seller_name: string;
@@ -153,20 +163,22 @@ export async function readAuthoritativeCatalog(): Promise<any[]> {
       // 1. Try relational table first
       const dbData = await getDbCatalog();
       if (dbData && dbData.length > 0) {
-        inMemoryCatalogCache = dbData;
+        const sortedDb = sortCatalogDeterministically(dbData);
+        inMemoryCatalogCache = sortedDb;
         lastCacheTimestamp = Date.now();
         lastStorageSource = "supabase_pg";
         lastStorageError = null;
-        return dbData;
+        return sortedDb;
       }
       // 2. Try KV table if relational is empty
       const kvData = await getKV("active_catalog");
       if (kvData && Array.isArray(kvData) && kvData.length > 0) {
-        inMemoryCatalogCache = kvData;
+        const sortedKv = sortCatalogDeterministically(kvData);
+        inMemoryCatalogCache = sortedKv;
         lastCacheTimestamp = Date.now();
         lastStorageSource = "supabase_kv";
         lastStorageError = null;
-        return kvData;
+        return sortedKv;
       }
       lastStorageSource = "local_fallback";
       lastStorageError = getLastDbError() || "Tabel catalog_games Supabase kosong, memakai fallback.";
@@ -194,14 +206,14 @@ export async function readAuthoritativeCatalog(): Promise<any[]> {
   if (candidates.length > 0) {
     // Sort by count descending so we never regress to an older file with fewer games
     candidates.sort((a, b) => b.data.length - a.data.length);
-    const best = candidates[0].data;
+    const best = sortCatalogDeterministically(candidates[0].data);
     inMemoryCatalogCache = best;
     lastCacheTimestamp = Date.now();
     return best;
   }
 
   if (inMemoryCatalogCache && inMemoryCatalogCache.length > 0) {
-    return inMemoryCatalogCache;
+    return sortCatalogDeterministically(inMemoryCatalogCache);
   }
 
   return [];
@@ -299,21 +311,23 @@ export async function writeAuthoritativeCatalog(
   catalogList: any[],
   options: WriteCatalogOptions = {}
 ): Promise<void> {
-  const sanitizedList = catalogList.map((g) => {
-    const sellers = Array.isArray(g.sellers) ? g.sellers : [];
-    const rawSel = String(g.selected_seller_id || "").trim();
-    const resolvedSel =
-      rawSel && sellers.some((s: any) => s.seller_id === rawSel)
-        ? rawSel
-        : String(sellers[0]?.seller_id || rawSel || "");
-    return {
-      ...g,
-      selling_price_shopee_idr: Math.max(0, Math.round(sanitizeNumber(g.selling_price_shopee_idr, 100000))),
-      target_margin_pct: Math.round(sanitizeNumber(g.target_margin_pct, 25) * 100) / 100,
-      selected_seller_id: resolvedSel,
-      sellers,
-    };
-  });
+  const sanitizedList = sortCatalogDeterministically(
+    catalogList.map((g) => {
+      const sellers = Array.isArray(g.sellers) ? g.sellers : [];
+      const rawSel = String(g.selected_seller_id || "").trim();
+      const resolvedSel =
+        rawSel && sellers.some((s: any) => s.seller_id === rawSel)
+          ? rawSel
+          : String(sellers[0]?.seller_id || rawSel || "");
+      return {
+        ...g,
+        selling_price_shopee_idr: Math.max(0, Math.round(sanitizeNumber(g.selling_price_shopee_idr, 100000))),
+        target_margin_pct: Math.round(sanitizeNumber(g.target_margin_pct, 25) * 100) / 100,
+        selected_seller_id: resolvedSel,
+        sellers,
+      };
+    })
+  );
 
   inMemoryCatalogCache = sanitizedList;
   lastCacheTimestamp = Date.now();
@@ -448,7 +462,8 @@ export async function addOrUpdateGame(incomingGame: any): Promise<{ item: Catalo
   // Send Telegram Bot notification with verified product link
   notifyTelegramCatalogEvent(targetItem).catch(() => {});
 
-  const enrichedAll = catalog.map(calculateItemMetrics);
+  const sortedCatalog = sortCatalogDeterministically(catalog);
+  const enrichedAll = sortedCatalog.map(calculateItemMetrics);
   const enrichedItem = calculateItemMetrics(targetItem);
 
   return { item: enrichedItem, allGames: enrichedAll };
@@ -520,13 +535,13 @@ export async function bulkAddOrUpdateGames(incomingGames: any[]): Promise<{ impo
   }
 
   await writeAuthoritativeCatalog(catalog, { changedGameIds: changedIds });
-  const enrichedAll = catalog.map(calculateItemMetrics);
+  const enrichedAll = sortCatalogDeterministically(catalog).map(calculateItemMetrics);
   return { importedCount: count, allGames: enrichedAll };
 }
 
 export async function deleteGameFromCatalog(gameId: string): Promise<CatalogGame[]> {
   const catalog = await readAuthoritativeCatalog();
-  const next = catalog.filter((g) => g.id !== gameId);
+  const next = sortCatalogDeterministically(catalog.filter((g) => g.id !== gameId));
   if (isDbConfigured()) {
     await deleteDbGame(gameId);
   }

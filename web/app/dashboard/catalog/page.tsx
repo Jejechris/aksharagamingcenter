@@ -203,11 +203,16 @@ export default function CatalogDashboardPage() {
   const [drawerDetectedStock, setDrawerDetectedStock] = useState<number | null>(null);
   const [drawerDetectedUrl, setDrawerDetectedUrl] = useState<string | null>(null);
 
-  // Synchronize state & localStorage cleanly without redundant server writes
+  // Synchronize state & localStorage cleanly with deterministic alphabetical order (never shuffles on edit)
   const updateCatalogState = (nextGames: CatalogGame[]) => {
-    setGames(nextGames);
+    const sorted = [...nextGames].sort((a, b) => {
+      const titleCmp = String(a?.title || '').localeCompare(String(b?.title || ''), 'en', { sensitivity: 'base' });
+      if (titleCmp !== 0) return titleCmp;
+      return String(a?.id || '').localeCompare(String(b?.id || ''));
+    });
+    setGames(sorted);
     try {
-      localStorage.setItem('akshara_custom_catalog_v3', JSON.stringify(nextGames));
+      localStorage.setItem('akshara_custom_catalog_v3', JSON.stringify(sorted));
     } catch (e) {}
   };
 
@@ -854,13 +859,19 @@ export default function CatalogDashboardPage() {
   };
 
   const filteredGames = useMemo(() => {
-    return games.filter(g => {
-      const matchesSearch = g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            g.platform.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            g.sellers.some(s => s.seller_name.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesPlatform = selectedPlatform === 'ALL' || g.platform.toLowerCase().includes(selectedPlatform.toLowerCase());
-      return matchesSearch && matchesPlatform;
-    });
+    return games
+      .filter(g => {
+        const matchesSearch = g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              g.platform.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              g.sellers.some(s => s.seller_name.toLowerCase().includes(searchQuery.toLowerCase()));
+        const matchesPlatform = selectedPlatform === 'ALL' || g.platform.toLowerCase().includes(selectedPlatform.toLowerCase());
+        return matchesSearch && matchesPlatform;
+      })
+      .sort((a, b) => {
+        const titleCmp = String(a?.title || '').localeCompare(String(b?.title || ''), 'en', { sensitivity: 'base' });
+        if (titleCmp !== 0) return titleCmp;
+        return String(a?.id || '').localeCompare(String(b?.id || ''));
+      });
   }, [games, searchQuery, selectedPlatform]);
 
   const portfolioStats = useMemo(() => {
@@ -1091,8 +1102,8 @@ export default function CatalogDashboardPage() {
         </div>
 
         {/* SEARCH & PLATFORM FILTERS */}
-        <div className="flex flex-col md:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
+        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+          <div className="relative w-full md:flex-1 md:min-w-[240px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -1102,7 +1113,7 @@ export default function CatalogDashboardPage() {
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 shadow-sm transition-all"
             />
           </div>
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200/60 w-full md:w-auto min-w-0">
+          <div className="flex flex-wrap items-center gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200/60 w-full sm:w-auto min-w-0">
             {['ALL', 'Steam', 'Microsoft', 'Rockstar', 'EA', 'Trade'].map((plat) => (
               <button
                 key={plat}

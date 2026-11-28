@@ -63,7 +63,15 @@ export async function fetchSmartCatalog(): Promise<any[]> {
   }
 
   // Server DB (/api/catalog) is authoritative whenever reachable and non-empty so deleted games/sellers never resurrect from localStorage
-  const finalList = (serverGames.length > 0 ? serverGames : localGames).map(sanitizeGameUrls);
+  const finalList = (serverGames.length > 0 ? serverGames : localGames)
+    .map(sanitizeGameUrls)
+    .sort((a: any, b: any) => {
+      const titleCmp = String(a?.title || "").localeCompare(String(b?.title || ""), "en", {
+        sensitivity: "base",
+      });
+      if (titleCmp !== 0) return titleCmp;
+      return String(a?.id || "").localeCompare(String(b?.id || ""));
+    });
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem("akshara_custom_catalog_v3", JSON.stringify(finalList));

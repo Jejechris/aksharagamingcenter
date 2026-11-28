@@ -70,7 +70,7 @@ export async function getDbCatalog(): Promise<any[] | null> {
   if (!isDbConfigured()) return null;
   try {
     const rows = await queryDb(
-      "SELECT id, title, platform, category, selling_price_shopee_idr, target_margin_pct, status, selected_seller_id, sellers FROM catalog_games ORDER BY updated_at DESC"
+      "SELECT id, title, platform, category, selling_price_shopee_idr, target_margin_pct, status, selected_seller_id, sellers FROM catalog_games ORDER BY LOWER(title) ASC, id ASC"
     );
     if (rows && rows.length > 0) {
       return rows.map((r: any) => ({
